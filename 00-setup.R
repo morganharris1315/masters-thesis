@@ -26,4 +26,27 @@ coromandel_raw_dir   <- glue("{base_raw_dir}/coromandel_raw")
 far_north_raw_dir    <- glue("{base_raw_dir}/far_north_raw")
 top_of_south_raw_dir <- glue("{base_raw_dir}/top_of_south_raw")
 waikato_raw_dir      <- glue("{base_raw_dir}/waikato_raw")
+model_data_dir       <- glue("{base_raw_dir}/model_data")
+
+theme_thesis <- theme_minimal(base_size = 9) +
+  theme(
+    plot.title   = element_text(size = 9, face = "bold", hjust = 0.5),
+    axis.title   = element_text(size = 9),
+    axis.text    = element_text(size = 7),
+    strip.text   = element_text(size = 8, face = "bold"),
+    legend.title = element_text(size = 8),
+    legend.text  = element_text(size = 7),
+    panel.spacing = unit(0.5, "lines")
+  )
+
+fig_width_full  <- 6.7
+fig_height_short <- 3.8
+fig_height_med   <- 4.8
+fig_height_tall  <- 6.2
+
+fig_width_hoz_full  <- 11
+fig_height_hoz_full <- 7.2
+
+fig_width_hoz_half  <- 8.5
+fig_height_hoz_half <- 6
 
