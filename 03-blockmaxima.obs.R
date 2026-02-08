@@ -1,12 +1,12 @@
 # -------------------------------------------------------------------------
-# 03-blockmaxima.R
+# 03-blockmaxima-obs.R
 # -------------------------------------------------------------------------
-# Nov 2025
+# Jan 2026
 # comparing blockmaxima to all in hydrological year.
 # -------------------------------------------------------------------------
 
 # Filter Tairua Forest ----------------------------------------------------
-tairua_forest_df <- combined_df %>%
+tairua_forest_df <- combined_df_obs %>%
   filter(station == "Tairua Forest") %>%
   select(observation_date, rainfall_mm, hydro_year)
 
@@ -134,7 +134,7 @@ p_tairua_forest <- ggplot(tairua_forest_rx1day_df, aes(x = hydro_year, y = RX1da
 p_tairua_forest
 
 # Filter Chiltern ----------------------------------------------------
-chiltern_df <- combined_df %>%
+chiltern_df <- combined_df_obs %>%
   filter(station == "Chiltern") %>%
   select(observation_date, rainfall_mm, hydro_year)
 
