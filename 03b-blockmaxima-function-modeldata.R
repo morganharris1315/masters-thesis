@@ -277,12 +277,28 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       vjust = 0,
       colour = "black"
     ) +
+    geom_vline(
+      xintercept = c(0.5, exceed_max + 0.5),
+      colour = "grey45",
+      linewidth = 0.35
+    ) +
+    geom_hline(
+      yintercept = c(0, rx1day_max * 1.1),
+      colour = "grey45",
+      linewidth = 0.35
+    ) +
     facet_grid(Region ~ Period, switch = "y") +
     scale_x_discrete(limits = as.character(0:exceed_max)) +
     scale_y_continuous(limits = c(0, rx1day_max * 1.1)) +
     labs(x = "Number of exceedances per year", y = "RX1day (mm)", title = "RX1day vs Exceedances") +
-    theme(strip.placement = "outside") +
-    theme_thesis
+    theme_thesis +
+    theme(
+      strip.placement = "outside",
+      strip.text.y.left = element_text(angle = 0, hjust = 0),
+      panel.spacing = unit(1.1, "lines"),
+      panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
+      axis.line = element_line(colour = "grey35", linewidth = 0.3)
+    )
 }
 
 # Save helper --------------------------------------------------------------
