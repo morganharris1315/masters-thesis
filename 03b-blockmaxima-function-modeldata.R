@@ -216,12 +216,34 @@ build_boxplot_panel_df <- function(regions_mod, thr_list) {
 
 plot_rx1day_vs_exceedance_panel <- function(df_panel) {
   group_counts <- df_panel %>% count(Region, Period, exceedances, name = "n")
+  period_totals <- df_panel %>% count(Region, Period, name = "total_years")
   
   df_box <- df_panel %>% left_join(group_counts, by = c("Region", "Period", "exceedances")) %>% filter(n >= 10)
   df_dot_only <- df_panel %>% left_join(group_counts, by = c("Region", "Period", "exceedances")) %>% filter(n < 10)
+
+  box_stats <- df_box %>%
+    group_by(Region, Period, exceedances) %>%
+    summarise(
+      q1 = quantile(RX1day, 0.25, na.rm = TRUE),
+      q3 = quantile(RX1day, 0.75, na.rm = TRUE),
+      iqr = IQR(RX1day, na.rm = TRUE),
+      upper_whisker = max(RX1day[RX1day <= q3 + 1.5 * iqr], na.rm = TRUE),
+      .groups = "drop"
+    )
+
+  df_box_dots_above <- df_box %>%
+    left_join(box_stats, by = c("Region", "Period", "exceedances")) %>%
+    filter(RX1day > upper_whisker)
   
   exceed_max <- max(df_panel$exceedances, na.rm = TRUE)
   rx1day_max <- max(df_panel$RX1day, na.rm = TRUE)
+
+  pct_labels <- group_counts %>%
+    left_join(period_totals, by = c("Region", "Period")) %>%
+    mutate(
+      pct_label = paste0(round(100 * n / total_years, 1), "%"),
+      y = rx1day_max * 1.03
+    )
   
   ggplot() +
     geom_boxplot(
@@ -233,7 +255,7 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       outlier.shape = NA
     ) +
     geom_jitter(
-      data = df_box,
+      data = df_box_dots_above,
       aes(x = factor(exceedances), y = RX1day),
       width = 0.12,
       alpha = 0.35,
@@ -248,10 +270,18 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       colour = box_colour,
       size = 1.5
     ) +
-    facet_grid(Region ~ Period) +
+    geom_text(
+      data = pct_labels,
+      aes(x = factor(exceedances), y = y, label = pct_label),
+      size = 2.5,
+      vjust = 0,
+      colour = "black"
+    ) +
+    facet_grid(Region ~ Period, switch = "y") +
     scale_x_discrete(limits = as.character(0:exceed_max)) +
-    scale_y_continuous(limits = c(0, rx1day_max * 1.05)) +
+    scale_y_continuous(limits = c(0, rx1day_max * 1.1)) +
     labs(x = "Number of exceedances per year", y = "RX1day (mm)", title = "RX1day vs Exceedances") +
+    theme(strip.placement = "outside") +
     theme_thesis
 }
 
@@ -402,4 +432,3 @@ write.csv(
   file.path(model_data_dir, "rx1day_single_threshold_cumulative_exceedance.csv"),
   row.names = FALSE
 )
-
