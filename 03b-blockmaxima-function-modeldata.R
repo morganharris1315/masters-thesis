@@ -174,23 +174,46 @@ build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
 plot_hist_exceedances <- function(hist_df_prop) {
   region_title <- unique(hist_df_prop$Region)
   day_breaks <- seq(min(hist_df_prop$days, na.rm = TRUE), max(hist_df_prop$days, na.rm = TRUE), by = 1)
+  x_label_df <- hist_df_prop %>%
+    distinct(Period) %>%
+    mutate(
+      days = mean(day_breaks),
+      prop_years = 0,
+      x_label = "Number of exceedance days per year"
+    )
   
   ggplot(hist_df_prop, aes(x = days, y = prop_years)) +
     geom_col(width = 0.9, fill = box_colour) +
+    geom_text(
+      data = x_label_df,
+      aes(x = days, y = prop_years, label = x_label),
+      vjust = 3.2,
+      size = 4.2,
+      inherit.aes = FALSE
+    ) +
     facet_grid(. ~ Period) +
     scale_x_continuous(breaks = day_breaks) +
+    scale_y_continuous(
+      limits = c(0, NA),
+      expand = expansion(mult = c(0, 0.02))
+    ) +
     labs(
       title = region_title,
-      x = "Number of exceedance days per year",
+      x = NULL,
       y = "Proportion of years"
     ) +
+    coord_cartesian(clip = "off") +
     theme_thesis +
     theme_model_axes +
     theme(
       panel.grid.major = element_line(colour = "grey82", linewidth = 0.3),
       panel.grid.minor = element_blank(),
-      panel.border = element_blank(),
-      axis.line = element_line(colour = "black", linewidth = 0.3)
+      axis.ticks = element_blank(),
+      panel.background = element_rect(fill = "white", colour = NA),
+      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.3),
+      axis.line = element_line(colour = "black", linewidth = 0.3),
+      plot.background = element_rect(colour = "black", fill = "white", linewidth = 0.3),
+      plot.margin = margin(8, 10, 24, 8)
     )
 }
 
@@ -357,7 +380,8 @@ save_plot <- function(plot, filename, width = fig_width_full, height = fig_heigh
     plot = plot,
     width = width,
     height = height,
-    dpi = 300
+    dpi = 300,
+    bg = "white"
   )
 }
 
