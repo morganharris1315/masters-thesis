@@ -112,12 +112,12 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
 
   plot_df <- bind_rows(
     df_CD %>% select(Year, RX1day) %>% mutate(Period = "Current Day"),
-    df_FP %>% select(Year, RX1day) %>% mutate(Period = "Future Prediction")
+    df_FP %>% select(Year, RX1day) %>% mutate(Period = "Future Projection")
   ) %>%
-    mutate(Period = factor(Period, levels = c("Current Day", "Future Prediction")))
+    mutate(Period = factor(Period, levels = c("Current Day", "Future Projection")))
 
   threshold_df <- data.frame(
-    Period = factor(c("Current Day", "Future Prediction"), levels = c("Current Day", "Future Prediction")),
+    Period = factor(c("Current Day", "Future Projection"), levels = c("Current Day", "Future Projection")),
     threshold = c(thr_cd$threshold, thr_fp$threshold)
   )
 
@@ -130,7 +130,7 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
       linewidth = 1.1,
       inherit.aes = FALSE
     ) +
-    facet_grid(rows = vars(Period)) +
+    facet_grid(cols = vars(Period), scales = "free_x") +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(limits = y_limits, expand = expansion(mult = c(0, 0.02))) +
     scale_colour_manual(values = c("Threshold" = box_colour), labels = c("Threshold" = paste(label, collapse = "\n"))) +
@@ -143,7 +143,8 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
     theme_thesis +
     theme_model_axes +
     theme(
-      strip.text.y = element_text(angle = 0)
+      strip.placement = "outside",
+      strip.text.x = element_text(face = "bold")
     )
 }
 
