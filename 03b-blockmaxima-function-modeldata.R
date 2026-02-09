@@ -334,6 +334,7 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
     theme_thesis +
     theme(
       strip.placement = "outside",
+      strip.text.y = element_text(angle = 0, hjust = 0.5),
       strip.text.y.left = element_text(angle = 0, hjust = 0),
       panel.spacing = unit(1.1, "lines"),
       panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
