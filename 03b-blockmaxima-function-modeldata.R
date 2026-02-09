@@ -173,17 +173,25 @@ build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
 
 plot_hist_exceedances <- function(hist_df_prop) {
   region_title <- unique(hist_df_prop$Region)
+  day_breaks <- seq(min(hist_df_prop$days, na.rm = TRUE), max(hist_df_prop$days, na.rm = TRUE), by = 1)
   
   ggplot(hist_df_prop, aes(x = days, y = prop_years)) +
     geom_col(width = 0.9, fill = box_colour) +
     facet_grid(. ~ Period) +
+    scale_x_continuous(breaks = day_breaks) +
     labs(
       title = region_title,
       x = "Number of exceedance days per year",
       y = "Proportion of years"
     ) +
     theme_thesis +
-    theme_model_axes
+    theme_model_axes +
+    theme(
+      panel.grid.major = element_line(colour = "grey82", linewidth = 0.3),
+      panel.grid.minor = element_blank(),
+      panel.border = element_blank(),
+      axis.line = element_line(colour = "black", linewidth = 0.3)
+    )
 }
 
 # Example years ------------------------------------------------------------
