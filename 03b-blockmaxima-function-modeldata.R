@@ -286,7 +286,12 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
   pct_labels <- group_counts %>%
     left_join(period_totals, by = c("Region", "Period")) %>%
     mutate(
-      pct_label = paste0(round(100 * n / total_years, 1), "%"),
+      pct = 100 * n / total_years,
+      pct_label = case_when(
+        pct == 0 ~ "0%",
+        pct < 0.1 ~ "<0.1%",
+        TRUE ~ paste0(round(pct, 1), "%")
+      ),
       y = rx1day_max * 1.03
     )
   
