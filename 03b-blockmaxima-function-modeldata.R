@@ -188,7 +188,7 @@ plot_hist_exceedances <- function(hist_df_prop) {
       data = x_label_df,
       aes(x = days, y = prop_years, label = x_label),
       vjust = 3.2,
-      size = 4.2,
+      size = 3.2,
       inherit.aes = FALSE
     ) +
     facet_grid(. ~ Period) +
@@ -209,9 +209,9 @@ plot_hist_exceedances <- function(hist_df_prop) {
       panel.grid.major = element_line(colour = "grey82", linewidth = 0.3),
       panel.grid.minor = element_blank(),
       axis.ticks = element_blank(),
-      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.3),
-      axis.line = element_line(colour = "black", linewidth = 0.3),
-      plot.background = element_rect(colour = "black", fill = NA, linewidth = 0.3),
+      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.2),
+      axis.line = element_line(colour = "black", linewidth = 0.2),
+      plot.background = element_rect(colour = "black", fill = NA, linewidth = 0.2),
       plot.margin = margin(8, 10, 24, 8)
     )
 }
