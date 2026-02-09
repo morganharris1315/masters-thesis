@@ -209,10 +209,9 @@ plot_hist_exceedances <- function(hist_df_prop) {
       panel.grid.major = element_line(colour = "grey82", linewidth = 0.3),
       panel.grid.minor = element_blank(),
       axis.ticks = element_blank(),
-      panel.background = element_rect(fill = "white", colour = NA),
       panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.3),
       axis.line = element_line(colour = "black", linewidth = 0.3),
-      plot.background = element_rect(colour = "black", fill = "white", linewidth = 0.3),
+      plot.background = element_rect(colour = "black", fill = NA, linewidth = 0.3),
       plot.margin = margin(8, 10, 24, 8)
     )
 }
