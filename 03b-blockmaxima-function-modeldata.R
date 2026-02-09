@@ -75,24 +75,6 @@ thr_list <- list(
   milford_FP = calculate_rx1day_threshold(milford_FP)
 )
 
-format_percent_label <- function(proportion) {
-  percent_value <- proportion * 100
-  if (percent_value > 0 && percent_value < 0.1) {
-    return("<0.1%")
-  }
-  paste0(round(percent_value, 1), "%")
-}
-
-threshold_label <- function(thr) {
-  paste0(
-    "2/3 RX1day-above threshold (",
-    round(thr$threshold, 1),
-    " mm, ",
-    format_percent_label(thr$proportion),
-    ")"
-  )
-}
-
 theme_model_axes <- theme(
   panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(),
@@ -105,10 +87,6 @@ theme_model_axes <- theme(
 plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) {
   thr_cd <- thr_list[[paste0(region_name, "_CD")]]
   thr_fp <- thr_list[[paste0(region_name, "_FP")]]
-  label <- c(
-    paste0("Current Day: ", threshold_label(thr_cd)),
-    paste0("Future Projection: ", threshold_label(thr_fp))
-  )
 
   plot_df <- bind_rows(
     df_CD %>% select(Year, RX1day) %>% mutate(Period = "Current Day"),
@@ -125,7 +103,8 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
     geom_line(colour = "black", linewidth = 0.35) +
     geom_hline(
       data = threshold_df,
-      aes(yintercept = threshold, colour = "Threshold"),
+      aes(yintercept = threshold),
+      colour = box_colour,
       linetype = "dashed",
       linewidth = 1.1,
       inherit.aes = FALSE
@@ -133,12 +112,10 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
     facet_grid(cols = vars(Period), scales = "free_x") +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(limits = y_limits, expand = expansion(mult = c(0, 0.02))) +
-    scale_colour_manual(values = c("Threshold" = box_colour), labels = c("Threshold" = paste(label, collapse = "\n"))) +
     labs(
       title = region_labels[[region_name]],
       x = "Year",
-      y = "RX1day (mm)",
-      colour = "Threshold"
+      y = "RX1day (mm)"
     ) +
     theme_thesis +
     theme_model_axes +
@@ -432,15 +409,15 @@ threshold_summary_table <- bind_rows(lapply(names(thr_list), function(name) {
   data.frame(
     Region = region_labels[[parts[1]]],
     Period = period_labels[[parts[2]]],
-    Threshold_definition = "2/3 RX1day-above",
-    Threshold_mm = thr_list[[name]]$threshold,
-    Proportion_of_days_exceeding = thr_list[[name]]$proportion
+    Threshold_level = "2/3 RX1day-above threshold",
+    Threshold_mm = round(thr_list[[name]]$threshold, 1),
+    Daily_rainfall_above_threshold_percent = round(thr_list[[name]]$proportion * 100, 2)
   )
 }))
 
 write.csv(
   threshold_summary_table,
-  file.path(model_data_dir, "rx1day_single_threshold_summary.csv"),
+  file.path(model_data_dir, "rx1day_threshold_levels_daily_rainfall_above_threshold_percent.csv"),
   row.names = FALSE
 )
 
