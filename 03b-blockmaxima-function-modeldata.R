@@ -49,15 +49,15 @@ box_colour <- "#6A5ACD"
 calculate_rx1day_threshold <- function(df) {
   rx <- df$RX1day
   threshold <- as.numeric(quantile(rx, probs = 1 / 3, na.rm = TRUE, type = 7))
-
+  
   daily_vec <- df %>%
     select(1:360) %>%
     as.matrix() %>%
     as.numeric()
-
+  
   n_days <- sum(!is.na(daily_vec))
   prop_exceed <- sum(daily_vec > threshold, na.rm = TRUE) / n_days
-
+  
   list(
     threshold = threshold,
     proportion = prop_exceed
@@ -89,7 +89,7 @@ threshold_label <- function(thr) {
 plot_rx1day <- function(df, region_scenario, y_limits, thr_list) {
   thr <- thr_list[[region_scenario]]
   label <- threshold_label(thr)
-
+  
   ggplot(df, aes(x = Year, y = RX1day)) +
     geom_linerange(aes(ymin = 0, ymax = RX1day), colour = "black", alpha = 0.7) +
     geom_point(colour = "black", size = 1.1) +
@@ -115,12 +115,12 @@ count_exceedances_per_year <- function(df, threshold) {
 build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
   thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
   thr_FP <- thr_list[[paste0(region_name, "_FP")]]$threshold
-
+  
   hist_df <- bind_rows(
     data.frame(days = count_exceedances_per_year(df_CD, thr_CD), Period = "Current Day"),
     data.frame(days = count_exceedances_per_year(df_FP, thr_FP), Period = "Future Projection")
   )
-
+  
   hist_df %>%
     count(Period, days) %>%
     group_by(Period) %>%
@@ -131,7 +131,7 @@ build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
 
 plot_hist_exceedances <- function(hist_df_prop) {
   region_title <- unique(hist_df_prop$Region)
-
+  
   ggplot(hist_df_prop, aes(x = days, y = prop_years)) +
     geom_col(width = 0.9, fill = box_colour) +
     facet_grid(Period ~ .) +
@@ -154,15 +154,15 @@ extract_daily_timeseries <- function(df, year) {
 
 select_example_years <- function(df, threshold) {
   exceed <- count_exceedances_per_year(df, threshold)
-
+  
   summary_df <- df %>%
     select(Year, RX1day) %>%
     mutate(exceedances = exceed)
-
+  
   muted_year <- summary_df %>% filter(exceedances == 0) %>% arrange(RX1day) %>% slice(1) %>% pull(Year)
   single_year <- summary_df %>% filter(exceedances == 1) %>% arrange(desc(RX1day)) %>% slice(1) %>% pull(Year)
   high_year <- summary_df %>% arrange(desc(exceedances), desc(RX1day)) %>% slice(1) %>% pull(Year)
-
+  
   list(muted = muted_year, single = single_year, high = high_year)
 }
 
@@ -173,7 +173,7 @@ compute_y_max <- function(df, years, buffer = 10) {
 
 plot_daily_example <- function(df, year, threshold, title, y_max, y_lab = "") {
   ts_df <- extract_daily_timeseries(df, year)
-
+  
   ggplot(ts_df, aes(x = day, y = rainfall_mm)) +
     geom_segment(aes(xend = day, y = 0, yend = rainfall_mm), colour = "black", alpha = 0.5) +
     geom_point(size = 0.7, colour = "black") +
@@ -186,11 +186,11 @@ plot_daily_example <- function(df, year, threshold, title, y_max, y_lab = "") {
 plot_exceedance_examples <- function(df, region, period_label, threshold) {
   years <- select_example_years(df, threshold)
   y_max <- compute_y_max(df, years)
-
+  
   p_muted <- plot_daily_example(df, years$muted, threshold, paste0("Muted Year (", years$muted, ")"), y_max, "Daily Rainfall (mm)")
   p_single <- plot_daily_example(df, years$single, threshold, paste0("Single Exceedance Year (", years$single, ")"), y_max)
   p_high <- plot_daily_example(df, years$high, threshold, paste0("High Exceedance Year (", years$high, ")"), y_max)
-
+  
   (p_muted + p_single + p_high) +
     plot_annotation(title = paste(region, "–", period_label),
                     theme = theme(plot.title = element_text(hjust = 0.5, size = 9, face = "bold")))
@@ -203,7 +203,7 @@ build_boxplot_panel_df <- function(regions_mod, thr_list) {
       df <- get(paste0(reg, "_", period))
       threshold <- thr_list[[paste0(reg, "_", period)]]$threshold
       exceedances <- count_exceedances_per_year(df, threshold)
-
+      
       data.frame(
         Region = region_labels[[reg]],
         Period = period_labels[[period]],
@@ -216,13 +216,13 @@ build_boxplot_panel_df <- function(regions_mod, thr_list) {
 
 plot_rx1day_vs_exceedance_panel <- function(df_panel) {
   group_counts <- df_panel %>% count(Region, Period, exceedances, name = "n")
-
+  
   df_box <- df_panel %>% left_join(group_counts, by = c("Region", "Period", "exceedances")) %>% filter(n >= 10)
   df_dot_only <- df_panel %>% left_join(group_counts, by = c("Region", "Period", "exceedances")) %>% filter(n < 10)
-
+  
   exceed_max <- max(df_panel$exceedances, na.rm = TRUE)
   rx1day_max <- max(df_panel$RX1day, na.rm = TRUE)
-
+  
   ggplot() +
     geom_boxplot(
       data = df_box,
@@ -270,11 +270,11 @@ save_plot <- function(plot, filename, width = fig_width_full, height = fig_heigh
 for (reg in regions_mod) {
   y_max <- max(get(paste0(reg, "_CD"))$RX1day, get(paste0(reg, "_FP"))$RX1day, na.rm = TRUE)
   y_limits <- c(0, y_max * 1.05)
-
+  
   p_cd <- plot_rx1day(get(paste0(reg, "_CD")), paste0(reg, "_CD"), y_limits, thr_list)
   p_fp <- plot_rx1day(get(paste0(reg, "_FP")), paste0(reg, "_FP"), y_limits, thr_list)
   save_plot(p_cd / p_fp, paste0(reg, "_rx1day_timeseries_combined.png"), height = fig_height_med)
-
+  
   p_ex_cd <- plot_exceedance_examples(
     get(paste0(reg, "_CD")),
     region_labels[[reg]],
@@ -289,7 +289,7 @@ for (reg in regions_mod) {
   )
   save_plot(p_ex_cd, paste0(reg, "_threshold_cd_examples.png"), height = fig_height_short)
   save_plot(p_ex_fp, paste0(reg, "_threshold_fp_examples.png"), height = fig_height_short)
-
+  
   hist_df <- build_hist_df(reg, thr_list, get(paste0(reg, "_CD")), get(paste0(reg, "_FP")))
   save_plot(plot_hist_exceedances(hist_df), paste0(reg, "_exceedance_threshold_cd_fp_histogram.png"), height = fig_height_med)
 }
@@ -297,3 +297,109 @@ for (reg in regions_mod) {
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)
 panel_plot <- plot_rx1day_vs_exceedance_panel(panel_df)
 save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = fig_width_hoz_full, height = fig_height_hoz_full)
+
+
+# Threshold summary table -------------------------------------------------
+
+threshold_summary_table <- bind_rows(lapply(names(thr_list), function(name) {
+  
+  parts <- strsplit(name, "_")[[1]]
+  
+  data.frame(
+    Region = region_labels[[parts[1]]],
+    Period = period_labels[[parts[2]]],
+    Threshold_definition = "2/3 RX1day-above",
+    Threshold_mm = thr_list[[name]]$threshold,
+    Proportion_of_days_exceeding = thr_list[[name]]$proportion
+  )
+}))
+
+write.csv(
+  threshold_summary_table,
+  file.path(model_data_dir, "rx1day_single_threshold_summary.csv"),
+  row.names = FALSE
+)
+
+
+# Mean exceedances per year (CD vs FP) ------------------------------------
+
+build_mean_exceedance_table <- function(region_name, thr_list, df_CD, df_FP) {
+  
+  thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
+  thr_FP <- thr_list[[paste0(region_name, "_FP")]]$threshold
+  
+  mean_CD <- mean(count_exceedances_per_year(df_CD, thr_CD), na.rm = TRUE)
+  mean_FP <- mean(count_exceedances_per_year(df_FP, thr_FP), na.rm = TRUE)
+  
+  data.frame(
+    Region = region_labels[[region_name]],
+    Mean_exceedances_CD = mean_CD,
+    Mean_exceedances_FP = mean_FP,
+    Absolute_change = mean_FP - mean_CD,
+    Relative_change = mean_FP / mean_CD
+  )
+}
+
+mean_exceedance_summary <- bind_rows(lapply(regions_mod, function(reg) {
+  build_mean_exceedance_table(
+    reg,
+    thr_list,
+    get(paste0(reg, "_CD")),
+    get(paste0(reg, "_FP"))
+  )
+}))
+
+write.csv(
+  mean_exceedance_summary,
+  file.path(model_data_dir, "rx1day_single_threshold_mean_exceedances.csv"),
+  row.names = FALSE
+)
+
+
+# Cumulative exceedance probability table ---------------------------------
+
+build_cumulative_exceedance_table <- function(region_name, thr_list, df_CD, df_FP) {
+  
+  thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
+  thr_FP <- thr_list[[paste0(region_name, "_FP")]]$threshold
+  
+  bind_rows(
+    data.frame(
+      exceedances = count_exceedances_per_year(df_CD, thr_CD),
+      Period = "Current Day"
+    ),
+    data.frame(
+      exceedances = count_exceedances_per_year(df_FP, thr_FP),
+      Period = "Future Projection"
+    )
+  ) %>%
+    count(Period, exceedances) %>%
+    group_by(Period) %>%
+    mutate(Proportion_years = n / sum(n)) %>%
+    ungroup() %>%
+    pivot_wider(
+      names_from = Period,
+      values_from = Proportion_years
+    ) %>%
+    mutate(
+      Region = region_labels[[region_name]],
+      FP_over_CD = `Future Projection` / `Current Day`
+    ) %>%
+    relocate(Region, exceedances)
+}
+
+cumulative_exceedance_table <- bind_rows(lapply(regions_mod, function(reg) {
+  build_cumulative_exceedance_table(
+    reg,
+    thr_list,
+    get(paste0(reg, "_CD")),
+    get(paste0(reg, "_FP"))
+  )
+}))
+
+write.csv(
+  cumulative_exceedance_table,
+  file.path(model_data_dir, "rx1day_single_threshold_cumulative_exceedance.csv"),
+  row.names = FALSE
+)
+
