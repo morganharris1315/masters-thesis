@@ -75,15 +75,31 @@ thr_list <- list(
   milford_FP = calculate_rx1day_threshold(milford_FP)
 )
 
+format_percent_label <- function(proportion) {
+  percent_value <- proportion * 100
+  if (percent_value > 0 && percent_value < 0.1) {
+    return("<0.1%")
+  }
+  paste0(round(percent_value, 1), "%")
+}
+
 threshold_label <- function(thr) {
   paste0(
     "2/3 RX1day-above threshold (",
     round(thr$threshold, 1),
     " mm, ",
-    round(thr$proportion * 100, 2),
-    "%)"
+    format_percent_label(thr$proportion),
+    ")"
   )
 }
+
+theme_model_axes <- theme(
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  axis.line = element_line(colour = "black", linewidth = 0.3),
+  axis.ticks = element_line(colour = "black", linewidth = 0.3),
+  panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.3)
+)
 
 # Time series of annual RX1day --------------------------------------------
 plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) {
@@ -115,7 +131,8 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
       inherit.aes = FALSE
     ) +
     facet_grid(rows = vars(Period)) +
-    scale_y_continuous(limits = y_limits) +
+    scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+    scale_y_continuous(limits = y_limits, expand = expansion(mult = c(0, 0.02))) +
     scale_colour_manual(values = c("Threshold" = box_colour), labels = c("Threshold" = paste(label, collapse = "\n"))) +
     labs(
       title = region_labels[[region_name]],
@@ -124,6 +141,7 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
       colour = "Threshold"
     ) +
     theme_thesis +
+    theme_model_axes +
     theme(
       strip.text.y = element_text(angle = 0)
     )
@@ -164,7 +182,8 @@ plot_hist_exceedances <- function(hist_df_prop) {
       x = "Number of exceedance days per year",
       y = "Proportion of years"
     ) +
-    theme_thesis
+    theme_thesis +
+    theme_model_axes
 }
 
 # Example years ------------------------------------------------------------
@@ -202,9 +221,11 @@ plot_daily_example <- function(df, year, threshold, title, y_max, y_lab = "") {
     geom_segment(aes(xend = day, y = 0, yend = rainfall_mm), colour = "black", alpha = 0.5) +
     geom_point(size = 0.7, colour = "black") +
     geom_hline(yintercept = threshold, linetype = "dashed", colour = box_colour, size = 1.1) +
-    scale_y_continuous(limits = c(0, y_max)) +
+    scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+    scale_y_continuous(limits = c(0, y_max), expand = expansion(mult = c(0, 0.02))) +
     labs(title = title, x = "Day of Year", y = y_lab) +
-    theme_thesis
+    theme_thesis +
+    theme_model_axes
 }
 
 plot_exceedance_examples <- function(df, region, period_label, threshold) {
