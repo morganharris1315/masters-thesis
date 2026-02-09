@@ -379,7 +379,8 @@ save_plot <- function(plot, filename, width = fig_width_full, height = fig_heigh
     plot = plot,
     width = width,
     height = height,
-    dpi = 300
+    dpi = 300,
+    bg = "white"
   )
 }
 
