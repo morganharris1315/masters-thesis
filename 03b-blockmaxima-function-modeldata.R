@@ -86,23 +86,47 @@ threshold_label <- function(thr) {
 }
 
 # Time series of annual RX1day --------------------------------------------
-plot_rx1day <- function(df, region_scenario, y_limits, thr_list) {
-  thr <- thr_list[[region_scenario]]
-  label <- threshold_label(thr)
-  
-  ggplot(df, aes(x = Year, y = RX1day)) +
-    geom_linerange(aes(ymin = 0, ymax = RX1day), colour = "black", alpha = 0.7) +
-    geom_point(colour = "black", size = 1.1) +
-    geom_hline(aes(yintercept = thr$threshold, colour = "Threshold"), linetype = "dashed", size = 1.1) +
+plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) {
+  thr_cd <- thr_list[[paste0(region_name, "_CD")]]
+  thr_fp <- thr_list[[paste0(region_name, "_FP")]]
+  label <- c(
+    paste0("Current Day: ", threshold_label(thr_cd)),
+    paste0("Future Projection: ", threshold_label(thr_fp))
+  )
+
+  plot_df <- bind_rows(
+    df_CD %>% select(Year, RX1day) %>% mutate(Period = "Current Day"),
+    df_FP %>% select(Year, RX1day) %>% mutate(Period = "Future Prediction")
+  ) %>%
+    mutate(Period = factor(Period, levels = c("Current Day", "Future Prediction")))
+
+  threshold_df <- data.frame(
+    Period = factor(c("Current Day", "Future Prediction"), levels = c("Current Day", "Future Prediction")),
+    threshold = c(thr_cd$threshold, thr_fp$threshold)
+  )
+
+  ggplot(plot_df, aes(x = Year, y = RX1day)) +
+    geom_line(colour = "black", linewidth = 0.35) +
+    geom_hline(
+      data = threshold_df,
+      aes(yintercept = threshold, colour = "Threshold"),
+      linetype = "dashed",
+      linewidth = 1.1,
+      inherit.aes = FALSE
+    ) +
+    facet_grid(rows = vars(Period)) +
     scale_y_continuous(limits = y_limits) +
-    scale_colour_manual(values = c("Threshold" = box_colour), labels = c("Threshold" = label)) +
+    scale_colour_manual(values = c("Threshold" = box_colour), labels = c("Threshold" = paste(label, collapse = "\n"))) +
     labs(
-      title = region_scenario,
+      title = region_labels[[region_name]],
       x = "Year",
       y = "RX1day (mm)",
       colour = "Threshold"
     ) +
-    theme_thesis
+    theme_thesis +
+    theme(
+      strip.text.y = element_text(angle = 0)
+    )
 }
 
 # Count exceedances per year ----------------------------------------------
@@ -118,7 +142,7 @@ build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
   
   hist_df <- bind_rows(
     data.frame(days = count_exceedances_per_year(df_CD, thr_CD), Period = "Current Day"),
-    data.frame(days = count_exceedances_per_year(df_FP, thr_FP), Period = "Future Projection")
+    data.frame(days = count_exceedances_per_year(df_FP, thr_FP), Period = "Future Prediction")
   )
   
   hist_df %>%
@@ -134,7 +158,7 @@ plot_hist_exceedances <- function(hist_df_prop) {
   
   ggplot(hist_df_prop, aes(x = days, y = prop_years)) +
     geom_col(width = 0.9, fill = box_colour) +
-    facet_grid(Period ~ .) +
+    facet_grid(. ~ Period) +
     labs(
       title = region_title,
       x = "Number of exceedance days per year",
@@ -317,9 +341,14 @@ for (reg in regions_mod) {
   y_max <- max(get(paste0(reg, "_CD"))$RX1day, get(paste0(reg, "_FP"))$RX1day, na.rm = TRUE)
   y_limits <- c(0, y_max * 1.05)
   
-  p_cd <- plot_rx1day(get(paste0(reg, "_CD")), paste0(reg, "_CD"), y_limits, thr_list)
-  p_fp <- plot_rx1day(get(paste0(reg, "_FP")), paste0(reg, "_FP"), y_limits, thr_list)
-  save_plot(p_cd / p_fp, paste0(reg, "_rx1day_timeseries_combined.png"), height = fig_height_med)
+  p_rx1day <- plot_rx1day_combined(
+    reg,
+    y_limits,
+    thr_list,
+    get(paste0(reg, "_CD")),
+    get(paste0(reg, "_FP"))
+  )
+  save_plot(p_rx1day, paste0(reg, "_rx1day_timeseries_combined.png"), height = fig_height_med)
   
   p_ex_cd <- plot_exceedance_examples(
     get(paste0(reg, "_CD")),
