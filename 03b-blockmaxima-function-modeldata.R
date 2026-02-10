@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------
-# 03b-blockmaxima-function-modeldata.R
+# 03b-blockmaxima-function-modeldata-singlethreshold.R
 # -------------------------------------------------------------------------
 # Jan 2026
 # RX1day processing for model data using a single threshold definition
@@ -43,7 +43,7 @@ region_labels <- c(
   milford = "Milford Sound"
 )
 period_labels <- c(CD = "Current Day", FP = "Future Projection")
-box_colour <- "#6A5ACD"
+box_colour <- "#8993FF"
 
 # Calculate thresholds -----------------------------------------------------
 calculate_rx1day_threshold <- function(df) {
@@ -421,80 +421,229 @@ write.csv(
 )
 
 
-# Mean exceedances per year (fixed CD threshold for CD/FP) ----------------
+# Summary table: change in mean exceedances (fixed CD threshold)
 
-build_mean_exceedance_table <- function(region_name, thr_list, df_CD, df_FP) {
+build_fixedCD_summary_table <- function(hist_df_prop) {
+  hist_df_prop %>%
+    group_by(Region, Period) %>%
+    summarise(
+      Mean_exceedances = weighted.mean(days, prop_years),
+      .groups = "drop"
+    )
+}
+
+fixedCD_changeinmean_table <- bind_rows(lapply(regions_mod, function(reg) {
   
-  thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-  mean_CD <- mean(count_exceedances_per_year(df_CD, thr_CD), na.rm = TRUE)
-  mean_FP <- mean(count_exceedances_per_year(df_FP, thr_CD), na.rm = TRUE)
+  hist_df <- build_hist_df(
+    reg,
+    thr_list,
+    get(paste0(reg, "_CD")),
+    get(paste0(reg, "_FP"))
+  )
+  
+  build_fixedCD_summary_table(hist_df)
+})) %>%
+  pivot_wider(
+    names_from  = Period,
+    values_from = Mean_exceedances
+  ) %>%
+  rename(
+    `Mean Exceedance CD` = `Current Day`,
+    `Mean Exceedance FP` = `Future Projection`
+  ) %>%
+  mutate(
+    Mean_change = `Mean Exceedance FP` - `Mean Exceedance CD`
+  )
+
+fixedCD_changeinmean_table
+
+write.csv(
+  fixedCD_changeinmean_table,
+  file.path(model_data_dir, "mean_exceedance_change_fixedCD.csv"),
+  row.names = FALSE
+)
+
+calc_cumulative_props <- function(exceed_vec) {
+  max_k <- max(exceed_vec, na.rm = TRUE)
+  n_years <- length(exceed_vec)
   
   data.frame(
-    Region = region_labels[[region_name]],
-    Mean_exceedances_CD = mean_CD,
-    Mean_exceedances_FP = mean_FP,
-    Absolute_change = mean_FP - mean_CD,
-    Relative_change = mean_FP / mean_CD
-  )
-}
-
-mean_exceedance_summary <- bind_rows(lapply(regions_mod, function(reg) {
-  build_mean_exceedance_table(
-    reg,
-    thr_list,
-    get(paste0(reg, "_CD")),
-    get(paste0(reg, "_FP"))
-  )
-}))
-
-write.csv(
-  mean_exceedance_summary,
-  file.path(model_data_dir, "rx1day_single_threshold_mean_exceedances.csv"),
-  row.names = FALSE
-)
-
-
-# Cumulative exceedance probability table (fixed CD threshold) -------------
-
-build_cumulative_exceedance_table <- function(region_name, thr_list, df_CD, df_FP) {
-  
-  thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-  bind_rows(
-    data.frame(
-      exceedances = count_exceedances_per_year(df_CD, thr_CD),
-      Period = "Current Day"
-    ),
-    data.frame(
-      exceedances = count_exceedances_per_year(df_FP, thr_CD),
-      Period = "Future Projection"
+    k = 0:max_k,
+    prop_ge_k = sapply(
+      0:max_k,
+      function(k) sum(exceed_vec >= k, na.rm = TRUE) / n_years
     )
-  ) %>%
-    count(Period, exceedances) %>%
-    group_by(Period) %>%
-    mutate(Proportion_years = n / sum(n)) %>%
-    ungroup() %>%
-    pivot_wider(
-      names_from = Period,
-      values_from = Proportion_years
-    ) %>%
-    mutate(
-      Region = region_labels[[region_name]],
-      FP_over_CD = `Future Projection` / `Current Day`
-    ) %>%
-    relocate(Region, exceedances)
+  )
 }
 
-cumulative_exceedance_table <- bind_rows(lapply(regions_mod, function(reg) {
-  build_cumulative_exceedance_table(
-    reg,
-    thr_list,
-    get(paste0(reg, "_CD")),
-    get(paste0(reg, "_FP"))
+build_cumulative_exceed_table_fixedCD <- function(region_name, thr_list, df_CD, df_FP) {
+  
+  # Fixed CD threshold 
+  thr_value <- thr_list[[paste0(region_name, "_CD")]]$threshold
+  
+  exc_CD <- count_exceedances_per_year(df_CD, thr_value)
+  exc_FP <- count_exceedances_per_year(df_FP, thr_value)
+  
+  max_k <- max(c(exc_CD, exc_FP), na.rm = TRUE)
+  k_seq <- 0:max_k
+  
+  cum_CD <- data.frame(
+    k = k_seq,
+    prop_CD = sapply(k_seq, function(k) mean(exc_CD >= k))
   )
-}))
+  
+  cum_FP <- data.frame(
+    k = k_seq,
+    prop_FP = sapply(k_seq, function(k) mean(exc_FP >= k))
+  )
+  
+  left_join(cum_CD, cum_FP, by = "k") %>%
+    mutate(
+      prop_CD = replace_na(prop_CD, 0),
+      prop_FP = replace_na(prop_FP, 0),
+      `FP / CD` = ifelse(prop_CD == 0, NA, prop_FP / prop_CD),
+      Region = region_labels[[region_name]],
+      Threshold = "2/3 RX1day-above threshold"
+    )
+}
+
+cumulative_proportion_table <- bind_rows(lapply(regions_mod, function(reg) {
+  build_cumulative_exceed_table_fixedCD(
+    region_name = reg,
+    thr_list = thr_list,
+    df_CD = get(paste0(reg, "_CD")),
+    df_FP = get(paste0(reg, "_FP"))
+  )
+})) %>%
+  mutate(
+    `Proportion CD` = round(prop_CD, 4),
+    `Proportion FP` = round(prop_FP, 4),
+    `FP / CD` = round(`FP / CD`, 4)
+  ) %>%
+  rename(`Exceedances ≥ k` = k) %>%
+  select(
+    Region,
+    Threshold,
+    `Exceedances ≥ k`,
+    `Proportion CD`,
+    `Proportion FP`,
+    `FP / CD`
+  )
+
+cumulative_proportion_table
 
 write.csv(
-  cumulative_exceedance_table,
-  file.path(model_data_dir, "rx1day_single_threshold_cumulative_exceedance.csv"),
+  cumulative_proportion_table,
+  file.path(model_data_dir, "cumulative_proportion_table_fixedCD.csv"),
   row.names = FALSE
 )
+
+
+# Distribution plot  ------------------------------------------------------
+
+build_rx1day_density_df <- function(region_name, period, thr_list, k = 5) {
+  
+  df <- get(paste0(region_name, "_", period))
+  threshold <- thr_list[[paste0(region_name, "_CD")]]$threshold
+  
+  exceedances <- count_exceedances_per_year(df, threshold)
+  
+  # Full dataset: All years
+  all_years_df <- data.frame(
+    RX1day = df$RX1day,
+    Group = "All years"
+  )
+  
+  # Subset for years with >= k exceedances
+  k_exceed_df <- data.frame(
+    RX1day = df$RX1day[exceedances >= k],
+    Group = paste0("≥ ", k, " exceedance days")
+  )
+  
+  # Combine
+  combined_df <- bind_rows(all_years_df, k_exceed_df) %>%
+    mutate(
+      Group = factor(Group, levels = c("All years", paste0("≥ ", k, " exceedance days"))),
+      Region = region_labels[[region_name]],
+      Period = period_labels[[period]]
+    )
+  
+  return(combined_df)
+}
+
+plot_rx1day_density <- function(df_density, k = 5) {
+  
+  group_levels <- levels(df_density$Group)
+  
+  colour_vals <- setNames(
+    c("navy", "firebrick"),
+    group_levels
+  )
+  
+  # Count total number of RX1day points in all years
+  n_all_years <- sum(df_density$Group == "All years")
+  
+  ggplot() +
+    # All years
+    geom_density(
+      data = df_density %>% filter(Group == "All years"),
+      aes(x = RX1day, colour = Group, fill = Group),
+      alpha = 0.35, linewidth = 0.9, adjust = 1.1
+    ) +
+    # ≥ k exceedance days, scaled to proportion of all years
+    geom_density(
+      data = df_density %>% filter(Group != "All years"),
+      aes(
+        x = RX1day,
+        colour = Group,
+        fill = Group,
+        y = ..density.. * (sum(df_density$Group != "All years") / n_all_years)
+      ),
+      alpha = 0.35, linewidth = 0.9, adjust = 1.1
+    ) +
+    scale_colour_manual(values = colour_vals) +
+    scale_fill_manual(values = colour_vals) +
+    labs(
+      x = "RX1day (mm)",
+      y = "Proportion",
+      title = unique(df_density$Region),
+      subtitle = unique(df_density$Period)
+    ) +
+    theme_thesis +
+    theme_model_axes +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 10),
+      plot.subtitle = element_text(hjust = 0.5, size = 9),
+      legend.position = "right",
+      legend.title = element_blank(),
+      legend.text = element_text(size = 8),
+      legend.key.height = unit(1.1, "lines"),
+      plot.margin = margin(8, 12, 8, 8)
+    )
+}
+
+k_exceed <- 5
+
+for (reg in regions_mod) {
+  for (per in c("CD", "FP")) {
+    
+    df_density <- build_rx1day_density_df(
+      region_name = reg,
+      period = per,
+      thr_list = thr_list,
+      k = k_exceed
+    )
+    
+    p_density <- plot_rx1day_density(df_density, k = k_exceed)
+    
+    save_plot(
+      p_density,
+      paste0(reg, "_", tolower(per), "_rx1day_density_ge", k_exceed, "_exceedances.png"),
+      height = fig_height_short
+    )
+  }
+}
+
+
+
+
