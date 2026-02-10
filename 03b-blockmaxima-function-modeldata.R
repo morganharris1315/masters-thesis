@@ -421,15 +421,13 @@ write.csv(
 )
 
 
-# Mean exceedances per year (CD vs FP) ------------------------------------
+# Mean exceedances per year (fixed CD threshold for CD/FP) ----------------
 
 build_mean_exceedance_table <- function(region_name, thr_list, df_CD, df_FP) {
   
   thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-  thr_FP <- thr_list[[paste0(region_name, "_FP")]]$threshold
-  
   mean_CD <- mean(count_exceedances_per_year(df_CD, thr_CD), na.rm = TRUE)
-  mean_FP <- mean(count_exceedances_per_year(df_FP, thr_FP), na.rm = TRUE)
+  mean_FP <- mean(count_exceedances_per_year(df_FP, thr_CD), na.rm = TRUE)
   
   data.frame(
     Region = region_labels[[region_name]],
@@ -456,20 +454,18 @@ write.csv(
 )
 
 
-# Cumulative exceedance probability table ---------------------------------
+# Cumulative exceedance probability table (fixed CD threshold) -------------
 
 build_cumulative_exceedance_table <- function(region_name, thr_list, df_CD, df_FP) {
   
   thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-  thr_FP <- thr_list[[paste0(region_name, "_FP")]]$threshold
-  
   bind_rows(
     data.frame(
       exceedances = count_exceedances_per_year(df_CD, thr_CD),
       Period = "Current Day"
     ),
     data.frame(
-      exceedances = count_exceedances_per_year(df_FP, thr_FP),
+      exceedances = count_exceedances_per_year(df_FP, thr_CD),
       Period = "Future Projection"
     )
   ) %>%
