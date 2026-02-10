@@ -43,6 +43,10 @@ region_labels <- c(
   milford = "Milford Sound"
 )
 period_labels <- c(CD = "Current Day", FP = "Future Projection")
+period_facet_labels <- c(
+  "Current Day" = "Current Day\nYear",
+  "Future Projection" = "Future Projection\nYear"
+)
 box_colour <- "#6A5ACD"
 
 # Calculate thresholds -----------------------------------------------------
@@ -92,10 +96,18 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
     df_CD %>% select(Year, RX1day) %>% mutate(Period = "Current Day"),
     df_FP %>% select(Year, RX1day) %>% mutate(Period = "Future Projection")
   ) %>%
-    mutate(Period = factor(Period, levels = c("Current Day", "Future Projection")))
+    mutate(
+      Period = factor(
+        period_facet_labels[Period],
+        levels = period_facet_labels[c("Current Day", "Future Projection")]
+      )
+    )
 
   threshold_df <- data.frame(
-    Period = factor(c("Current Day", "Future Projection"), levels = c("Current Day", "Future Projection")),
+    Period = factor(
+      period_facet_labels[c("Current Day", "Future Projection")],
+      levels = period_facet_labels[c("Current Day", "Future Projection")]
+    ),
     threshold = c(thr_cd$threshold, thr_fp$threshold)
   )
 
@@ -109,12 +121,12 @@ plot_rx1day_combined <- function(region_name, y_limits, thr_list, df_CD, df_FP) 
       linewidth = 1.1,
       inherit.aes = FALSE
     ) +
-    facet_grid(cols = vars(Period), scales = "free_x") +
+    facet_grid(cols = vars(Period), scales = "free_x", switch = "x") +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(limits = y_limits, expand = expansion(mult = c(0, 0.02))) +
     labs(
       title = region_labels[[region_name]],
-      x = "Year",
+      x = NULL,
       y = "RX1day (mm)"
     ) +
     theme_thesis +
@@ -186,9 +198,6 @@ plot_hist_exceedances <- function(hist_df_prop) {
       panel.grid.major = element_line(colour = "grey82", linewidth = 0.3),
       panel.grid.minor = element_blank(),
       axis.ticks = element_blank(),
-      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.2),
-      axis.line = element_line(colour = "black", linewidth = 0.2),
-      plot.background = element_rect(colour = "black", fill = NA, linewidth = 0.2),
       plot.margin = margin(8, 10, 24, 8)
     )
 }
@@ -227,7 +236,7 @@ plot_daily_example <- function(df, year, threshold, title, y_max, y_lab = "") {
   ggplot(ts_df, aes(x = day, y = rainfall_mm)) +
     geom_segment(aes(xend = day, y = 0, yend = rainfall_mm), colour = "black", alpha = 0.5) +
     geom_point(size = 0.7, colour = "black") +
-    geom_hline(yintercept = threshold, linetype = "dashed", colour = box_colour, size = 1.1) +
+    geom_hline(yintercept = threshold, linetype = "dashed", colour = box_colour, linewidth = 1.1) +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(limits = c(0, y_max), expand = expansion(mult = c(0, 0.02))) +
     labs(title = title, x = "Day of Year", y = y_lab) +
@@ -339,13 +348,12 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
     scale_y_continuous(limits = c(0, rx1day_max * 1.1)) +
     labs(x = "Number of exceedances per year", y = "RX1day (mm)", title = "RX1day vs Exceedances") +
     theme_thesis +
+    theme_model_axes +
     theme(
       strip.placement = "outside",
       strip.text.y = element_text(angle = 0, hjust = 0.5),
       strip.text.y.left = element_text(angle = 0, hjust = 0),
-      panel.spacing = unit(1.1, "lines"),
-      panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
-      axis.line = element_blank()
+      panel.spacing = unit(1.1, "lines")
     )
 }
 
