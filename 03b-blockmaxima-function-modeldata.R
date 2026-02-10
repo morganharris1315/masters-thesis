@@ -131,14 +131,13 @@ count_exceedances_per_year <- function(df, threshold) {
   apply(daily_df, 1, function(x) sum(x > threshold, na.rm = TRUE))
 }
 
-# Histogram (single threshold only) ---------------------------------------
+# Histogram (single threshold, fixed CD for CD/FP comparison) ---------------
 build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
   thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-  thr_FP <- thr_list[[paste0(region_name, "_FP")]]$threshold
   
   hist_df <- bind_rows(
     data.frame(days = count_exceedances_per_year(df_CD, thr_CD), Period = "Current Day"),
-    data.frame(days = count_exceedances_per_year(df_FP, thr_FP), Period = "Future Prediction")
+    data.frame(days = count_exceedances_per_year(df_FP, thr_CD), Period = "Future Projection")
   )
   
   hist_df %>%
@@ -249,12 +248,12 @@ plot_exceedance_examples <- function(df, region, period_label, threshold) {
                     theme = theme(plot.title = element_text(hjust = 0.5, size = 9, face = "bold")))
 }
 
-# Multi-panel RX1day vs exceedances ---------------------------------------
+# Multi-panel RX1day vs exceedances (fixed CD threshold) --------------------
 build_boxplot_panel_df <- function(regions_mod, thr_list) {
   bind_rows(lapply(regions_mod, function(reg) {
     bind_rows(lapply(c("CD", "FP"), function(period) {
       df <- get(paste0(reg, "_", period))
-      threshold <- thr_list[[paste0(reg, "_", period)]]$threshold
+      threshold <- thr_list[[paste0(reg, "_CD")]]$threshold
       exceedances <- count_exceedances_per_year(df, threshold)
       
       data.frame(
@@ -422,15 +421,13 @@ write.csv(
 )
 
 
-# Mean exceedances per year (CD vs FP) ------------------------------------
+# Mean exceedances per year (fixed CD threshold for CD/FP) ----------------
 
 build_mean_exceedance_table <- function(region_name, thr_list, df_CD, df_FP) {
   
   thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-  thr_FP <- thr_list[[paste0(region_name, "_FP")]]$threshold
-  
   mean_CD <- mean(count_exceedances_per_year(df_CD, thr_CD), na.rm = TRUE)
-  mean_FP <- mean(count_exceedances_per_year(df_FP, thr_FP), na.rm = TRUE)
+  mean_FP <- mean(count_exceedances_per_year(df_FP, thr_CD), na.rm = TRUE)
   
   data.frame(
     Region = region_labels[[region_name]],
@@ -457,20 +454,18 @@ write.csv(
 )
 
 
-# Cumulative exceedance probability table ---------------------------------
+# Cumulative exceedance probability table (fixed CD threshold) -------------
 
 build_cumulative_exceedance_table <- function(region_name, thr_list, df_CD, df_FP) {
   
   thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-  thr_FP <- thr_list[[paste0(region_name, "_FP")]]$threshold
-  
   bind_rows(
     data.frame(
       exceedances = count_exceedances_per_year(df_CD, thr_CD),
       Period = "Current Day"
     ),
     data.frame(
-      exceedances = count_exceedances_per_year(df_FP, thr_FP),
+      exceedances = count_exceedances_per_year(df_FP, thr_CD),
       Period = "Future Projection"
     )
   ) %>%
