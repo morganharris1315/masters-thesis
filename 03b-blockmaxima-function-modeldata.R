@@ -235,9 +235,9 @@ plot_daily_example <- function(df, year, threshold, title, y_max, y_lab = "") {
     theme_model_axes
 }
 
-plot_exceedance_examples <- function(df, region, period_label, threshold) {
+plot_exceedance_examples <- function(df, region, period_label, threshold, y_max_override = NULL) {
   years <- select_example_years(df, threshold)
-  y_max <- compute_y_max(df, years)
+  y_max <- if (is.null(y_max_override)) compute_y_max(df, years) else y_max_override
   
   p_muted <- plot_daily_example(df, years$muted, threshold, paste0("Muted Year (", years$muted, ")"), y_max, "Daily Rainfall (mm)")
   p_single <- plot_daily_example(df, years$single, threshold, paste0("Single Exceedance Year (", years$single, ")"), y_max)
@@ -246,6 +246,16 @@ plot_exceedance_examples <- function(df, region, period_label, threshold) {
   (p_muted + p_single + p_high) +
     plot_annotation(title = paste(region, "–", period_label),
                     theme = theme(plot.title = element_text(hjust = 0.5, size = 9, face = "bold")))
+}
+
+compute_shared_example_y_max <- function(df_CD, thr_CD, df_FP, thr_FP) {
+  years_cd <- select_example_years(df_CD, thr_CD)
+  years_fp <- select_example_years(df_FP, thr_FP)
+
+  max_cd <- compute_y_max(df_CD, years_cd)
+  max_fp <- compute_y_max(df_FP, years_fp)
+
+  max(max_cd, max_fp)
 }
 
 # Multi-panel RX1day vs exceedances (fixed CD threshold) --------------------
@@ -378,17 +388,27 @@ for (reg in regions_mod) {
   )
   save_plot(p_rx1day, paste0(reg, "_rx1day_timeseries_combined.png"), height = fig_height_med)
   
+  shared_example_y_max <- compute_shared_example_y_max(
+    get(paste0(reg, "_CD")),
+    thr_list[[paste0(reg, "_CD")]]$threshold,
+    get(paste0(reg, "_FP")),
+    thr_list[[paste0(reg, "_FP")]]$threshold
+  )
+
   p_ex_cd <- plot_exceedance_examples(
     get(paste0(reg, "_CD")),
     region_labels[[reg]],
     "Current Day",
-    thr_list[[paste0(reg, "_CD")]]$threshold
+    thr_list[[paste0(reg, "_CD")]]$threshold,
+    y_max_override = shared_example_y_max
   )
+
   p_ex_fp <- plot_exceedance_examples(
     get(paste0(reg, "_FP")),
     region_labels[[reg]],
     "Future Projection",
-    thr_list[[paste0(reg, "_FP")]]$threshold
+    thr_list[[paste0(reg, "_FP")]]$threshold,
+    y_max_override = shared_example_y_max
   )
   save_plot(p_ex_cd, paste0(reg, "_threshold_cd_examples.png"), height = fig_height_short)
   save_plot(p_ex_fp, paste0(reg, "_threshold_fp_examples.png"), height = fig_height_short)
@@ -646,6 +666,5 @@ for (reg in regions_mod) {
     )
   }
 }
-
 
 
