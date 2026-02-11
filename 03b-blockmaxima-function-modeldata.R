@@ -441,10 +441,9 @@ threshold_summary_table <- bind_rows(lapply(names(thr_list), function(name) {
   
   data.frame(
     Region = region_labels[[parts[1]]],
-    Period = period_labels[[parts[2]]],
-    Threshold_level = "2/3 RX1day-above threshold",
-    Threshold_mm = round(thr_list[[name]]$threshold, 1),
-    Daily_rainfall_above_threshold_percent = round(thr_list[[name]]$proportion * 100, 2)
+    Scenario = period_labels[[parts[2]]],
+    `Threshold (mm)` = round(thr_list[[name]]$threshold, 1),
+    `Percentage of Daily Rainfall above Threshold` = round(thr_list[[name]]$proportion * 100, 2)
   )
 }))
 
@@ -482,11 +481,11 @@ fixedCD_changeinmean_table <- bind_rows(lapply(regions_mod, function(reg) {
     values_from = Mean_exceedances
   ) %>%
   rename(
-    `Mean Exceedance CD` = `Current Day`,
-    `Mean Exceedance FP` = `Future Projection`
+    `Mean Exceedance Days in Current Day` = `Current Day`,
+    `Mean Exceedance Days in Future Projection` = `Future Projection`
   ) %>%
   mutate(
-    Mean_change = `Mean Exceedance FP` - `Mean Exceedance CD`
+    `Change in Mean Exceedance Days` = `Mean Exceedance Days in Future Projection` - `Mean Exceedance Days in Current Day`
   )
 
 fixedCD_changeinmean_table
@@ -536,8 +535,7 @@ build_cumulative_exceed_table_fixedCD <- function(region_name, thr_list, df_CD, 
       prop_CD = replace_na(prop_CD, 0),
       prop_FP = replace_na(prop_FP, 0),
       `FP / CD` = ifelse(prop_CD == 0, NA, prop_FP / prop_CD),
-      Region = region_labels[[region_name]],
-      Threshold = "2/3 RX1day-above threshold"
+      Region = region_labels[[region_name]]
     )
 }
 
@@ -550,17 +548,16 @@ cumulative_proportion_table <- bind_rows(lapply(regions_mod, function(reg) {
   )
 })) %>%
   mutate(
-    `Proportion CD` = round(prop_CD, 4),
-    `Proportion FP` = round(prop_FP, 4),
+    `Proportion in Current Day` = round(prop_CD, 4),
+    `Proportion in Future Projection` = round(prop_FP, 4),
     `FP / CD` = round(`FP / CD`, 4)
   ) %>%
   rename(`Exceedances ≥ k` = k) %>%
   select(
     Region,
-    Threshold,
     `Exceedances ≥ k`,
-    `Proportion CD`,
-    `Proportion FP`,
+    `Proportion in Current Day`,
+    `Proportion in Future Projection`,
     `FP / CD`
   )
 
