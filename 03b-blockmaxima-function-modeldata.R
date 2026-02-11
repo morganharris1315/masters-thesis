@@ -1,7 +1,7 @@
 # -------------------------------------------------------------------------
 # 03b-blockmaxima-function-modeldata-singlethreshold.R
 # -------------------------------------------------------------------------
-# Jan 2026
+# Feb 2026
 # RX1day processing for model data using a single threshold definition
 # Threshold: value where 2/3 of annual RX1day values are above it
 # -------------------------------------------------------------------------
