@@ -550,7 +550,7 @@ cumulative_proportion_table <- bind_rows(lapply(regions_mod, function(reg) {
   mutate(
     `Proportion in Current Day` = round(prop_CD, 4),
     `Proportion in Future Projection` = round(prop_FP, 4),
-    `FP / CD` = round(`FP / CD`, 4)
+    `Probability Ratio (Future Projection/ Current Day)` = round(`FP / CD`, 4)
   ) %>%
   rename(`Exceedances ≥ k` = k) %>%
   select(
@@ -558,7 +558,7 @@ cumulative_proportion_table <- bind_rows(lapply(regions_mod, function(reg) {
     `Exceedances ≥ k`,
     `Proportion in Current Day`,
     `Proportion in Future Projection`,
-    `FP / CD`
+    `Probability Ratio (Future Projection/ Current Day)`
   )
 
 cumulative_proportion_table
