@@ -644,7 +644,8 @@ plot_rx1day_density <- function(df_density, k = 4) {
     theme(
       plot.title = element_text(hjust = 0.5, face = "bold", size = 10),
       plot.subtitle = element_text(hjust = 0.5, size = 9),
-      legend.position = "right",
+      legend.position = c(0.78, 0.82),
+      legend.justification = c(1, 1),
       legend.title = element_blank(),
       legend.text = element_text(size = 8),
       legend.key.height = unit(1.1, "lines"),
