@@ -541,7 +541,7 @@ write.csv(
 
 # Distribution plot  ------------------------------------------------------
 
-build_rx1day_density_df <- function(region_name, period, thr_list, k = 5) {
+build_rx1day_density_df <- function(region_name, period, thr_list, k = 4) {
   
   df <- get(paste0(region_name, "_", period))
   threshold <- thr_list[[paste0(region_name, "_CD")]]$threshold
@@ -571,7 +571,7 @@ build_rx1day_density_df <- function(region_name, period, thr_list, k = 5) {
   return(combined_df)
 }
 
-plot_rx1day_density <- function(df_density, k = 5) {
+plot_rx1day_density <- function(df_density, k = 4) {
   
   group_levels <- levels(df_density$Group)
   
@@ -622,7 +622,7 @@ plot_rx1day_density <- function(df_density, k = 5) {
     )
 }
 
-k_exceed <- 5
+k_exceed <- 4
 
 for (reg in regions_mod) {
   for (per in c("CD", "FP")) {
