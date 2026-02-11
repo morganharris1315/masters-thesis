@@ -442,8 +442,8 @@ threshold_summary_table <- bind_rows(lapply(names(thr_list), function(name) {
   data.frame(
     Region = region_labels[[parts[1]]],
     Scenario = period_labels[[parts[2]]],
-    Threshold..mm. = round(thr_list[[name]]$threshold, 1),
-    Percentage.of.Daily.Rainfall.above.Threshold = round(thr_list[[name]]$proportion * 100, 2)
+    `Threshold (mm)` = round(thr_list[[name]]$threshold, 1),
+    `Percentage of Daily Rainfall above Threshold` = round(thr_list[[name]]$proportion * 100, 2)
   )
 }))
 
