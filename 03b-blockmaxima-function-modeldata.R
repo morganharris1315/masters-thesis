@@ -148,9 +148,9 @@ build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
     mutate(Region = tools::toTitleCase(region_name))
 }
 
-plot_hist_exceedances <- function(hist_df_prop) {
+plot_hist_exceedances <- function(hist_df_prop, max_exceedance) {
   region_title <- unique(hist_df_prop$Region)
-  day_breaks <- seq(min(hist_df_prop$days, na.rm = TRUE), max(hist_df_prop$days, na.rm = TRUE), by = 1)
+  day_breaks <- 0:max_exceedance
   x_label_df <- hist_df_prop %>%
     distinct(Period) %>%
     mutate(
@@ -375,6 +375,13 @@ save_plot <- function(plot, filename, width = fig_width_full, height = fig_heigh
 }
 
 # Build all outputs --------------------------------------------------------
+global_hist_max_exceedance <- max(unlist(lapply(regions_mod, function(reg) {
+  thr_cd <- thr_list[[paste0(reg, "_CD")]]$threshold
+  exc_cd <- count_exceedances_per_year(get(paste0(reg, "_CD")), thr_cd)
+  exc_fp <- count_exceedances_per_year(get(paste0(reg, "_FP")), thr_cd)
+  max(c(exc_cd, exc_fp), na.rm = TRUE)
+})), na.rm = TRUE)
+
 for (reg in regions_mod) {
   y_max <- max(get(paste0(reg, "_CD"))$RX1day, get(paste0(reg, "_FP"))$RX1day, na.rm = TRUE)
   y_limits <- c(0, y_max * 1.05)
@@ -414,7 +421,7 @@ for (reg in regions_mod) {
   save_plot(p_ex_fp, paste0(reg, "_threshold_fp_examples.png"), height = fig_height_short)
   
   hist_df <- build_hist_df(reg, thr_list, get(paste0(reg, "_CD")), get(paste0(reg, "_FP")))
-  save_plot(plot_hist_exceedances(hist_df), paste0(reg, "_exceedance_threshold_cd_fp_histogram.png"), height = fig_height_med)
+  save_plot(plot_hist_exceedances(hist_df, global_hist_max_exceedance), paste0(reg, "_exceedance_threshold_cd_fp_histogram.png"), height = fig_height_med)
 }
 
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)
@@ -666,4 +673,3 @@ for (reg in regions_mod) {
     )
   }
 }
-
