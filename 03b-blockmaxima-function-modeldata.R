@@ -251,10 +251,10 @@ plot_exceedance_examples <- function(df, region, period_label, threshold, y_max_
 compute_shared_example_y_max <- function(df_CD, thr_CD, df_FP, thr_FP) {
   years_cd <- select_example_years(df_CD, thr_CD)
   years_fp <- select_example_years(df_FP, thr_FP)
-
+  
   max_cd <- compute_y_max(df_CD, years_cd)
   max_fp <- compute_y_max(df_FP, years_fp)
-
+  
   max(max_cd, max_fp)
 }
 
@@ -401,7 +401,7 @@ for (reg in regions_mod) {
     get(paste0(reg, "_FP")),
     thr_list[[paste0(reg, "_FP")]]$threshold
   )
-
+  
   p_ex_cd <- plot_exceedance_examples(
     get(paste0(reg, "_CD")),
     region_labels[[reg]],
@@ -409,7 +409,7 @@ for (reg in regions_mod) {
     thr_list[[paste0(reg, "_CD")]]$threshold,
     y_max_override = shared_example_y_max
   )
-
+  
   p_ex_fp <- plot_exceedance_examples(
     get(paste0(reg, "_FP")),
     region_labels[[reg]],
@@ -606,7 +606,7 @@ plot_rx1day_density <- function(df_density, k = 4) {
   group_levels <- levels(df_density$Group)
   
   colour_vals <- setNames(
-    c("navy", "firebrick"),
+    c("darkgrey", "#8993FF"),
     group_levels
   )
   
