@@ -169,7 +169,11 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance) {
       inherit.aes = FALSE
     ) +
     facet_grid(. ~ Period) +
-    scale_x_continuous(breaks = day_breaks) +
+    scale_x_continuous(
+      breaks = day_breaks,
+      limits = c(0, max_exceedance),
+      expand = expansion(mult = c(0, 0))
+    ) +
     scale_y_continuous(
       limits = c(0, NA),
       expand = expansion(mult = c(0, 0.02))
