@@ -643,6 +643,7 @@ plot_rx1day_density <- function(df_density, k = 4) {
       title = unique(df_density$Region),
       subtitle = unique(df_density$Period)
     ) +
+    coord_cartesian(xlim = c(0, max_rx1day_all_regions)) +
     theme_thesis +
     theme_model_axes +
     theme(
@@ -658,6 +659,18 @@ plot_rx1day_density <- function(df_density, k = 4) {
 }
 
 k_exceed <- 4
+
+max_rx1day_all_regions <- max(
+  unlist(
+    lapply(regions_mod, function(reg) {
+      c(
+        get(paste0(reg, "_CD"))$RX1day,
+        get(paste0(reg, "_FP"))$RX1day
+      )
+    })
+  ),
+  na.rm = TRUE
+)
 
 for (reg in regions_mod) {
   for (per in c("CD", "FP")) {
