@@ -442,14 +442,14 @@ threshold_summary_table <- bind_rows(lapply(names(thr_list), function(name) {
   data.frame(
     Region = region_labels[[parts[1]]],
     Scenario = period_labels[[parts[2]]],
-    `Threshold (mm)` = round(thr_list[[name]]$threshold, 1),
-    `Percentage of Daily Rainfall above Threshold` = round(thr_list[[name]]$proportion * 100, 2)
+    Threshold..mm. = round(thr_list[[name]]$threshold, 1),
+    Percentage.of.Daily.Rainfall.above.Threshold = round(thr_list[[name]]$proportion * 100, 2)
   )
 }))
 
 write.csv(
   threshold_summary_table,
-  file.path(model_data_dir, "rx1day_threshold_levels_daily_rainfall_above_threshold_percent.csv"),
+  file.path(plot_output_dir, "rx1day_threshold_levels_daily_rainfall_above_threshold_percent.csv"),
   row.names = FALSE
 )
 
@@ -492,7 +492,7 @@ fixedCD_changeinmean_table
 
 write.csv(
   fixedCD_changeinmean_table,
-  file.path(model_data_dir, "mean_exceedance_change_fixedCD.csv"),
+  file.path(plot_output_dir, "mean_exceedance_change_fixedCD.csv"),
   row.names = FALSE
 )
 
@@ -565,7 +565,7 @@ cumulative_proportion_table
 
 write.csv(
   cumulative_proportion_table,
-  file.path(model_data_dir, "cumulative_proportion_table_fixedCD.csv"),
+  file.path(plot_output_dir, "cumulative_proportion_table_fixedCD.csv"),
   row.names = FALSE
 )
 
