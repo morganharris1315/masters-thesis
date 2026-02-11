@@ -188,7 +188,7 @@ plot_hist_exceedances <- function(hist_df_prop) {
       axis.ticks = element_blank(),
       panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.2),
       axis.line = element_line(colour = "black", linewidth = 0.2),
-      plot.background = element_rect(colour = "black", fill = NA, linewidth = 0.2),
+      plot.background = element_rect(colour = NA, fill = NA),
       plot.margin = margin(8, 10, 24, 8)
     )
 }
@@ -666,5 +666,4 @@ for (reg in regions_mod) {
     )
   }
 }
-
 
