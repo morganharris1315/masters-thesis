@@ -6,14 +6,24 @@
 # -------------------------------------------------------------------------
 
 # function: compute RX1day metrics & thresholds -------------------------
-calculate_rx1day_thresholds_obs <- function(df_station_obs) {
-  
-  RX1day_df <- df_station_obs %>%
+
+# helper: compute RX1day with missing-data catch -------------------------
+compute_RX1day_obs <- function(df_station, missing_day_threshold = 30) {
+  df_station %>%
     group_by(hydro_year) %>%
     summarise(
-      RX1day = max(rainfall_mm, na.rm = TRUE),
+      missing_days = sum(is.na(rainfall_mm)),
+      RX1day_raw = max(rainfall_mm, na.rm = TRUE),
+      RX1day = ifelse(missing_days >= missing_day_threshold, NA_real_, RX1day_raw),
       .groups = "drop"
-    )
+    ) %>%
+    mutate(RX1day = ifelse(is.infinite(RX1day), NA_real_, RX1day)) %>%
+    select(hydro_year, RX1day)
+}
+
+calculate_rx1day_thresholds_obs <- function(df_station_obs) {
+  
+  RX1day_df <- compute_RX1day_obs(df_station_obs)
   
   rx <- RX1day_df$RX1day
   
@@ -181,9 +191,7 @@ run_RX1day_station_analysis_obs <- function(combined_df_obs,station_name,
   thr_station_obs <- calculate_rx1day_thresholds_obs(df_station_obs)
   labels_obs <- make_labels_obs(thr_station_obs)
   
-  RX1day_df <- df_station_obs %>%
-    group_by(hydro_year) %>%
-    summarise(RX1day = max(rainfall_mm, na.rm = TRUE), .groups = "drop")
+  RX1day_df <- compute_RX1day_obs(df_station_obs)
   
   p_ts <- plot_rx1day_obs(
     RX1day_df = RX1day_df,
@@ -258,19 +266,12 @@ head(combined_df_obs)
 
 # Example years -----------------------------------------------------------
 
-# Compute RX1day per year
-compute_RX1day_obs <- function(df_station) {
-  df_station %>%
-    group_by(hydro_year) %>%
-    summarise(RX1day = max(rainfall_mm, na.rm = TRUE), .groups = "drop") %>%
-    rename(Year = hydro_year)
-}
-
 # Select example years safely
 select_example_years_obs <- function(df_station, threshold) {
   
   # Compute RX1day per year
-  RX1day_df <- compute_RX1day_obs(df_station)
+  RX1day_df <- compute_RX1day_obs(df_station) %>%
+    rename(Year = hydro_year)
   
   # Count exceedances per year
   exceedances <- df_station %>%
@@ -279,7 +280,8 @@ select_example_years_obs <- function(df_station, threshold) {
     rename(Year = hydro_year)
   
   summary_df <- RX1day_df %>%
-    left_join(exceedances, by = "Year")
+    left_join(exceedances, by = "Year") %>%
+    filter(!is.na(RX1day))
   
   muted_year  <- summary_df %>% filter(exceedance_days == 0) %>% arrange(RX1day) %>% slice(1) %>% pull(Year)
   if(length(muted_year) == 0) muted_year <- NA_integer_
@@ -452,9 +454,7 @@ run_rx1day_boxplots_obs <- function(df_obs, station_name, output_dir) {
   
   df_station <- df_obs %>% filter(station == station_name)
   
-  RX1day_df <- df_station %>%
-    group_by(hydro_year) %>%
-    summarise(RX1day = max(rainfall_mm, na.rm = TRUE), .groups = "drop") %>%
+  RX1day_df <- compute_RX1day_obs(df_station) %>%
     rename(Year = hydro_year)
   
   thr_station <- calculate_rx1day_thresholds_obs(df_station)
@@ -573,7 +573,8 @@ build_high_exceedance_table_all_stations <- function(combined_df_obs) {
           threshold_value <- thr[thr_label]
           
           # RX1day per year
-          RX1day_df <- compute_RX1day_obs(df_station)
+          RX1day_df <- compute_RX1day_obs(df_station) %>%
+            rename(Year = hydro_year)
           
           # Exceedances per year
           exc_df <- count_exceedances_per_year_obs(df_station, threshold_value) %>%
