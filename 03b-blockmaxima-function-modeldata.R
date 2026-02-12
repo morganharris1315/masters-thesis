@@ -43,7 +43,7 @@ region_labels <- c(
   milford = "Milford Sound"
 )
 period_labels <- c(CD = "Current Day", FP = "Future Projection")
-box_colour <- "#8993FF"
+box_colour <- "#93acff"
 
 # Calculate thresholds -----------------------------------------------------
 calculate_rx1day_threshold <- function(df) {
@@ -607,7 +607,7 @@ plot_rx1day_density <- function(df_density, k = 4) {
   group_levels <- levels(df_density$Group)
   
   colour_vals <- setNames(
-    c("darkgrey", "#8993FF"),
+    c("darkgrey", "#93acff"),
     group_levels
   )
   
