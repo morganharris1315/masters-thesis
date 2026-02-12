@@ -77,7 +77,7 @@ plot_rx1day_obs_single_threshold_st <- function(RX1day_df, thr, labels, station_
     scale_colour_manual(
       breaks = c("Single threshold"),
       labels = labels,
-      values = c("Single threshold" = "#E69F00")
+      values = c("Single threshold" = "#93acff")
     ) +
     theme_thesis
 }
@@ -104,7 +104,7 @@ plot_hist_exceedances_obs_single_threshold_st <- function(df_station_obs, thr, s
       binwidth = 1,
       boundary = 0,
       closed = "left",
-      fill = "#E69F00"
+      fill = "#93acff"
     ) +
     scale_x_continuous(limits = x_lim, breaks = 0:12) +
     scale_y_continuous(limits = y_lim, expand = expansion(mult = c(0, 0.02))) +
@@ -264,7 +264,7 @@ plot_daily_example_obs_st <- function(df_station, year, threshold, title, y_max,
 }
 
 # Plot example years for one station
-plot_exceedance_examples_obs_st <- function(df_station, station_name, threshold, colour = "#E69F00") {
+plot_exceedance_examples_obs_st <- function(df_station, station_name, threshold, colour = "#93acff") {
   years <- select_example_years_obs_st(df_station, threshold)
 
   # Determine max y across valid years
