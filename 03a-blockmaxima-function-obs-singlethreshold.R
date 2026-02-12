@@ -200,3 +200,156 @@ imap(region_output_dirs_obs_single_threshold_st, function(region_dir, region_nam
 })
 
 head(combined_df_obs)
+
+
+# Example years ------------------------------------------------------------
+
+# Select example years safely
+select_example_years_obs_st <- function(df_station, threshold) {
+  # Compute RX1day per year
+  RX1day_df <- compute_RX1day_obs_st(df_station) %>%
+    rename(Year = hydro_year)
+
+  # Count exceedances per year
+  exceedances <- df_station %>%
+    group_by(hydro_year) %>%
+    summarise(exceedance_days = sum(rainfall_mm > threshold, na.rm = TRUE), .groups = "drop") %>%
+    rename(Year = hydro_year)
+
+  summary_df <- RX1day_df %>%
+    left_join(exceedances, by = "Year") %>%
+    filter(!is.na(RX1day))
+
+  muted_year <- summary_df %>% filter(exceedance_days == 0) %>% arrange(RX1day) %>% slice(1) %>% pull(Year)
+  if (length(muted_year) == 0) muted_year <- NA_integer_
+
+  single_year <- summary_df %>% filter(exceedance_days == 1) %>% arrange(desc(RX1day)) %>% slice(1) %>% pull(Year)
+  if (length(single_year) == 0) single_year <- NA_integer_
+
+  high_year <- summary_df %>% arrange(desc(exceedance_days), desc(RX1day)) %>% slice(1) %>% pull(Year)
+  if (length(high_year) == 0) high_year <- NA_integer_
+
+  list(
+    muted = muted_year,
+    single = single_year,
+    high = high_year
+  )
+}
+
+# Plot daily timeseries for one year
+plot_daily_example_obs_st <- function(df_station, year, threshold, title, y_max, colour, y_lab = "Daily Rainfall (mm)") {
+  if (is.na(year)) return(NULL)
+
+  ts_df <- df_station %>%
+    filter(hydro_year == year)
+
+  ggplot(ts_df, aes(x = observation_date, y = rainfall_mm, group = 1)) +
+    geom_line() +
+    geom_point(size = 1) +
+    geom_hline(
+      yintercept = threshold,
+      linetype = "dashed",
+      colour = colour,
+      size = 1.1
+    ) +
+    scale_x_date(
+      date_labels = "%b",
+      date_breaks = "3 months",
+      expand = expansion(add = c(0, 0))
+    ) +
+    scale_y_continuous(limits = c(0, y_max), breaks = seq(0, y_max, by = 50)) +
+    labs(title = title, x = "Date", y = y_lab) +
+    theme_thesis +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+# Plot example years for one station
+plot_exceedance_examples_obs_st <- function(df_station, station_name, threshold, colour = "#E69F00") {
+  years <- select_example_years_obs_st(df_station, threshold)
+
+  # Determine max y across valid years
+  valid_years <- years[!is.na(unlist(years))]
+  if (length(valid_years) == 0) {
+    warning(paste("No valid example years for station:", station_name))
+    return(NULL)
+  }
+
+  y_max <- df_station %>%
+    filter(hydro_year %in% unlist(valid_years)) %>%
+    summarise(max_val = max(rainfall_mm, na.rm = TRUE)) %>%
+    pull(max_val) %>% {
+      . + 10
+    }
+
+  # Create plots safely
+  plots <- list()
+
+  if (!is.na(years$muted)) {
+    plots$muted <- plot_daily_example_obs_st(df_station, years$muted, threshold, paste0("Muted Year (", years$muted, ")"), y_max, colour)
+  }
+  if (!is.na(years$single)) {
+    plots$single <- plot_daily_example_obs_st(df_station, years$single, threshold, paste0("Single Exceedance Year (", years$single, ")"), y_max, colour)
+  }
+  if (!is.na(years$high)) {
+    plots$high <- plot_daily_example_obs_st(df_station, years$high, threshold, paste0("High Exceedance Year (", years$high, ")"), y_max, colour)
+  }
+
+  # Combine available plots
+  wrap_plots(plots) +
+    plot_annotation(title = station_name, theme = theme(plot.title = element_text(hjust = 0.5, face = "bold")))
+}
+
+# Master function for example years per station
+run_example_years_obs_single_threshold_st <- function(df_obs, station_name, output_dir) {
+  if (!station_name %in% df_obs$station) {
+    stop(paste("Station not found:", station_name))
+  }
+
+  df_station <- df_obs %>% filter(station == station_name)
+
+  # Calculate single threshold
+  thr_station <- calculate_rx1day_single_threshold_obs_st(df_station)
+
+  # Example-year plot (single threshold)
+  p_example <- plot_exceedance_examples_obs_st(df_station, station_name, thr_station$threshold)
+
+  # Save plot if it exists
+  station_safe <- gsub(" ", "_", station_name)
+
+  if (!is.null(p_example)) {
+    ggsave(
+      filename = file.path(output_dir, paste0(station_safe, "_RX1day_ExampleYears_SingleThreshold.png")),
+      plot = p_example,
+      width = fig_width_full,
+      height = fig_height_tall,
+      dpi = 300
+    )
+  }
+
+  invisible(list(single_threshold = p_example))
+}
+
+imap(region_output_dirs_obs_single_threshold_st, function(region_dir, region_name) {
+  # Get all stations in the region
+  stations <- unique(combined_df_obs$station[combined_df_obs$region == region_name])
+
+  # Loop through stations
+  walk(stations, function(station_name) {
+    # Subset data for this station
+    df_station <- combined_df_obs %>% filter(station == station_name)
+
+    # Calculate threshold and check if valid example years exist
+    thr_station <- calculate_rx1day_single_threshold_obs_st(df_station)
+    years_single <- select_example_years_obs_st(df_station, thr_station$threshold)
+    all_years <- unlist(years_single)
+
+    # Skip station if no valid years
+    if (all(is.na(all_years))) {
+      message(paste("Skipping station (no valid example years):", station_name))
+      return(NULL)
+    }
+
+    # Otherwise, run example-years analysis
+    run_example_years_obs_single_threshold_st(combined_df_obs, station_name, region_dir)
+  })
+})
