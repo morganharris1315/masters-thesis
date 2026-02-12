@@ -1,5 +1,5 @@
 # -------------------------------------------------------------------------
-# 03a-blockmaxima-function-obs.R
+# 03a-blockmaxima-function-obs-multithreshold.R
 # -------------------------------------------------------------------------
 # Jan 2026
 # Creating functions to make the processing of observation data easier
