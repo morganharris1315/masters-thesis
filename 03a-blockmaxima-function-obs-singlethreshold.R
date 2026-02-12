@@ -353,3 +353,78 @@ imap(region_output_dirs_obs_single_threshold_st, function(region_dir, region_nam
     run_example_years_obs_single_threshold_st(combined_df_obs, station_name, region_dir)
   })
 })
+
+
+# Exceedance summary table -------------------------------------------------
+build_high_exceedance_table_obs_single_threshold_st <- function(combined_df_obs) {
+  stations <- unique(combined_df_obs$station)
+
+  bind_rows(
+    lapply(stations, function(station_name) {
+      df_station <- combined_df_obs %>% filter(station == station_name)
+      region <- unique(df_station$region)
+
+      # Calculate station-specific single threshold
+      thr <- calculate_rx1day_single_threshold_obs_st(df_station)$threshold
+
+      # RX1day per year
+      RX1day_df <- compute_RX1day_obs_st(df_station) %>%
+        rename(Year = hydro_year)
+
+      # Exceedances per year
+      exc_df <- count_exceedances_per_year_obs_st(df_station, thr) %>%
+        rename(
+          Exceedance_Days = exceedance_days,
+          Year = hydro_year
+        )
+
+      # Annual rainfall per year
+      annual_rain_df <- df_station %>%
+        group_by(hydro_year) %>%
+        summarise(AnnualRain = sum(rainfall_mm, na.rm = TRUE), .groups = "drop") %>%
+        rename(Year = hydro_year)
+
+      RX1day_df %>%
+        left_join(exc_df, by = "Year") %>%
+        left_join(annual_rain_df, by = "Year") %>%
+        filter(!is.na(Exceedance_Days)) %>%
+        arrange(desc(RX1day)) %>%
+        mutate(
+          RX1day_Rank = row_number(),
+          RX1day_Percentile = (1 - (RX1day_Rank - 1) / (n() - 1)) * 100,
+          Threshold = "Single threshold",
+          Station = station_name,
+          Region = region
+        ) %>%
+        select(
+          Region,
+          Station,
+          Threshold,
+          Year,
+          Exceedance_Days,
+          RX1day,
+          RX1day_Rank,
+          RX1day_Percentile,
+          AnnualRain
+        )
+    })
+  ) %>%
+    arrange(desc(Exceedance_Days), desc(RX1day))
+}
+
+high_exceedance_table_single_threshold <-
+  build_high_exceedance_table_obs_single_threshold_st(combined_df_obs)
+
+# Top-20 exceedance years across all stations (no filtering required)
+top20_single_threshold <- high_exceedance_table_single_threshold %>%
+  slice_max(order_by = Exceedance_Days, n = 20, with_ties = FALSE)
+
+print(top20_single_threshold, n = 20)
+
+obs_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/obs_data"
+
+write.csv(
+  top20_single_threshold,
+  file = file.path(obs_dir, "highexceedance_singlethreshold_obs.csv"),
+  row.names = FALSE
+)
