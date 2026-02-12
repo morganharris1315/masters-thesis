@@ -688,3 +688,41 @@ for (reg in regions_mod) {
     )
   }
 }
+
+build_rx1day_density_df_all_regions <- function(period, regions_mod, thr_list, k = 4) {
+  bind_rows(lapply(regions_mod, function(reg) {
+    df <- get(paste0(reg, "_", period))
+    threshold <- thr_list[[paste0(reg, "_CD")]]$threshold
+    exceedances <- count_exceedances_per_year(df, threshold)
+    
+    bind_rows(
+      data.frame(RX1day = df$RX1day, Group = "All years"),
+      data.frame(
+        RX1day = df$RX1day[exceedances >= k],
+        Group = paste0("≥ ", k, " exceedance days")
+      )
+    )
+  })) %>%
+    mutate(
+      Group = factor(Group, levels = c("All years", paste0("≥ ", k, " exceedance days"))),
+      Region = "All Regions",
+      Period = period_labels[[period]]
+    )
+}
+
+for (per in c("CD", "FP")) {
+  df_density_all_regions <- build_rx1day_density_df_all_regions(
+    period = per,
+    regions_mod = regions_mod,
+    thr_list = thr_list,
+    k = k_exceed
+  )
+  
+  p_density_all_regions <- plot_rx1day_density(df_density_all_regions, k = k_exceed)
+  
+  save_plot(
+    p_density_all_regions,
+    paste0("all_regions_", tolower(per), "_rx1day_density_ge", k_exceed, "_exceedances.png"),
+    height = fig_height_short
+  )
+}
