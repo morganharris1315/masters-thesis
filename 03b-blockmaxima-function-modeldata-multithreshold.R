@@ -572,6 +572,9 @@ boxplot_fp_mid_milford <- plot_rx1day_vs_exceedance(milford_FP, milford_fp_mid, 
 boxplot_fp_360_milford <- plot_rx1day_vs_exceedance(milford_FP, milford_fp_360, "1-in-360 - Future Projection")
 
 # General function to save plots
+model_data_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/multi_threshold"
+dir.create(model_data_dir, recursive = TRUE, showWarnings = FALSE)
+
 save_plot <- function(plot, filename, width = fig_width_full, height = fig_height_med) {
   ggsave(filename = file.path(model_data_dir, filename),
          plot = plot,
@@ -1037,4 +1040,3 @@ for (reg in regions_mod) {
   # Save the combined plot
   save_plot(combined_boxplot_fixedCD, paste0(reg, "_rx1day_all_boxplots_fixedCD.png"), width = fig_width_hoz_half, height = fig_height_hoz_half)
 }
-
