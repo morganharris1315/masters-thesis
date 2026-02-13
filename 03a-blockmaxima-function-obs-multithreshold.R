@@ -551,8 +551,6 @@ imap(region_output_dirs, function(region_dir, region_name) {
   })
 })
 
-
-
 # High exccedance examples table  -----------------------------------------
 build_high_exceedance_table_all_stations <- function(combined_df_obs) {
   
@@ -642,7 +640,6 @@ top20_by_threshold <- high_exceedance_table %>%
   slice_max(order_by = Exceedance_Days, n = 20, with_ties = FALSE) %>%  # top 20 per threshold
   ungroup()
 
-# Split into two separate tables for convenience
 top20_mid <- top20_by_threshold %>% filter(Threshold == "Mid RX1day")
 top20_onein360 <- top20_by_threshold %>% filter(Threshold == "1-in-360")
 
