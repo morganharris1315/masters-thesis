@@ -364,7 +364,7 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
 }
 
 # Save helper --------------------------------------------------------------
-plot_output_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/Single Threshold Plots"
+plot_output_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/single_threshold"
 dir.create(plot_output_dir, recursive = TRUE, showWarnings = FALSE)
 
 save_plot <- function(plot, filename, width = fig_width_full, height = fig_height_med) {
