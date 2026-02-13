@@ -179,6 +179,8 @@ plot_hist_exceedances_obs <- function(df_station_obs, thr, station_name) {
 # master function: run RX1day analysis for one station --------------------
 run_RX1day_station_analysis_obs <- function(combined_df_obs,station_name,
                                             output_dir = "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/RX1day_plots") {
+
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
   if (!station_name %in% combined_df_obs$station) {
     stop(paste("Station not found:", station_name))
@@ -238,10 +240,10 @@ run_RX1day_station_analysis_obs <- function(combined_df_obs,station_name,
 
 #all reigions
 region_output_dirs <- c(
-  coromandel   = glue("{base_raw_dir}/obs_data/coromandel"),
-  far_north    = glue("{base_raw_dir}/obs_data/far_north"),
-  top_of_south = glue("{base_raw_dir}/obs_data/top_of_south"),
-  waikato      = glue("{base_raw_dir}/obs_data/waikato")
+  coromandel   = glue("{base_raw_dir}/obs_data/coromandel/multi_threshold"),
+  far_north    = glue("{base_raw_dir}/obs_data/far_north/multi_threshold"),
+  top_of_south = glue("{base_raw_dir}/obs_data/top_of_south/multi_threshold"),
+  waikato      = glue("{base_raw_dir}/obs_data/waikato/multi_threshold")
 )
 
 imap(region_output_dirs, function(region_dir, region_name) {
@@ -373,6 +375,8 @@ plot_exceedance_examples_obs <- function(df_station, station_name, threshold, co
 
 # Master function for example years per station
 run_example_years_obs <- function(df_obs, station_name, output_dir) {
+
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
   if(!station_name %in% df_obs$station) {
     stop(paste("Station not found:", station_name))
@@ -447,6 +451,8 @@ imap(region_output_dirs, function(region_dir, region_name) {
 # boxplots ----------------------------------------------------------------
 
 run_rx1day_boxplots_obs <- function(df_obs, station_name, output_dir) {
+
+  dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
   if(!station_name %in% df_obs$station) {
     stop(paste("Station not found:", station_name))
@@ -654,4 +660,3 @@ obs_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/T
 
 write.csv(top20_mid, file = file.path(obs_dir, "highexceedance_mid_obs.csv"), row.names = FALSE)
 write.csv(top20_onein360, file = file.path(obs_dir, "highexceedance_360_obs.csv"), row.names = FALSE)
-
