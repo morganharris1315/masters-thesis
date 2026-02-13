@@ -302,10 +302,14 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
     filter(RX1day > upper_whisker)
   
   exceed_max <- max(df_panel$exceedances, na.rm = TRUE)
-  rx1day_max <- max(df_panel$RX1day, na.rm = TRUE)
+  facet_max <- df_panel %>%
+    group_by(Region, Period) %>%
+    summarise(facet_rx1day_max = max(RX1day, na.rm = TRUE), .groups = "drop")
+  rx1day_max <- max(facet_max$facet_rx1day_max, na.rm = TRUE)
   
   pct_labels <- group_counts %>%
     left_join(period_totals, by = c("Region", "Period")) %>%
+    left_join(facet_max, by = c("Region", "Period")) %>%
     mutate(
       pct = 100 * n / total_years,
       pct_label = case_when(
@@ -313,7 +317,7 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
         pct < 0.1 ~ "<0.1%",
         TRUE ~ paste0(round(pct, 1), "%")
       ),
-      y = rx1day_max * 1.03
+      y = facet_rx1day_max * 1.03
     )
   
   ggplot() +
@@ -341,12 +345,16 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       colour = box_colour,
       size = 1.5
     ) +
-    geom_text(
+    geom_label(
       data = pct_labels,
       aes(x = factor(exceedances), y = y, label = pct_label),
-      size = 2.5,
+      size = 3.1,
+      fontface = "bold",
       vjust = 0,
-      colour = "black"
+      colour = "black",
+      fill = "white",
+      label.size = NA,
+      label.padding = unit(0.08, "lines")
     ) +
     facet_grid(Region ~ Period, switch = "y") +
     scale_x_discrete(limits = as.character(0:exceed_max)) +
@@ -358,9 +366,17 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       strip.text.y = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
       strip.text.y.left = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
       panel.spacing = unit(1.1, "lines"),
+      panel.spacing.x = unit(1.5, "lines"),
       panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
-      axis.line = element_blank()
+      axis.line = element_blank(),
+      axis.text.x = element_text(size = 8)
     )
+}
+
+plot_rx1day_vs_exceedance_region <- function(df_panel_region) {
+  plot_rx1day_vs_exceedance_panel(df_panel_region) +
+    facet_grid(. ~ Period) +
+    labs(title = paste0(unique(df_panel_region$Region), ": RX1day vs Exceedances"))
 }
 
 # Save helper --------------------------------------------------------------
@@ -377,6 +393,9 @@ save_plot <- function(plot, filename, width = fig_width_full, height = fig_heigh
     bg = "white"
   )
 }
+
+panel_width <- 13
+panel_height <- 12
 
 # Build all outputs --------------------------------------------------------
 global_hist_max_exceedance <- max(unlist(lapply(regions_mod, function(reg) {
@@ -430,7 +449,18 @@ for (reg in regions_mod) {
 
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)
 panel_plot <- plot_rx1day_vs_exceedance_panel(panel_df)
-save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = fig_width_standard, height = fig_height_tall)
+save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = panel_width, height = panel_height)
+
+invisible(lapply(regions_mod, function(reg) {
+  region_df <- panel_df %>% filter(Region == region_labels[[reg]])
+  region_plot <- plot_rx1day_vs_exceedance_region(region_df)
+  save_plot(
+    region_plot,
+    paste0(reg, "_rx1day_exceedance_boxplot_readable.png"),
+    width = 10.5,
+    height = 4.8
+  )
+}))
 
 
 # Threshold summary table -------------------------------------------------
