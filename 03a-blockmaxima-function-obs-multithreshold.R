@@ -179,7 +179,7 @@ plot_hist_exceedances_obs <- function(df_station_obs, thr, station_name) {
 # master function: run RX1day analysis for one station --------------------
 run_RX1day_station_analysis_obs <- function(combined_df_obs,station_name,
                                             output_dir = "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/RX1day_plots") {
-
+  
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
   if (!station_name %in% combined_df_obs$station) {
@@ -268,14 +268,11 @@ head(combined_df_obs)
 
 # Example years -----------------------------------------------------------
 
-# Select example years safely
 select_example_years_obs <- function(df_station, threshold) {
   
-  # Compute RX1day per year
   RX1day_df <- compute_RX1day_obs(df_station) %>%
     rename(Year = hydro_year)
   
-  # Count exceedances per year
   exceedances <- df_station %>%
     group_by(hydro_year) %>%
     summarise(exceedance_days = sum(rainfall_mm > threshold, na.rm = TRUE), .groups = "drop") %>%
@@ -355,7 +352,6 @@ plot_exceedance_examples_obs <- function(df_station, station_name, threshold, co
     summarise(max_val = max(rainfall_mm, na.rm = TRUE)) %>%
     pull(max_val) %>% {. + 10}  # add buffer
   
-  # Create plots safely
   plots <- list()
   
   if(!is.na(years$muted)) {
@@ -368,14 +364,13 @@ plot_exceedance_examples_obs <- function(df_station, station_name, threshold, co
     plots$high <- plot_daily_example_obs(df_station, years$high, threshold, paste0("High Exceedance Year (", years$high, ")"), y_max, colour)
   }
   
-  # Combine available plots
   wrap_plots(plots) +
     plot_annotation(title = station_name, theme = theme(plot.title = element_text(hjust = 0.5, face = "bold")))
 }
 
 # Master function for example years per station
 run_example_years_obs <- function(df_obs, station_name, output_dir) {
-
+  
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
   if(!station_name %in% df_obs$station) {
@@ -391,7 +386,6 @@ run_example_years_obs <- function(df_obs, station_name, output_dir) {
   p_example_mid <- plot_exceedance_examples_obs(df_station, station_name, thr_station$thresholds["mid"])
   p_example_360 <- plot_exceedance_examples_obs(df_station, station_name, thr_station$thresholds["onein360"], colour = "#E69F00")
   
-  # Save plots if they exist
   station_safe <- gsub(" ", "_", station_name)
   
   if(!is.null(p_example_mid)) {
@@ -442,7 +436,6 @@ imap(region_output_dirs, function(region_dir, region_name) {
       return(NULL)
     }
     
-    # Otherwise, run example-years analysis
     run_example_years_obs(combined_df_obs, station_name, region_dir)
   })
 })
@@ -451,7 +444,7 @@ imap(region_output_dirs, function(region_dir, region_name) {
 # boxplots ----------------------------------------------------------------
 
 run_rx1day_boxplots_obs <- function(df_obs, station_name, output_dir) {
-
+  
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
   if(!station_name %in% df_obs$station) {
@@ -527,7 +520,7 @@ run_rx1day_boxplots_obs <- function(df_obs, station_name, output_dir) {
         title = paste(station_name, "-", title)
       ) +
       guides(fill = "none") +
-            scale_y_continuous(breaks = seq(0, y_top, by = 100)) +
+      scale_y_continuous(breaks = seq(0, y_top, by = 100)) +
       
       coord_cartesian(ylim = c(0, y_top), clip = "off") +
       scale_x_discrete(limits = as.character(0:exceed_max))
@@ -636,7 +629,7 @@ head(exceedances_table_missingyearsgetaround, 20)
 # finding stations with issues
 stationswithissues <- high_exceedance_table %>%
   filter(Exceedance_Days > 12) %>%
- distinct(Station) #remove this to look at years etc. 
+  distinct(Station) #remove this to look at years etc. 
 
 print(stationswithissues,n =38)
 
