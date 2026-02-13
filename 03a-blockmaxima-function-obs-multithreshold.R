@@ -553,6 +553,7 @@ imap(region_output_dirs, function(region_dir, region_name) {
 
 
 
+# High exccedance examples table  -----------------------------------------
 build_high_exceedance_table_all_stations <- function(combined_df_obs) {
   
   stations <- unique(combined_df_obs$station)
