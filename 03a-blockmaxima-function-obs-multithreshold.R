@@ -221,8 +221,8 @@ run_RX1day_station_analysis_obs <- function(combined_df_obs,station_name,
   ggsave(
     filename = file.path(output_dir, paste0(station_safe, "_RX1day_Histogram.png")),
     plot = p_hist,
-    width = fig_width_hoz_full,
-    height = fig_height_med,
+    width = fig_width_standard,
+    height = fig_height_standard,
     dpi = 300
   )
   
@@ -394,8 +394,8 @@ run_example_years_obs <- function(df_obs, station_name, output_dir) {
     ggsave(
       filename = file.path(output_dir, paste0(station_safe, "_RX1day_ExampleYears_Mid.png")),
       plot = p_example_mid,
-      width = fig_width_full,
-      height = fig_height_tall,
+      width = fig_width_standard,
+      height = fig_height_standard,
       dpi = 300
     )
   }
@@ -404,8 +404,8 @@ run_example_years_obs <- function(df_obs, station_name, output_dir) {
     ggsave(
       filename = file.path(output_dir, paste0(station_safe, "_RX1day_ExampleYears_360.png")),
       plot = p_example_360,
-      width = fig_width_full,
-      height = fig_height_tall,
+      width = fig_width_standard,
+      height = fig_height_standard,
       dpi = 300
     )
   }

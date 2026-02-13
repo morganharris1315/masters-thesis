@@ -591,10 +591,10 @@ region_labels <- c(
 
 for (reg in regions_mod) {
   save_plot(get(paste0("p_RX1day_timseries_", reg, "_combined")), paste0(reg, "_rx1day_timeseries_combined.png"),height = fig_height_med)
-  save_plot(get(paste0("p_exampleyears_", reg, "_CD_mid")), paste0(reg, "_mid_cd_examples.png"), height = fig_height_short)
-  save_plot(get(paste0("p_exampleyears_", reg, "_FP_mid")), paste0(reg, "_mid_fp_examples.png"), height = fig_height_short)
-  save_plot(get(paste0("p_exampleyears_", reg, "_CD_360")), paste0(reg, "_1in360_cd_examples.png"), height = fig_height_short)
-  save_plot(get(paste0("p_exampleyears_", reg, "_FP_360")), paste0(reg, "_1in360_fp_examples.png"), height = fig_height_short)
+  save_plot(get(paste0("p_exampleyears_", reg, "_CD_mid")), paste0(reg, "_mid_cd_examples.png"), width = fig_width_standard, height = fig_height_standard)
+  save_plot(get(paste0("p_exampleyears_", reg, "_FP_mid")), paste0(reg, "_mid_fp_examples.png"), width = fig_width_standard, height = fig_height_standard)
+  save_plot(get(paste0("p_exampleyears_", reg, "_CD_360")), paste0(reg, "_1in360_cd_examples.png"), width = fig_width_standard, height = fig_height_standard)
+  save_plot(get(paste0("p_exampleyears_", reg, "_FP_360")), paste0(reg, "_1in360_fp_examples.png"), width = fig_width_standard, height = fig_height_standard)
   
   box_cd_mid  <- get(paste0("boxplot_cd_mid_", reg))
   box_fp_mid  <- get(paste0("boxplot_fp_mid_", reg))
@@ -607,7 +607,7 @@ for (reg in regions_mod) {
   
   save_plot(combined_boxplot, paste0(reg, "_rx1day_all_boxplots.png"), width = fig_width_full,height = fig_height_tall)
   
-  save_plot(get(paste0("hist_plot_", reg)), paste0(reg, "_exceedance_allthresholds_cd_fp_histogram.png"), height = fig_height_med)
+  save_plot(get(paste0("hist_plot_", reg)), paste0(reg, "_exceedance_allthresholds_cd_fp_histogram.png"), width = fig_width_standard, height = fig_height_standard)
 }
 
 # Summary tables ----------------------------------------------------------
@@ -847,7 +847,7 @@ hist_plots_fixedCD <- lapply(hist_fixedCD_all, plot_hist_exceedances)
 hist_plots_fixedCD$waikato
 hist_plots_fixedCD$milford
 
-for (reg in regions_mod) {save_plot(hist_plots_fixedCD[[reg]], paste0(reg, "_exceedance_fixedCD_allthresholds_histogram.png"), height = fig_height_med)}
+for (reg in regions_mod) {save_plot(hist_plots_fixedCD[[reg]], paste0(reg, "_exceedance_fixedCD_allthresholds_histogram.png"), width = fig_width_standard, height = fig_height_standard)}
 
 #checking it is working 
 hist_original <- build_hist_df("waikato", thr_list, waikato_CD, waikato_FP)
