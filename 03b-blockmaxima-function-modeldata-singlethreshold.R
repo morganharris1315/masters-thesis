@@ -421,11 +421,11 @@ for (reg in regions_mod) {
     thr_list[[paste0(reg, "_FP")]]$threshold,
     y_max_override = shared_example_y_max
   )
-  save_plot(p_ex_cd, paste0(reg, "_threshold_cd_examples.png"), height = fig_height_short)
-  save_plot(p_ex_fp, paste0(reg, "_threshold_fp_examples.png"), height = fig_height_short)
+  save_plot(p_ex_cd, paste0(reg, "_threshold_cd_examples.png"), width = fig_width_standard, height = fig_height_standard)
+  save_plot(p_ex_fp, paste0(reg, "_threshold_fp_examples.png"), width = fig_width_standard, height = fig_height_standard)
   
   hist_df <- build_hist_df(reg, thr_list, get(paste0(reg, "_CD")), get(paste0(reg, "_FP")))
-  save_plot(plot_hist_exceedances(hist_df, global_hist_max_exceedance), paste0(reg, "_exceedance_threshold_cd_fp_histogram.png"), height = fig_height_med)
+  save_plot(plot_hist_exceedances(hist_df, global_hist_max_exceedance), paste0(reg, "_exceedance_threshold_cd_fp_histogram.png"), width = fig_width_standard, height = fig_height_standard)
 }
 
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)

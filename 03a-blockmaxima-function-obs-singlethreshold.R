@@ -165,8 +165,8 @@ run_RX1day_station_analysis_obs_single_threshold_st <- function(
   ggsave(
     filename = file.path(output_dir, paste0(station_safe, "_RX1day_Histogram.png")),
     plot = p_hist,
-    width = fig_width_hoz_full,
-    height = fig_height_med,
+    width = fig_width_standard,
+    height = fig_height_standard,
     dpi = 300
   )
 
@@ -320,8 +320,8 @@ run_example_years_obs_single_threshold_st <- function(df_obs, station_name, outp
     ggsave(
       filename = file.path(output_dir, paste0(station_safe, "_RX1day_ExampleYears_SingleThreshold.png")),
       plot = p_example,
-      width = fig_width_full,
-      height = fig_height_tall,
+      width = fig_width_standard,
+      height = fig_height_standard,
       dpi = 300
     )
   }
