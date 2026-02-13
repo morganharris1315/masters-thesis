@@ -430,7 +430,7 @@ for (reg in regions_mod) {
 
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)
 panel_plot <- plot_rx1day_vs_exceedance_panel(panel_df)
-save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = fig_width_hoz_full, height = fig_height_hoz_full)
+save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = fig_width_full, height = fig_height_full)
 
 
 # Threshold summary table -------------------------------------------------
