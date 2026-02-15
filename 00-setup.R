@@ -45,8 +45,8 @@ fig_height_med   <- 4.8
 fig_height_tall  <- 6.2
 fig_height_full <- 7
 
-fig_width_standard  <- 17.02 / 2.54
-fig_height_standard <- 9.65 / 2.54
+fig_width_standard  <- 16.89 / 2.54
+fig_height_standard <- 19 / 2.54
 
 fig_width_hoz_full  <- 11
 fig_height_hoz_full <- 7.2
