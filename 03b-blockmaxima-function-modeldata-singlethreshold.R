@@ -142,6 +142,7 @@ build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
   
   hist_df %>%
     count(Period, days) %>%
+    complete(Period, days = 0:max(days, na.rm = TRUE), fill = list(n = 0)) %>%
     group_by(Period) %>%
     mutate(prop_years = n / sum(n)) %>%
     ungroup() %>%
@@ -171,7 +172,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance) {
     facet_grid(. ~ Period) +
     scale_x_continuous(
       breaks = day_breaks,
-      limits = c(0, max_exceedance),
+      limits = c(-0.5, max_exceedance + 0.5),
       expand = expansion(mult = c(0, 0))
     ) +
     scale_y_continuous(
