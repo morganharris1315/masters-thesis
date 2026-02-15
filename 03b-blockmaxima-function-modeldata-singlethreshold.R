@@ -198,6 +198,43 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance) {
     )
 }
 
+# Histogram for top 10% annual RX1day years ---------------------------------
+build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, max_exceedance_bin = 10) {
+  threshold <- thr_list[[paste0(region_name, "_CD")]]$threshold
+  exceed_days <- count_exceedances_per_year(df, threshold)
+  rx1day_90th <- as.numeric(quantile(df$RX1day, probs = 0.9, na.rm = TRUE, type = 7))
+
+  top10_df <- df %>%
+    transmute(
+      Year,
+      RX1day,
+      exceed_days = exceed_days,
+      exceedance_bin = pmin(exceed_days, max_exceedance_bin)
+    ) %>%
+    filter(RX1day >= rx1day_90th)
+
+  hist_df <- top10_df %>%
+    count(exceedance_bin, name = "n_years") %>%
+    complete(exceedance_bin = 0:max_exceedance_bin, fill = list(n_years = 0)) %>%
+    mutate(
+      prop_years = n_years / sum(n_years),
+      Period = period_labels[[period]],
+      Region = region_labels[[region_name]],
+      rx1day_90th = rx1day_90th,
+      n_top10_years = nrow(top10_df)
+    )
+
+  hist_df
+}
+
+build_top_rx1day_hist_region_df <- function(region_name, thr_list, df_CD, df_FP, max_exceedance_bin = 10) {
+  bind_rows(
+    build_top_rx1day_hist_df(region_name, "CD", thr_list, df_CD, max_exceedance_bin),
+    build_top_rx1day_hist_df(region_name, "FP", thr_list, df_FP, max_exceedance_bin)
+  ) %>%
+    rename(days = exceedance_bin)
+}
+
 # Example years ------------------------------------------------------------
 extract_daily_timeseries <- function(df, year) {
   df %>%
@@ -503,6 +540,20 @@ for (reg in regions_mod) {
   
   hist_df <- build_hist_df(reg, thr_list, get(paste0(reg, "_CD")), get(paste0(reg, "_FP")))
   save_plot(plot_hist_exceedances(hist_df, global_hist_max_exceedance), paste0(reg, "_exceedance_threshold_cd_fp_histogram.png"), width = fig_width_standard, height = fig_height_standard)
+
+  top10_hist_df <- build_top_rx1day_hist_region_df(
+    reg,
+    thr_list,
+    get(paste0(reg, "_CD")),
+    get(paste0(reg, "_FP")),
+    max_exceedance_bin = 10
+  )
+  save_plot(
+    plot_hist_exceedances(top10_hist_df, max_exceedance = 10),
+    paste0(reg, "_top10_rx1day_exceedance_bins_histogram.png"),
+    width = fig_width_standard,
+    height = fig_height_standard
+  )
 }
 
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)
@@ -647,6 +698,35 @@ cumulative_proportion_table
 write.csv(
   cumulative_proportion_table,
   file.path(plot_output_dir, "cumulative_proportion_table_fixedCD.csv"),
+  row.names = FALSE
+)
+
+
+# Summary table: exceedance bins for top 10% RX1day years -------------------
+top10_rx1day_exceedance_summary <- bind_rows(lapply(regions_mod, function(reg) {
+  build_top_rx1day_hist_region_df(
+    region_name = reg,
+    thr_list = thr_list,
+    df_CD = get(paste0(reg, "_CD")),
+    df_FP = get(paste0(reg, "_FP")),
+    max_exceedance_bin = 10
+  )
+})) %>%
+  transmute(
+    Region,
+    Scenario = Period,
+    `RX1day 90th Percentile (mm)` = round(rx1day_90th, 2),
+    `Top 10% Years (count)` = n_top10_years,
+    `Exceedance Days Bin` = days,
+    `Number of Years in Bin` = n_years,
+    `Proportion of Top 10% Years` = round(prop_years, 4)
+  )
+
+top10_rx1day_exceedance_summary
+
+write.csv(
+  top10_rx1day_exceedance_summary,
+  file.path(plot_output_dir, "top10_rx1day_exceedance_bins_summary.csv"),
   row.names = FALSE
 )
 
