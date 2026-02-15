@@ -39,14 +39,14 @@ theme_thesis <- theme_minimal(base_size = 9) +
     panel.spacing = unit(0.5, "lines")
   )
 
-fig_width_full  <- 6.7
+fig_width_full  <-  20 / 2.54
 fig_height_short <- 3.8
 fig_height_med   <- 4.8
 fig_height_tall  <- 6.2
-fig_height_full <- 7
+fig_height_full <- 24 / 2.54
 
-fig_width_standard  <- 16.89 / 2.54
-fig_height_standard <- 19 / 2.54
+fig_width_standard  <- 17.02 / 2.54
+fig_height_standard <- 9.65 / 2.54
 
 fig_width_hoz_full  <- 11
 fig_height_hoz_full <- 7.2
