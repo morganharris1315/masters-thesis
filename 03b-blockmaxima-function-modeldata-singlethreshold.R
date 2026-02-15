@@ -393,6 +393,7 @@ plot_rx1day_timeseries_panel <- function(df_panel) {
     summarise(
       threshold = first(threshold),
       x_pos = min(Year, na.rm = TRUE),
+      y_pos = Inf,
       threshold_label = paste0("Threshold: ", round(first(threshold), 1), " mm"),
       .groups = "drop"
     )
@@ -410,10 +411,11 @@ plot_rx1day_timeseries_panel <- function(df_panel) {
     ) +
     geom_text(
       data = threshold_df,
-      aes(x = x_pos, y = threshold, label = threshold_label),
+      aes(x = x_pos, y = y_pos, label = threshold_label),
       hjust = 0,
-      vjust = -0.3,
+      vjust = 1.15,
       size = 2.5,
+      fontface = "bold",
       colour = box_colour,
       inherit.aes = FALSE
     ) +
