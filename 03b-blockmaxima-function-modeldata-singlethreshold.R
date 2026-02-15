@@ -386,8 +386,6 @@ global_hist_max_exceedance <- max(unlist(lapply(regions_mod, function(reg) {
   max(c(exc_cd, exc_fp), na.rm = TRUE)
 })), na.rm = TRUE)
 
-rx1day_timeseries_plots <- list()
-
 for (reg in regions_mod) {
   y_max <- max(get(paste0(reg, "_CD"))$RX1day, get(paste0(reg, "_FP"))$RX1day, na.rm = TRUE)
   y_limits <- c(0, y_max * 1.05)
@@ -399,7 +397,6 @@ for (reg in regions_mod) {
     get(paste0(reg, "_CD")),
     get(paste0(reg, "_FP"))
   )
-  rx1day_timeseries_plots[[reg]] <- p_rx1day
   save_plot(p_rx1day, paste0(reg, "_rx1day_timeseries_combined.png"), height = fig_height_med)
   
   shared_example_y_max <- compute_shared_example_y_max(
@@ -431,23 +428,9 @@ for (reg in regions_mod) {
   save_plot(plot_hist_exceedances(hist_df, global_hist_max_exceedance), paste0(reg, "_exceedance_threshold_cd_fp_histogram.png"), width = fig_width_standard, height = fig_height_standard)
 }
 
-all_regions_rx1day_timeseries <- wrap_plots(
-  rx1day_timeseries_plots,
-  ncol = 2,
-  byrow = TRUE
-) +
-  plot_annotation(title = "Annual RX1day Time Series by Region")
-
-save_plot(
-  all_regions_rx1day_timeseries,
-  "all_regions_rx1day_timeseries_combined.png",
-  width = fig_width_standard,
-  height = fig_height_standard
-)
-
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)
 panel_plot <- plot_rx1day_vs_exceedance_panel(panel_df)
-save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = fig_width_standard, height = fig_height_tall)
+save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = fig_width_full, height = fig_height_tall)
 
 
 # Threshold summary table -------------------------------------------------
