@@ -363,6 +363,63 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
     )
 }
 
+build_timeseries_panel_df <- function(regions_mod, thr_list) {
+  bind_rows(lapply(regions_mod, function(reg) {
+    bind_rows(lapply(c("CD", "FP"), function(period) {
+      df <- get(paste0(reg, "_", period))
+      threshold <- thr_list[[paste0(reg, "_", period)]]$threshold
+
+      data.frame(
+        Region = region_labels[[reg]],
+        Period = period_labels[[period]],
+        Year = df$Year,
+        RX1day = df$RX1day,
+        threshold = threshold
+      )
+    }))
+  })) %>%
+    mutate(
+      Region = factor(Region, levels = region_labels[regions_mod]),
+      Period = factor(Period, levels = c("Current Day", "Future Projection"))
+    )
+}
+
+plot_rx1day_timeseries_panel <- function(df_panel) {
+  threshold_df <- df_panel %>%
+    distinct(Region, Period, threshold)
+  rx1day_max <- max(df_panel$RX1day, na.rm = TRUE)
+
+  ggplot(df_panel, aes(x = Year, y = RX1day)) +
+    geom_line(colour = "black", linewidth = 0.35) +
+    geom_hline(
+      data = threshold_df,
+      aes(yintercept = threshold),
+      colour = box_colour,
+      linetype = "dashed",
+      linewidth = 1.1,
+      inherit.aes = FALSE
+    ) +
+    facet_grid(Region ~ Period, switch = "y") +
+    scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
+    scale_y_continuous(limits = c(0, rx1day_max * 1.05), expand = expansion(mult = c(0, 0.02))) +
+    labs(
+      title = "RX1day Annual Time Series",
+      x = "Year",
+      y = "RX1day (mm)"
+    ) +
+    theme_thesis +
+    theme(
+      strip.placement = "outside",
+      strip.text.x = element_text(face = "bold"),
+      strip.text.y = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
+      strip.text.y.left = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
+      panel.spacing = unit(1.1, "lines"),
+      panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
+      axis.line = element_blank(),
+      axis.ticks = element_line(colour = "black", linewidth = 0.3)
+    )
+}
+
 # Save helper --------------------------------------------------------------
 plot_output_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/single_threshold"
 dir.create(plot_output_dir, recursive = TRUE, showWarnings = FALSE)
@@ -431,6 +488,10 @@ for (reg in regions_mod) {
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)
 panel_plot <- plot_rx1day_vs_exceedance_panel(panel_df)
 save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = fig_width_full, height = fig_height_tall)
+
+timeseries_panel_df <- build_timeseries_panel_df(regions_mod, thr_list)
+timeseries_panel_plot <- plot_rx1day_timeseries_panel(timeseries_panel_df)
+save_plot(timeseries_panel_plot, "all_regions_rx1day_timeseries_panel.png", width = fig_width_full, height = fig_height_tall)
 
 
 # Threshold summary table -------------------------------------------------
