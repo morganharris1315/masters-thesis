@@ -364,6 +364,8 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
 }
 
 build_timeseries_panel_df <- function(regions_mod, thr_list) {
+  panel_region_order <- c("Milford Sound", "Napier", "Northland", "Waikato")
+
   bind_rows(lapply(regions_mod, function(reg) {
     bind_rows(lapply(c("CD", "FP"), function(period) {
       df <- get(paste0(reg, "_", period))
@@ -379,14 +381,20 @@ build_timeseries_panel_df <- function(regions_mod, thr_list) {
     }))
   })) %>%
     mutate(
-      Region = factor(Region, levels = region_labels[regions_mod]),
+      Region = factor(Region, levels = panel_region_order),
       Period = factor(Period, levels = c("Current Day", "Future Projection"))
     )
 }
 
 plot_rx1day_timeseries_panel <- function(df_panel) {
   threshold_df <- df_panel %>%
-    distinct(Region, Period, threshold)
+    group_by(Region, Period) %>%
+    summarise(
+      threshold = first(threshold),
+      x_pos = min(Year, na.rm = TRUE),
+      threshold_label = paste0("Threshold: ", round(first(threshold), 1), " mm"),
+      .groups = "drop"
+    )
   rx1day_max <- max(df_panel$RX1day, na.rm = TRUE)
 
   ggplot(df_panel, aes(x = Year, y = RX1day)) +
@@ -399,7 +407,16 @@ plot_rx1day_timeseries_panel <- function(df_panel) {
       linewidth = 1.1,
       inherit.aes = FALSE
     ) +
-    facet_grid(Region ~ Period, switch = "y") +
+    geom_text(
+      data = threshold_df,
+      aes(x = x_pos, y = threshold, label = threshold_label),
+      hjust = 0,
+      vjust = -0.3,
+      size = 2.5,
+      colour = box_colour,
+      inherit.aes = FALSE
+    ) +
+    facet_grid(Region ~ Period, switch = "y", scales = "free_x") +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(limits = c(0, rx1day_max * 1.05), expand = expansion(mult = c(0, 0.02))) +
     labs(
