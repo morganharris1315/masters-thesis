@@ -259,6 +259,60 @@ select_example_years <- function(df, threshold) {
   list(muted = muted_year, single = single_year, high = high_year)
 }
 
+day_cols <- as.character(1:360)
+
+annual_rain <- function(df) {
+  df %>%
+    mutate(
+      AnnualRain = rowSums(across(all_of(day_cols)), na.rm = TRUE)
+    )
+}
+
+make_example_year_row <- function(df, exceedances, region, scenario, threshold_label, category, year) {
+  if (!"AnnualRain" %in% colnames(df)) {
+    df <- annual_rain(df)
+  }
+
+  n_years <- nrow(df)
+
+  rx_stats <- df %>%
+    arrange(desc(RX1day)) %>%
+    mutate(
+      RX1day_rank = row_number(),
+      RX1day_percentile = (1 - (RX1day_rank - 1) / (n_years - 1)) * 100
+    )
+
+  yr_row <- df %>% filter(Year == year)
+  yr_rx <- rx_stats %>% filter(Year == year)
+
+  data.frame(
+    Region = region,
+    Scenario = scenario,
+    Threshold = threshold_label,
+    `Example Type` = category,
+    Year = year,
+    `Exceedance Days` = exceedances[as.character(year)],
+    `RX1day (mm)` = yr_row$RX1day,
+    `RX1day Rank` = yr_rx$RX1day_rank,
+    `RX1day Percentile` = yr_rx$RX1day_percentile,
+    `Annual Rainfall (mm)` = yr_row$AnnualRain,
+    stringsAsFactors = FALSE,
+    check.names = FALSE
+  )
+}
+
+build_example_year_table <- function(df, threshold_value, region, scenario, threshold_label) {
+  exceedances <- count_exceedances_per_year(df, threshold_value)
+  names(exceedances) <- df$Year
+  yrs <- select_example_years(df, threshold_value)
+
+  bind_rows(
+    make_example_year_row(df, exceedances, region, scenario, threshold_label, "Muted", yrs$muted),
+    make_example_year_row(df, exceedances, region, scenario, threshold_label, "Single Exceedance", yrs$single),
+    make_example_year_row(df, exceedances, region, scenario, threshold_label, "High Exceedance", yrs$high)
+  )
+}
+
 compute_y_max <- function(df, years, buffer = 10) {
   max_rx <- df %>% filter(Year %in% unlist(years)) %>% summarise(m = max(RX1day, na.rm = TRUE)) %>% pull(m)
   ceiling((max_rx + buffer) / 10) * 10
@@ -728,6 +782,32 @@ top10_rx1day_exceedance_summary
 write.csv(
   top10_rx1day_exceedance_summary,
   file.path(plot_output_dir, "top10_rx1day_exceedance_bins_summary.csv"),
+  row.names = FALSE
+)
+
+
+# Example years table ------------------------------------------------------
+table_example_years_singlethreshold <- bind_rows(lapply(regions_mod, function(reg) {
+  bind_rows(lapply(c("CD", "FP"), function(period) {
+    df <- get(paste0(reg, "_", period)) %>% annual_rain()
+    threshold_value <- thr_list[[paste0(reg, "_", period)]]$threshold
+
+    build_example_year_table(
+      df = df,
+      threshold_value = threshold_value,
+      region = region_labels[[reg]],
+      scenario = period_labels[[period]],
+      threshold_label = "Single threshold"
+    )
+  }))
+})) %>%
+  arrange(Region, Scenario, `Example Type`)
+
+table_example_years_singlethreshold
+
+write.csv(
+  table_example_years_singlethreshold,
+  file.path(plot_output_dir, "example_years_table_singlethreshold.csv"),
   row.names = FALSE
 )
 
