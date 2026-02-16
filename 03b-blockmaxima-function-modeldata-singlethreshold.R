@@ -45,7 +45,6 @@ region_labels <- c(
 period_labels <- c(CD = "Current Day", FP = "Future Projection")
 box_colour <- "#93acff"
 box_colour_dark <- "#6f8dff"
-period_colours <- c("Current Day" = "#4C78A8", "Future Projection" = "#F58518")
 
 # Calculate thresholds -----------------------------------------------------
 calculate_rx1day_threshold <- function(df) {
@@ -200,63 +199,12 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
     )
 }
 
-plot_top10_exceedance_distribution <- function(hist_df_prop, max_exceedance) {
-  region_title <- unique(hist_df_prop$Region)
-
-  plot_df <- hist_df_prop %>%
-    mutate(Period = factor(Period, levels = c("Current Day", "Future Projection")))
-
-  n_label_df <- plot_df %>%
-    distinct(Period, n_top10_years) %>%
-    mutate(label = paste0("Top 10% years (n = ", n_top10_years, ")"))
-
-  ggplot(plot_df, aes(x = days, y = prop_years, colour = Period)) +
-    geom_line(linewidth = 0.9) +
-    geom_point(size = 2.2) +
-    facet_grid(. ~ Period) +
-    geom_text(
-      data = n_label_df,
-      aes(x = 0, y = Inf, label = label),
-      hjust = 0,
-      vjust = 1.2,
-      size = 2.9,
-      colour = "black",
-      inherit.aes = FALSE
-    ) +
-    scale_colour_manual(values = period_colours, guide = "none") +
-    scale_x_continuous(
-      breaks = 0:max_exceedance,
-      labels = c(as.character(0:(max_exceedance - 1)), paste0(max_exceedance, "+")),
-      limits = c(0, max_exceedance),
-      expand = expansion(mult = c(0.01, 0.02))
-    ) +
-    scale_y_continuous(
-      labels = scales::label_percent(accuracy = 1),
-      limits = c(0, NA),
-      expand = expansion(mult = c(0, 0.08))
-    ) +
-    labs(
-      title = paste0(region_title, " – Distribution of Exceedance Days for Top 10% RX1day Years"),
-      x = "Exceedance days per year (CD threshold)",
-      y = "Share of top-10% years"
-    ) +
-    theme_thesis +
-    theme_model_axes +
-    theme(
-      panel.grid.major = element_line(colour = "grey82", linewidth = 0.3),
-      panel.grid.minor = element_blank(),
-      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.2),
-      axis.line = element_line(colour = "black", linewidth = 0.2),
-      strip.text.x = element_text(face = "bold")
-    )
-}
-
 # Histogram for top 10% annual RX1day years ---------------------------------
 build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, max_exceedance_bin = 10) {
   threshold <- thr_list[[paste0(region_name, "_CD")]]$threshold
   exceed_days <- count_exceedances_per_year(df, threshold)
   rx1day_90th <- as.numeric(quantile(df$RX1day, probs = 0.9, na.rm = TRUE, type = 7))
-
+  
   top10_df <- df %>%
     transmute(
       Year,
@@ -265,7 +213,7 @@ build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, max_exce
       exceedance_bin = pmin(exceed_days, max_exceedance_bin)
     ) %>%
     filter(RX1day >= rx1day_90th)
-
+  
   hist_df <- top10_df %>%
     count(exceedance_bin, name = "n_years") %>%
     complete(exceedance_bin = 0:max_exceedance_bin, fill = list(n_years = 0)) %>%
@@ -276,7 +224,7 @@ build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, max_exce
       rx1day_90th = rx1day_90th,
       n_top10_years = nrow(top10_df)
     )
-
+  
   hist_df
 }
 
@@ -324,19 +272,19 @@ make_example_year_row <- function(df, exceedances, region, scenario, threshold_l
   if (!"AnnualRain" %in% colnames(df)) {
     df <- annual_rain(df)
   }
-
+  
   n_years <- nrow(df)
-
+  
   rx_stats <- df %>%
     arrange(desc(RX1day)) %>%
     mutate(
       RX1day_rank = row_number(),
       RX1day_percentile = (1 - (RX1day_rank - 1) / (n_years - 1)) * 100
     )
-
+  
   yr_row <- df %>% filter(Year == year)
   yr_rx <- rx_stats %>% filter(Year == year)
-
+  
   data.frame(
     Region = region,
     Scenario = scenario,
@@ -357,7 +305,7 @@ build_example_year_table <- function(df, threshold_value, region, scenario, thre
   exceedances <- count_exceedances_per_year(df, threshold_value)
   names(exceedances) <- df$Year
   yrs <- select_example_years(df, threshold_value)
-
+  
   bind_rows(
     make_example_year_row(df, exceedances, region, scenario, threshold_label, "Muted", yrs$muted),
     make_example_year_row(df, exceedances, region, scenario, threshold_label, "Single Exceedance", yrs$single),
@@ -510,12 +458,12 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
 
 build_timeseries_panel_df <- function(regions_mod, thr_list) {
   panel_region_order <- c("Milford Sound", "Napier", "Northland", "Waikato")
-
+  
   bind_rows(lapply(regions_mod, function(reg) {
     bind_rows(lapply(c("CD", "FP"), function(period) {
       df <- get(paste0(reg, "_", period))
       threshold <- thr_list[[paste0(reg, "_", period)]]$threshold
-
+      
       data.frame(
         Region = region_labels[[reg]],
         Period = period_labels[[period]],
@@ -542,7 +490,7 @@ plot_rx1day_timeseries_panel <- function(df_panel) {
       .groups = "drop"
     )
   rx1day_max <- max(df_panel$RX1day, na.rm = TRUE)
-
+  
   ggplot(df_panel, aes(x = Year, y = RX1day)) +
     geom_line(colour = "black", linewidth = 0.35) +
     geom_hline(
@@ -647,7 +595,7 @@ for (reg in regions_mod) {
   
   hist_df <- build_hist_df(reg, thr_list, get(paste0(reg, "_CD")), get(paste0(reg, "_FP")))
   save_plot(plot_hist_exceedances(hist_df, global_hist_max_exceedance), paste0(reg, "_exceedance_threshold_cd_fp_histogram.png"), width = fig_width_standard, height = fig_height_standard)
-
+  
   top10_hist_df <- build_top_rx1day_hist_region_df(
     reg,
     thr_list,
@@ -656,7 +604,7 @@ for (reg in regions_mod) {
     max_exceedance_bin = 10
   )
   save_plot(
-    plot_top10_exceedance_distribution(top10_hist_df, max_exceedance = 10),
+    plot_hist_exceedances(top10_hist_df, max_exceedance = 10, fill_colour = box_colour_dark),
     paste0(reg, "_top10_rx1day_exceedance_bins_histogram.png"),
     width = fig_width_standard,
     height = fig_height_standard
@@ -843,7 +791,7 @@ table_example_years_singlethreshold <- bind_rows(lapply(regions_mod, function(re
   bind_rows(lapply(c("CD", "FP"), function(period) {
     df <- get(paste0(reg, "_", period)) %>% annual_rain()
     threshold_value <- thr_list[[paste0(reg, "_", period)]]$threshold
-
+    
     build_example_year_table(
       df = df,
       threshold_value = threshold_value,
