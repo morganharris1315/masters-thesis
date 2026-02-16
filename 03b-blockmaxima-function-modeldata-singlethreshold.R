@@ -757,6 +757,32 @@ write.csv(
 )
 
 
+# Summary table: exceedance bins for all years (fixed CD threshold) ----------
+all_years_exceedance_summary <- bind_rows(lapply(regions_mod, function(reg) {
+  build_hist_df(
+    region_name = reg,
+    thr_list = thr_list,
+    df_CD = get(paste0(reg, "_CD")),
+    df_FP = get(paste0(reg, "_FP"))
+  )
+})) %>%
+  transmute(
+    Region,
+    Scenario = Period,
+    `Exceedance Days Bin` = days,
+    `Number of Years in Bin` = n,
+    `Proportion of All Years` = round(prop_years, 4)
+  )
+
+all_years_exceedance_summary
+
+write.csv(
+  all_years_exceedance_summary,
+  file.path(plot_output_dir, "all_years_exceedance_bins_summary.csv"),
+  row.names = FALSE
+)
+
+
 # Summary table: exceedance bins for top 10% RX1day years -------------------
 top10_rx1day_exceedance_summary <- bind_rows(lapply(regions_mod, function(reg) {
   build_top_rx1day_hist_region_df(
