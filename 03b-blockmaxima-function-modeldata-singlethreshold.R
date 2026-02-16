@@ -44,6 +44,7 @@ region_labels <- c(
 )
 period_labels <- c(CD = "Current Day", FP = "Future Projection")
 box_colour <- "#93acff"
+box_colour_dark <- "#6f8dff"
 
 # Calculate thresholds -----------------------------------------------------
 calculate_rx1day_threshold <- function(df) {
@@ -149,7 +150,7 @@ build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
     mutate(Region = tools::toTitleCase(region_name))
 }
 
-plot_hist_exceedances <- function(hist_df_prop, max_exceedance) {
+plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = box_colour) {
   region_title <- unique(hist_df_prop$Region)
   day_breaks <- 0:max_exceedance
   x_label_df <- hist_df_prop %>%
@@ -161,7 +162,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance) {
     )
   
   ggplot(hist_df_prop, aes(x = days, y = prop_years)) +
-    geom_col(width = 0.9, fill = box_colour) +
+    geom_col(width = 0.9, fill = fill_colour) +
     geom_text(
       data = x_label_df,
       aes(x = days, y = prop_years, label = x_label),
@@ -549,7 +550,7 @@ for (reg in regions_mod) {
     max_exceedance_bin = 10
   )
   save_plot(
-    plot_hist_exceedances(top10_hist_df, max_exceedance = 10),
+    plot_hist_exceedances(top10_hist_df, max_exceedance = 10, fill_colour = box_colour_dark),
     paste0(reg, "_top10_rx1day_exceedance_bins_histogram.png"),
     width = fig_width_standard,
     height = fig_height_standard
