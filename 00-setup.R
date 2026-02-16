@@ -21,7 +21,7 @@ options(scipen = 999, digits = 4)
 
 # directories --------------------------------------------------------------
 thesis_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis"
-base_raw_dir <- glue("{thesis_dir}/Historic Compound Events")
+base_raw_dir <- glue("{thesis_dir}/Compound Events")
 coromandel_raw_dir   <- glue("{base_raw_dir}/coromandel_raw")
 far_north_raw_dir    <- glue("{base_raw_dir}/far_north_raw")
 top_of_south_raw_dir <- glue("{base_raw_dir}/top_of_south_raw")

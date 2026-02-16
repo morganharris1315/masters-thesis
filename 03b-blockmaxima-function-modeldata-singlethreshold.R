@@ -7,14 +7,14 @@
 # -------------------------------------------------------------------------
 
 # Read raw data ------------------------------------------------------------
-waikato_CD_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/WaikatoCurrentClimate.csv")
-waikato_FP_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/Waikato3DegClimate.csv")
-napier_CD_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/NapierCurrentClimate.csv")
-napier_FP_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/Napier3DegClimate.csv")
-northland_CD_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/NorthlandCurrentClimate.csv")
-northland_FP_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/Northland3DegClimate.csv")
-milford_CD_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/wah_ens_daily_rain_MilfordSound_CD.csv")
-milford_FP_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/wah_ens_daily_rain_MilfordSound_3deg.csv")
+waikato_CD_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/WaikatoCurrentClimate.csv")
+waikato_FP_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/Waikato3DegClimate.csv")
+napier_CD_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/NapierCurrentClimate.csv")
+napier_FP_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/Napier3DegClimate.csv")
+northland_CD_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/NorthlandCurrentClimate.csv")
+northland_FP_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/Northland3DegClimate.csv")
+milford_CD_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/wah_ens_daily_rain_MilfordSound_CD.csv")
+milford_FP_raw <- read.csv("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/wah_ens_daily_rain_MilfordSound_3deg.csv")
 
 # Prepare model data -------------------------------------------------------
 prepare_model_data <- function(df) {
@@ -533,7 +533,7 @@ plot_rx1day_timeseries_panel <- function(df_panel) {
 }
 
 # Save helper --------------------------------------------------------------
-plot_output_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/model_data/single_threshold"
+plot_output_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/single_threshold"
 dir.create(plot_output_dir, recursive = TRUE, showWarnings = FALSE)
 
 save_plot <- function(plot, filename, width = fig_width_full, height = fig_height_med) {

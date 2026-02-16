@@ -178,7 +178,7 @@ plot_hist_exceedances_obs <- function(df_station_obs, thr, station_name) {
 
 # master function: run RX1day analysis for one station --------------------
 run_RX1day_station_analysis_obs <- function(combined_df_obs,station_name,
-                                            output_dir = "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/RX1day_plots") {
+                                            output_dir = "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/RX1day_plots") {
   
   dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   
@@ -647,7 +647,7 @@ top20_onein360 <- top20_by_threshold %>% filter(Threshold == "1-in-360")
 print(top20_mid, n = 20)
 print(top20_onein360, n = 20)
 
-obs_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/obs_data"
+obs_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/obs_data"
 
 write.csv(top20_mid, file = file.path(obs_dir, "highexceedance_mid_obs.csv"), row.names = FALSE)
 write.csv(top20_onein360, file = file.path(obs_dir, "highexceedance_360_obs.csv"), row.names = FALSE)
