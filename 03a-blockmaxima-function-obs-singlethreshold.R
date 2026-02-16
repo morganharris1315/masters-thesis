@@ -120,7 +120,7 @@ plot_hist_exceedances_obs_single_threshold_st <- function(df_station_obs, thr, s
 run_RX1day_station_analysis_obs_single_threshold_st <- function(
     combined_df_obs,
     station_name,
-    output_dir = "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/RX1day_plots"
+    output_dir = "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/RX1day_plots"
 ) {
   if (!station_name %in% combined_df_obs$station) {
     stop(paste("Station not found:", station_name))
@@ -421,7 +421,7 @@ top20_single_threshold <- high_exceedance_table_single_threshold %>%
 
 print(top20_single_threshold, n = 20)
 
-obs_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Historic Compound Events/obs_data"
+obs_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/obs_data"
 
 write.csv(
   top20_single_threshold,
