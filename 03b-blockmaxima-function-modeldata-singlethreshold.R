@@ -45,6 +45,7 @@ region_labels <- c(
 period_labels <- c(CD = "Current Day", FP = "Future Projection")
 box_colour <- "#93acff"
 box_colour_dark <- "#6f8dff"
+period_colours <- c("Current Day" = "#4C78A8", "Future Projection" = "#F58518")
 
 # Calculate thresholds -----------------------------------------------------
 calculate_rx1day_threshold <- function(df) {
@@ -196,6 +197,57 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
       axis.line = element_line(colour = "black", linewidth = 0.2),
       plot.background = element_rect(colour = NA, fill = NA),
       plot.margin = margin(8, 10, 24, 8)
+    )
+}
+
+plot_top10_exceedance_distribution <- function(hist_df_prop, max_exceedance) {
+  region_title <- unique(hist_df_prop$Region)
+
+  plot_df <- hist_df_prop %>%
+    mutate(Period = factor(Period, levels = c("Current Day", "Future Projection")))
+
+  n_label_df <- plot_df %>%
+    distinct(Period, n_top10_years) %>%
+    mutate(label = paste0("Top 10% years (n = ", n_top10_years, ")"))
+
+  ggplot(plot_df, aes(x = days, y = prop_years, colour = Period)) +
+    geom_line(linewidth = 0.9) +
+    geom_point(size = 2.2) +
+    facet_grid(. ~ Period) +
+    geom_text(
+      data = n_label_df,
+      aes(x = 0, y = Inf, label = label),
+      hjust = 0,
+      vjust = 1.2,
+      size = 2.9,
+      colour = "black",
+      inherit.aes = FALSE
+    ) +
+    scale_colour_manual(values = period_colours, guide = "none") +
+    scale_x_continuous(
+      breaks = 0:max_exceedance,
+      labels = c(as.character(0:(max_exceedance - 1)), paste0(max_exceedance, "+")),
+      limits = c(0, max_exceedance),
+      expand = expansion(mult = c(0.01, 0.02))
+    ) +
+    scale_y_continuous(
+      labels = scales::label_percent(accuracy = 1),
+      limits = c(0, NA),
+      expand = expansion(mult = c(0, 0.08))
+    ) +
+    labs(
+      title = paste0(region_title, " – Distribution of Exceedance Days for Top 10% RX1day Years"),
+      x = "Exceedance days per year (CD threshold)",
+      y = "Share of top-10% years"
+    ) +
+    theme_thesis +
+    theme_model_axes +
+    theme(
+      panel.grid.major = element_line(colour = "grey82", linewidth = 0.3),
+      panel.grid.minor = element_blank(),
+      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.2),
+      axis.line = element_line(colour = "black", linewidth = 0.2),
+      strip.text.x = element_text(face = "bold")
     )
 }
 
@@ -604,7 +656,7 @@ for (reg in regions_mod) {
     max_exceedance_bin = 10
   )
   save_plot(
-    plot_hist_exceedances(top10_hist_df, max_exceedance = 10, fill_colour = box_colour_dark),
+    plot_top10_exceedance_distribution(top10_hist_df, max_exceedance = 10),
     paste0(reg, "_top10_rx1day_exceedance_bins_histogram.png"),
     width = fig_width_standard,
     height = fig_height_standard
