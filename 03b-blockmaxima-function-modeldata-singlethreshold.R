@@ -938,6 +938,8 @@ max_rx1day_all_regions <- max(
 )
 
 for (reg in regions_mod) {
+  density_plots <- list()
+
   for (per in c("CD", "FP")) {
     
     df_density <- build_rx1day_density_df(
@@ -954,7 +956,18 @@ for (reg in regions_mod) {
       paste0(reg, "_", tolower(per), "_rx1day_density_ge", k_exceed, "_exceedances.png"),
       height = fig_height_short
     )
+
+    density_plots[[per]] <- p_density
   }
+
+  p_density_combined <- density_plots[["CD"]] + density_plots[["FP"]] +
+    plot_layout(ncol = 2)
+
+  save_plot(
+    p_density_combined,
+    paste0(reg, "_cd_fp_rx1day_density_ge", k_exceed, "_exceedances.png"),
+    height = fig_height_short
+  )
 }
 
 build_rx1day_density_df_all_regions <- function(period, regions_mod, thr_list, k = 4) {
@@ -978,6 +991,8 @@ build_rx1day_density_df_all_regions <- function(period, regions_mod, thr_list, k
     )
 }
 
+all_regions_density_plots <- list()
+
 for (per in c("CD", "FP")) {
   df_density_all_regions <- build_rx1day_density_df_all_regions(
     period = per,
@@ -993,4 +1008,15 @@ for (per in c("CD", "FP")) {
     paste0("all_regions_", tolower(per), "_rx1day_density_ge", k_exceed, "_exceedances.png"),
     height = fig_height_short
   )
+
+  all_regions_density_plots[[per]] <- p_density_all_regions
 }
+
+p_density_all_regions_combined <- all_regions_density_plots[["CD"]] + all_regions_density_plots[["FP"]] +
+  plot_layout(ncol = 2)
+
+save_plot(
+  p_density_all_regions_combined,
+  paste0("all_regions_cd_fp_rx1day_density_ge", k_exceed, "_exceedances.png"),
+  height = fig_height_short
+)
