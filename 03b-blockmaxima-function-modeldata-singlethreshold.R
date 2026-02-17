@@ -954,7 +954,14 @@ compute_density_y_max <- function(df_density, adjust = 1.1) {
   max(y_all, y_k, na.rm = TRUE)
 }
 
-compute_density_y_upper_limit <- function(regions_mod, thr_list, k = 4, y_break = 0.005) {
+compute_density_y_upper_limit <- function(
+    regions_mod,
+    thr_list,
+    k = 4,
+    y_break = 0.005,
+    top_padding_prop = 0.03,
+    y_round_step = 0.001
+) {
   density_max_values <- c(
     unlist(lapply(regions_mod, function(reg) {
       sapply(c("CD", "FP"), function(per) {
@@ -979,10 +986,16 @@ compute_density_y_upper_limit <- function(regions_mod, thr_list, k = 4, y_break 
   )
 
   max_density <- max(density_max_values, na.rm = TRUE)
-  max(y_break, ceiling(max_density / y_break) * y_break)
+  padded_max <- max_density * (1 + top_padding_prop)
+  max(y_break, ceiling(padded_max / y_round_step) * y_round_step)
 }
 
 k_exceed <- 4
+
+density_top_padding_prop <- 0.03
+# Controls how finely the y-axis ceiling is rounded up.
+# Smaller values keep the top spacing tighter to the highest density peak.
+density_y_round_step <- 0.001
 
 max_rx1day_all_regions <- max(
   unlist(
@@ -1000,7 +1013,9 @@ density_y_upper_limit <- compute_density_y_upper_limit(
   regions_mod = regions_mod,
   thr_list = thr_list,
   k = k_exceed,
-  y_break = 0.005
+  y_break = 0.005,
+  top_padding_prop = density_top_padding_prop,
+  y_round_step = density_y_round_step
 )
 
 for (reg in regions_mod) {
