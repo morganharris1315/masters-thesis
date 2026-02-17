@@ -376,6 +376,9 @@ build_boxplot_panel_df <- function(regions_mod, thr_list) {
 plot_rx1day_vs_exceedance_panel <- function(df_panel) {
   group_counts <- df_panel %>% count(Region, Period, exceedances, name = "n")
   period_totals <- df_panel %>% count(Region, Period, name = "total_years")
+  region_limits <- df_panel %>%
+    group_by(Region) %>%
+    summarise(region_rx1day_max = max(RX1day, na.rm = TRUE), .groups = "drop")
   
   df_box <- df_panel %>% left_join(group_counts, by = c("Region", "Period", "exceedances")) %>% filter(n >= 10)
   df_dot_only <- df_panel %>% left_join(group_counts, by = c("Region", "Period", "exceedances")) %>% filter(n < 10)
@@ -395,10 +398,10 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
     filter(RX1day > upper_whisker)
   
   exceed_max <- max(df_panel$exceedances, na.rm = TRUE)
-  rx1day_max <- max(df_panel$RX1day, na.rm = TRUE)
   
   pct_labels <- group_counts %>%
     left_join(period_totals, by = c("Region", "Period")) %>%
+    left_join(region_limits, by = "Region") %>%
     mutate(
       pct = 100 * n / total_years,
       pct_label = case_when(
@@ -406,7 +409,7 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
         pct < 0.1 ~ "<0.1%",
         TRUE ~ paste0(round(pct, 1), "%")
       ),
-      y = rx1day_max * 1.03
+      y = region_rx1day_max * 1.03
     )
   
   ggplot() +
@@ -441,9 +444,9 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       vjust = 0,
       colour = "black"
     ) +
-    facet_grid(Region ~ Period, switch = "y") +
+    facet_grid(Region ~ Period, switch = "y", scales = "free_y") +
     scale_x_discrete(limits = as.character(0:exceed_max)) +
-    scale_y_continuous(limits = c(0, rx1day_max * 1.1)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.08))) +
     labs(x = "Number of exceedances per year", y = "RX1day (mm)", title = "RX1day vs Exceedances") +
     theme_thesis +
     theme(
