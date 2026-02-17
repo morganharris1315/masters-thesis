@@ -903,8 +903,8 @@ plot_rx1day_density <- function(df_density, k = 4, show_region_title = TRUE, sho
     scale_colour_manual(values = colour_vals) +
     scale_fill_manual(values = colour_vals) +
     scale_y_continuous(
-      limits = c(0, 0.015),
-      breaks = seq(0, 0.015, by = 0.005),
+      limits = c(0, density_y_upper_limit),
+      breaks = seq(0, density_y_upper_limit, by = 0.005),
       expand = expansion(mult = c(0, 0))
     ) +
     labs(
@@ -929,6 +929,59 @@ plot_rx1day_density <- function(df_density, k = 4, show_region_title = TRUE, sho
     )
 }
 
+compute_density_y_max <- function(df_density, adjust = 1.1) {
+  n_all_years <- sum(df_density$Group == "All years")
+  if (n_all_years == 0) {
+    return(0)
+  }
+
+  all_vals <- df_density %>% filter(Group == "All years") %>% pull(RX1day)
+  k_vals <- df_density %>% filter(Group != "All years") %>% pull(RX1day)
+
+  y_all <- if (length(all_vals) >= 2 && length(unique(all_vals)) > 1) {
+    max(density(all_vals, adjust = adjust)$y)
+  } else {
+    0
+  }
+
+  y_k <- if (length(k_vals) >= 2 && length(unique(k_vals)) > 1) {
+    scaling_factor <- length(k_vals) / n_all_years
+    max(density(k_vals, adjust = adjust)$y) * scaling_factor
+  } else {
+    0
+  }
+
+  max(y_all, y_k, na.rm = TRUE)
+}
+
+compute_density_y_upper_limit <- function(regions_mod, thr_list, k = 4, y_break = 0.005) {
+  density_max_values <- c(
+    unlist(lapply(regions_mod, function(reg) {
+      sapply(c("CD", "FP"), function(per) {
+        df_density <- build_rx1day_density_df(
+          region_name = reg,
+          period = per,
+          thr_list = thr_list,
+          k = k
+        )
+        compute_density_y_max(df_density)
+      })
+    })),
+    sapply(c("CD", "FP"), function(per) {
+      df_density_all_regions <- build_rx1day_density_df_all_regions(
+        period = per,
+        regions_mod = regions_mod,
+        thr_list = thr_list,
+        k = k
+      )
+      compute_density_y_max(df_density_all_regions)
+    })
+  )
+
+  max_density <- max(density_max_values, na.rm = TRUE)
+  max(y_break, ceiling(max_density / y_break) * y_break)
+}
+
 k_exceed <- 4
 
 max_rx1day_all_regions <- max(
@@ -941,6 +994,13 @@ max_rx1day_all_regions <- max(
     })
   ),
   na.rm = TRUE
+)
+
+density_y_upper_limit <- compute_density_y_upper_limit(
+  regions_mod = regions_mod,
+  thr_list = thr_list,
+  k = k_exceed,
+  y_break = 0.005
 )
 
 for (reg in regions_mod) {
