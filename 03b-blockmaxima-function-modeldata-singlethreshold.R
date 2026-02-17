@@ -870,7 +870,7 @@ build_rx1day_density_df <- function(region_name, period, thr_list, k = 4) {
   return(combined_df)
 }
 
-plot_rx1day_density <- function(df_density, k = 4) {
+plot_rx1day_density <- function(df_density, k = 4, show_y_title = TRUE) {
   
   group_levels <- levels(df_density$Group)
   
@@ -902,18 +902,21 @@ plot_rx1day_density <- function(df_density, k = 4) {
     ) +
     scale_colour_manual(values = colour_vals) +
     scale_fill_manual(values = colour_vals) +
+    scale_y_continuous(
+      limits = c(0, 0.015),
+      breaks = seq(0, 0.015, by = 0.005),
+      expand = expansion(mult = c(0, 0))
+    ) +
     labs(
       x = "RX1day (mm)",
-      y = "Proportion",
-      title = unique(df_density$Region),
-      subtitle = unique(df_density$Period)
+      y = if (show_y_title) "Proportion" else NULL,
+      title = unique(df_density$Period)
     ) +
     coord_cartesian(xlim = c(0, max_rx1day_all_regions)) +
     theme_thesis +
     theme_model_axes +
     theme(
       plot.title = element_text(hjust = 0.5, face = "bold", size = 10),
-      plot.subtitle = element_text(hjust = 0.5, size = 9),
       legend.position = c(0.78, 0.82),
       legend.justification = c(1, 1),
       legend.title = element_blank(),
@@ -949,7 +952,11 @@ for (reg in regions_mod) {
       k = k_exceed
     )
     
-    p_density <- plot_rx1day_density(df_density, k = k_exceed)
+    p_density <- plot_rx1day_density(
+      df_density,
+      k = k_exceed,
+      show_y_title = per == "CD"
+    )
     
     save_plot(
       p_density,
@@ -961,7 +968,13 @@ for (reg in regions_mod) {
   }
 
   p_density_combined <- density_plots[["CD"]] + density_plots[["FP"]] +
-    plot_layout(ncol = 2)
+    plot_layout(ncol = 2, guides = "collect") +
+    plot_annotation(title = region_labels[[reg]]) &
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 10),
+      legend.position = c(0.98, 0.98),
+      legend.justification = c(1, 1)
+    )
 
   save_plot(
     p_density_combined,
@@ -1001,7 +1014,11 @@ for (per in c("CD", "FP")) {
     k = k_exceed
   )
   
-  p_density_all_regions <- plot_rx1day_density(df_density_all_regions, k = k_exceed)
+  p_density_all_regions <- plot_rx1day_density(
+    df_density_all_regions,
+    k = k_exceed,
+    show_y_title = per == "CD"
+  )
   
   save_plot(
     p_density_all_regions,
@@ -1013,7 +1030,13 @@ for (per in c("CD", "FP")) {
 }
 
 p_density_all_regions_combined <- all_regions_density_plots[["CD"]] + all_regions_density_plots[["FP"]] +
-  plot_layout(ncol = 2)
+  plot_layout(ncol = 2, guides = "collect") +
+  plot_annotation(title = "All Regions") &
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 10),
+    legend.position = c(0.98, 0.98),
+    legend.justification = c(1, 1)
+  )
 
 save_plot(
   p_density_all_regions_combined,
