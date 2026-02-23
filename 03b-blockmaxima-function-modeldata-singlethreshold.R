@@ -538,9 +538,6 @@ build_quadrant_heatmap_df <- function(df_panel, exceedance_cutoff = 4) {
 
   exceed_max <- max(df_panel$exceedances, na.rm = TRUE)
 
-  region_period_limits <- df_panel %>%
-    group_by(Region, Period) %>%
-    summarise(y_max = max(RX1day, na.rm = TRUE) * 1.05, .groups = "drop")
 
   df_panel_classified <- df_panel %>%
     left_join(top10_threshold_cd, by = "Region") %>%
@@ -565,12 +562,11 @@ build_quadrant_heatmap_df <- function(df_panel, exceedance_cutoff = 4) {
     ) %>%
     ungroup() %>%
     left_join(top10_threshold_cd, by = "Region") %>%
-    left_join(region_period_limits, by = c("Region", "Period")) %>%
     mutate(
       xmin = if_else(exceed_group == "<4 exceedances", -0.5, exceedance_cutoff),
       xmax = if_else(exceed_group == "<4 exceedances", exceedance_cutoff, exceed_max + 0.5),
       ymin = if_else(rx_group == "bottom 90% RX1day", 0, rx1day_top10_threshold),
-      ymax = if_else(rx_group == "bottom 90% RX1day", rx1day_top10_threshold, y_max),
+      ymax = if_else(rx_group == "bottom 90% RX1day", rx1day_top10_threshold, 500),
       xmid = (xmin + xmax) / 2,
       ymid = (ymin + ymax) / 2
     )
@@ -596,13 +592,13 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
     geom_text(aes(x = xmid, y = ymid, label = pct_label), colour = "black", size = 3.2, fontface = "bold") +
     geom_vline(xintercept = exceedance_cutoff, colour = "black", linewidth = 0.35) +
     geom_hline(aes(yintercept = rx1day_top10_threshold), colour = "black", linewidth = 0.35, linetype = "solid") +
-    facet_grid(Region ~ Period, switch = "y", scales = "free_y") +
+    facet_grid(Region ~ Period, switch = "y") +
     scale_x_continuous(
       breaks = 0:exceed_max,
       limits = c(-0.5, exceed_max + 0.5),
       expand = expansion(mult = c(0, 0))
     ) +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.08))) +
+    scale_y_continuous(limits = c(0, 500), expand = expansion(mult = c(0, 0))) +
     scale_fill_gradient(
       low = "#f2f2f2",
       high = box_colour_dark,
@@ -611,9 +607,7 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
     ) +
     labs(
       x = "Number of exceedances per year",
-      y = "RX1day (mm)",
-      title = "Four-Quadrant Share of Years",
-      subtitle = "Quadrants split at <4 vs >=4 exceedance days and Current Day top-10% RX1day threshold"
+      y = "RX1day (mm)"
     ) +
     theme_thesis +
     theme(
