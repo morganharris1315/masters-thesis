@@ -506,7 +506,7 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       aes(yintercept = rx1day_top10_threshold),
       colour = "black",
       linewidth = 0.35,
-      linetype = "dashed",
+      linetype = "solid",
       inherit.aes = FALSE
     ) +
     facet_grid(Region ~ Period, switch = "y", scales = "free_y") +
@@ -595,7 +595,7 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
     ) +
     geom_text(aes(x = xmid, y = ymid, label = pct_label), colour = "black", size = 3.2, fontface = "bold") +
     geom_vline(xintercept = exceedance_cutoff, colour = "black", linewidth = 0.35) +
-    geom_hline(aes(yintercept = rx1day_top10_threshold), colour = "black", linewidth = 0.35, linetype = "dashed") +
+    geom_hline(aes(yintercept = rx1day_top10_threshold), colour = "black", linewidth = 0.35, linetype = "solid") +
     facet_grid(Region ~ Period, switch = "y", scales = "free_y") +
     scale_x_continuous(
       breaks = 0:exceed_max,
