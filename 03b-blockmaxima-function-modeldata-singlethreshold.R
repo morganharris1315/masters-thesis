@@ -135,7 +135,7 @@ count_exceedances_per_year <- function(df, threshold) {
 calc_cumulative_props <- function(exceed_vec) {
   max_k <- max(exceed_vec, na.rm = TRUE)
   n_years <- sum(!is.na(exceed_vec))
-
+  
   data.frame(
     k = 0:max_k,
     prop_ge_k = sapply(
@@ -148,22 +148,22 @@ calc_cumulative_props <- function(exceed_vec) {
 # Histogram (single threshold, fixed CD for CD/FP comparison) ---------------
 build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
   thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-
+  
   exc_cd <- count_exceedances_per_year(df_CD, thr_CD)
   exc_fp <- count_exceedances_per_year(df_FP, thr_CD)
-
+  
   hist_df <- bind_rows(
     data.frame(days = exc_cd, Period = "Current Day"),
     data.frame(days = exc_fp, Period = "Future Projection")
   )
-
+  
   cumulative_df <- bind_rows(
     calc_cumulative_props(exc_cd) %>%
       transmute(Period = "Current Day", days = k, cum_prop_years = prop_ge_k),
     calc_cumulative_props(exc_fp) %>%
       transmute(Period = "Future Projection", days = k, cum_prop_years = prop_ge_k)
   )
-
+  
   hist_df %>%
     count(Period, days) %>%
     complete(Period, days = 0:max(days, na.rm = TRUE), fill = list(n = 0)) %>%
@@ -178,7 +178,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
   region_title <- unique(hist_df_prop$Region)
   day_breaks <- 0:max_exceedance
   has_cumulative <- "cum_prop_years" %in% colnames(hist_df_prop)
-
+  
   x_label_df <- hist_df_prop %>%
     distinct(Period) %>%
     mutate(
@@ -186,7 +186,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
       prop_years = 0,
       x_label = "Number of exceedance days per year"
     )
-
+  
   p <- ggplot(hist_df_prop, aes(x = days, y = prop_years)) +
     geom_col(width = 0.9, fill = fill_colour) +
     geom_text(
@@ -223,7 +223,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
       plot.background = element_rect(colour = NA, fill = NA),
       plot.margin = margin(8, 10, 24, 8)
     )
-
+  
   if (has_cumulative) {
     p <- p +
       geom_text(
@@ -236,7 +236,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
         colour = "black"
       )
   }
-
+  
   p
 }
 
@@ -244,7 +244,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
 build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, rx1day_90th_cd, max_exceedance_bin = 10) {
   threshold <- thr_list[[paste0(region_name, "_CD")]]$threshold
   exceed_days <- count_exceedances_per_year(df, threshold)
-
+  
   # Use Current Day RX1day 90th percentile threshold for both CD and FP
   rx1day_90th <- rx1day_90th_cd
   
@@ -273,7 +273,7 @@ build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, rx1day_9
 
 build_top_rx1day_hist_region_df <- function(region_name, thr_list, df_CD, df_FP, max_exceedance_bin = 10) {
   rx1day_90th_cd <- as.numeric(quantile(df_CD$RX1day, probs = 0.9, na.rm = TRUE, type = 7))
-
+  
   bind_rows(
     build_top_rx1day_hist_df(region_name, "CD", thr_list, df_CD, rx1day_90th_cd, max_exceedance_bin),
     build_top_rx1day_hist_df(region_name, "FP", thr_list, df_FP, rx1day_90th_cd, max_exceedance_bin)
@@ -456,19 +456,19 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       ),
       y = region_rx1day_max * 1.03
     )
-
+  
   top10_threshold_cd <- df_panel %>%
     filter(Period == "Current Day") %>%
     group_by(Region) %>%
     summarise(rx1day_top10_threshold = quantile(RX1day, probs = 0.9, na.rm = TRUE, type = 7), .groups = "drop")
-
+  
   top10_threshold_df <- df_panel %>%
     distinct(Region, Period) %>%
     left_join(top10_threshold_cd, by = "Region")
-
+  
   exceed_breaks <- as.character(0:exceed_max)
   x_vline_at_4 <- match("4", exceed_breaks)
-
+  
   p <- ggplot() +
     geom_boxplot(
       data = df_box,
@@ -522,11 +522,11 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
       axis.line = element_blank()
     )
-
+  
   if (!is.na(x_vline_at_4)) {
     p <- p + geom_vline(xintercept = x_vline_at_4, colour = "black", linewidth = 0.35)
   }
-
+  
   p
 }
 
@@ -535,17 +535,17 @@ build_quadrant_heatmap_df <- function(df_panel, exceedance_cutoff = 4) {
     filter(Period == "Current Day") %>%
     group_by(Region) %>%
     summarise(rx1day_top10_threshold = quantile(RX1day, probs = 0.9, na.rm = TRUE, type = 7), .groups = "drop")
-
+  
   exceed_max <- max(df_panel$exceedances, na.rm = TRUE)
-
-
+  
+  
   df_panel_classified <- df_panel %>%
     left_join(top10_threshold_cd, by = "Region") %>%
     mutate(
       exceed_group = if_else(exceedances < exceedance_cutoff, "<4 exceedances", ">=4 exceedances"),
       rx_group = if_else(RX1day < rx1day_top10_threshold, "bottom 90% RX1day", "top 10% RX1day")
     )
-
+  
   quadrant_df <- df_panel_classified %>%
     count(Region, Period, exceed_group, rx_group, name = "n_years") %>%
     complete(
@@ -570,7 +570,7 @@ build_quadrant_heatmap_df <- function(df_panel, exceedance_cutoff = 4) {
       xmid = (xmin + xmax) / 2,
       ymid = (ymin + ymax) / 2
     )
-
+  
   list(
     tile_df = quadrant_df,
     exceed_max = exceed_max,
@@ -582,17 +582,7 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
   tile_df <- heatmap_data$tile_df
   exceed_max <- heatmap_data$exceed_max
   exceedance_cutoff <- heatmap_data$exceedance_cutoff
-
-  x_label_df <- tile_df %>%
-    filter(Region == "Waikato") %>%
-    distinct(Region, Period) %>%
-    mutate(
-      Region = factor("Waikato", levels = levels(tile_df$Region)),
-      xmid = exceed_max / 2,
-      ymid = 0,
-      x_label = "Number of exceedance days per year"
-    )
-
+  
   ggplot(tile_df) +
     geom_rect(
       aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = pct_years),
@@ -602,13 +592,6 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
     geom_text(aes(x = xmid, y = ymid, label = pct_label), colour = "black", size = 3.2, fontface = "bold") +
     geom_vline(xintercept = exceedance_cutoff, colour = "black", linewidth = 0.35) +
     geom_hline(aes(yintercept = rx1day_top10_threshold), colour = "black", linewidth = 0.35, linetype = "solid") +
-    geom_text(
-      data = x_label_df,
-      aes(x = xmid, y = ymid, label = x_label),
-      vjust = 3.2,
-      size = 3.2,
-      inherit.aes = FALSE
-    ) +
     facet_grid(Region ~ Period, switch = "y") +
     scale_x_continuous(
       breaks = 0:exceed_max,
@@ -623,10 +606,9 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
       name = "% of years"
     ) +
     labs(
-      x = NULL,
+      x = "Number of exceedances per year",
       y = "RX1day (mm)"
     ) +
-    coord_cartesian(clip = "off") +
     theme_thesis +
     theme(
       strip.placement = "outside",
@@ -634,8 +616,7 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
       strip.text.y.left = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
       panel.spacing = unit(1.1, "lines"),
       panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
-      axis.line = element_blank(),
-      plot.margin = margin(8, 10, 24, 8)
+      axis.line = element_blank()
     )
 }
 
@@ -1137,23 +1118,23 @@ compute_density_y_max <- function(df_density, adjust = 1.1) {
   if (n_all_years == 0) {
     return(0)
   }
-
+  
   all_vals <- df_density %>% filter(Group == "All years") %>% pull(RX1day)
   k_vals <- df_density %>% filter(Group != "All years") %>% pull(RX1day)
-
+  
   y_all <- if (length(all_vals) >= 2 && length(unique(all_vals)) > 1) {
     max(density(all_vals, adjust = adjust)$y)
   } else {
     0
   }
-
+  
   y_k <- if (length(k_vals) >= 2 && length(unique(k_vals)) > 1) {
     scaling_factor <- length(k_vals) / n_all_years
     max(density(k_vals, adjust = adjust)$y) * scaling_factor
   } else {
     0
   }
-
+  
   max(y_all, y_k, na.rm = TRUE)
 }
 
@@ -1178,7 +1159,7 @@ compute_density_y_upper_limit <- function(
       })
     }))
   )
-
+  
   max_density <- max(density_max_values, na.rm = TRUE)
   padded_max <- max_density * (1 + top_padding_prop)
   max(y_break, ceiling(padded_max / y_round_step) * y_round_step)
