@@ -586,6 +586,7 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
   x_label_df <- tile_df %>%
     distinct(Period) %>%
     mutate(
+      Region = factor("Waikato", levels = levels(tile_df$Region)),
       xmid = exceed_max / 2,
       ymid = 0,
       x_label = "Number of exceedance days per year"
