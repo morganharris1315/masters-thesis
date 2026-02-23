@@ -530,6 +530,102 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
   p
 }
 
+build_quadrant_heatmap_df <- function(df_panel, exceedance_cutoff = 4) {
+  top10_threshold_cd <- df_panel %>%
+    filter(Period == "Current Day") %>%
+    group_by(Region) %>%
+    summarise(rx1day_top10_threshold = quantile(RX1day, probs = 0.9, na.rm = TRUE, type = 7), .groups = "drop")
+
+  exceed_max <- max(df_panel$exceedances, na.rm = TRUE)
+
+  region_period_limits <- df_panel %>%
+    group_by(Region, Period) %>%
+    summarise(y_max = max(RX1day, na.rm = TRUE) * 1.05, .groups = "drop")
+
+  df_panel_classified <- df_panel %>%
+    left_join(top10_threshold_cd, by = "Region") %>%
+    mutate(
+      exceed_group = if_else(exceedances < exceedance_cutoff, "<4 exceedances", ">=4 exceedances"),
+      rx_group = if_else(RX1day < rx1day_top10_threshold, "bottom 90% RX1day", "top 10% RX1day")
+    )
+
+  quadrant_df <- df_panel_classified %>%
+    count(Region, Period, exceed_group, rx_group, name = "n_years") %>%
+    complete(
+      Region,
+      Period,
+      exceed_group = c("<4 exceedances", ">=4 exceedances"),
+      rx_group = c("bottom 90% RX1day", "top 10% RX1day"),
+      fill = list(n_years = 0)
+    ) %>%
+    group_by(Region, Period) %>%
+    mutate(
+      pct_years = 100 * n_years / sum(n_years),
+      pct_label = paste0(round(pct_years, 1), "%")
+    ) %>%
+    ungroup() %>%
+    left_join(top10_threshold_cd, by = "Region") %>%
+    left_join(region_period_limits, by = c("Region", "Period")) %>%
+    mutate(
+      xmin = if_else(exceed_group == "<4 exceedances", -0.5, exceedance_cutoff),
+      xmax = if_else(exceed_group == "<4 exceedances", exceedance_cutoff, exceed_max + 0.5),
+      ymin = if_else(rx_group == "bottom 90% RX1day", 0, rx1day_top10_threshold),
+      ymax = if_else(rx_group == "bottom 90% RX1day", rx1day_top10_threshold, y_max),
+      xmid = (xmin + xmax) / 2,
+      ymid = (ymin + ymax) / 2
+    )
+
+  list(
+    tile_df = quadrant_df,
+    exceed_max = exceed_max,
+    exceedance_cutoff = exceedance_cutoff
+  )
+}
+
+plot_quadrant_heatmap_panel <- function(heatmap_data) {
+  tile_df <- heatmap_data$tile_df
+  exceed_max <- heatmap_data$exceed_max
+  exceedance_cutoff <- heatmap_data$exceedance_cutoff
+
+  ggplot(tile_df) +
+    geom_rect(
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = pct_years),
+      colour = "white",
+      linewidth = 0.3
+    ) +
+    geom_text(aes(x = xmid, y = ymid, label = pct_label), colour = "black", size = 3.2, fontface = "bold") +
+    geom_vline(xintercept = exceedance_cutoff, colour = "black", linewidth = 0.35) +
+    geom_hline(aes(yintercept = rx1day_top10_threshold), colour = "black", linewidth = 0.35, linetype = "dashed") +
+    facet_grid(Region ~ Period, switch = "y", scales = "free_y") +
+    scale_x_continuous(
+      breaks = 0:exceed_max,
+      limits = c(-0.5, exceed_max + 0.5),
+      expand = expansion(mult = c(0, 0))
+    ) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.08))) +
+    scale_fill_gradient(
+      low = "#f2f2f2",
+      high = box_colour_dark,
+      limits = c(0, 100),
+      name = "% of years"
+    ) +
+    labs(
+      x = "Number of exceedances per year",
+      y = "RX1day (mm)",
+      title = "Four-Quadrant Share of Years",
+      subtitle = "Quadrants split at <4 vs >=4 exceedance days and Current Day top-10% RX1day threshold"
+    ) +
+    theme_thesis +
+    theme(
+      strip.placement = "outside",
+      strip.text.y = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
+      strip.text.y.left = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
+      panel.spacing = unit(1.1, "lines"),
+      panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
+      axis.line = element_blank()
+    )
+}
+
 build_timeseries_panel_df <- function(regions_mod, thr_list) {
   panel_region_order <- c("Milford Sound", "Napier", "Northland", "Waikato")
   
@@ -688,6 +784,10 @@ for (reg in regions_mod) {
 panel_df <- build_boxplot_panel_df(regions_mod, thr_list)
 panel_plot <- plot_rx1day_vs_exceedance_panel(panel_df)
 save_plot(panel_plot, "all_regions_rx1day_exceedance_panel_boxplot.png", width = fig_width_full, height = fig_height_tall)
+
+quadrant_heatmap_data <- build_quadrant_heatmap_df(panel_df, exceedance_cutoff = 4)
+quadrant_heatmap_plot <- plot_quadrant_heatmap_panel(quadrant_heatmap_data)
+save_plot(quadrant_heatmap_plot, "all_regions_rx1day_exceedance_quadrant_heatmap.png", width = fig_width_full, height = fig_height_tall)
 
 timeseries_panel_df <- build_timeseries_panel_df(regions_mod, thr_list)
 timeseries_panel_plot <- plot_rx1day_timeseries_panel(timeseries_panel_df)
