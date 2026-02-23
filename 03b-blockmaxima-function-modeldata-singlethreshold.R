@@ -132,27 +132,53 @@ count_exceedances_per_year <- function(df, threshold) {
   apply(daily_df, 1, function(x) sum(x > threshold, na.rm = TRUE))
 }
 
+calc_cumulative_props <- function(exceed_vec) {
+  max_k <- max(exceed_vec, na.rm = TRUE)
+  n_years <- sum(!is.na(exceed_vec))
+
+  data.frame(
+    k = 0:max_k,
+    prop_ge_k = sapply(
+      0:max_k,
+      function(k) sum(exceed_vec >= k, na.rm = TRUE) / n_years
+    )
+  )
+}
+
 # Histogram (single threshold, fixed CD for CD/FP comparison) ---------------
 build_hist_df <- function(region_name, thr_list, df_CD, df_FP) {
   thr_CD <- thr_list[[paste0(region_name, "_CD")]]$threshold
-  
+
+  exc_cd <- count_exceedances_per_year(df_CD, thr_CD)
+  exc_fp <- count_exceedances_per_year(df_FP, thr_CD)
+
   hist_df <- bind_rows(
-    data.frame(days = count_exceedances_per_year(df_CD, thr_CD), Period = "Current Day"),
-    data.frame(days = count_exceedances_per_year(df_FP, thr_CD), Period = "Future Projection")
+    data.frame(days = exc_cd, Period = "Current Day"),
+    data.frame(days = exc_fp, Period = "Future Projection")
   )
-  
+
+  cumulative_df <- bind_rows(
+    calc_cumulative_props(exc_cd) %>%
+      transmute(Period = "Current Day", days = k, cum_prop_years = prop_ge_k),
+    calc_cumulative_props(exc_fp) %>%
+      transmute(Period = "Future Projection", days = k, cum_prop_years = prop_ge_k)
+  )
+
   hist_df %>%
     count(Period, days) %>%
     complete(Period, days = 0:max(days, na.rm = TRUE), fill = list(n = 0)) %>%
     group_by(Period) %>%
     mutate(prop_years = n / sum(n)) %>%
     ungroup() %>%
+    left_join(cumulative_df, by = c("Period", "days")) %>%
     mutate(Region = tools::toTitleCase(region_name))
 }
 
 plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = box_colour) {
   region_title <- unique(hist_df_prop$Region)
   day_breaks <- 0:max_exceedance
+  has_cumulative <- "cum_prop_years" %in% colnames(hist_df_prop)
+
   x_label_df <- hist_df_prop %>%
     distinct(Period) %>%
     mutate(
@@ -160,8 +186,8 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
       prop_years = 0,
       x_label = "Number of exceedance days per year"
     )
-  
-  ggplot(hist_df_prop, aes(x = days, y = prop_years)) +
+
+  p <- ggplot(hist_df_prop, aes(x = days, y = prop_years)) +
     geom_col(width = 0.9, fill = fill_colour) +
     geom_text(
       data = x_label_df,
@@ -197,6 +223,21 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
       plot.background = element_rect(colour = NA, fill = NA),
       plot.margin = margin(8, 10, 24, 8)
     )
+
+  if (has_cumulative) {
+    p <- p +
+      geom_text(
+        aes(
+          y = prop_years,
+          label = scales::percent(cum_prop_years, accuracy = 1)
+        ),
+        vjust = -0.35,
+        size = 2.4,
+        colour = "black"
+      )
+  }
+
+  p
 }
 
 # Histogram for top 10% annual RX1day years ---------------------------------
@@ -411,8 +452,15 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       ),
       y = region_rx1day_max * 1.03
     )
-  
-  ggplot() +
+
+  top10_threshold_df <- df_panel %>%
+    group_by(Region, Period) %>%
+    summarise(rx1day_top10_threshold = quantile(RX1day, probs = 0.9, na.rm = TRUE, type = 7), .groups = "drop")
+
+  exceed_breaks <- as.character(0:exceed_max)
+  x_vline_at_4 <- match("4", exceed_breaks)
+
+  p <- ggplot() +
     geom_boxplot(
       data = df_box,
       aes(x = factor(exceedances), y = RX1day, group = exceedances),
@@ -444,8 +492,16 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       vjust = 0,
       colour = "black"
     ) +
+    geom_hline(
+      data = top10_threshold_df,
+      aes(yintercept = rx1day_top10_threshold),
+      colour = "black",
+      linewidth = 0.35,
+      linetype = "dashed",
+      inherit.aes = FALSE
+    ) +
     facet_grid(Region ~ Period, switch = "y", scales = "free_y") +
-    scale_x_discrete(limits = as.character(0:exceed_max)) +
+    scale_x_discrete(limits = exceed_breaks) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.08))) +
     labs(x = "Number of exceedances per year", y = "RX1day (mm)", title = "RX1day vs Exceedances") +
     theme_thesis +
@@ -457,6 +513,12 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
       axis.line = element_blank()
     )
+
+  if (!is.na(x_vline_at_4)) {
+    p <- p + geom_vline(xintercept = x_vline_at_4, colour = "black", linewidth = 0.35)
+  }
+
+  p
 }
 
 build_timeseries_panel_df <- function(regions_mod, thr_list) {
@@ -686,19 +748,6 @@ write.csv(
   row.names = FALSE
 )
 
-calc_cumulative_props <- function(exceed_vec) {
-  max_k <- max(exceed_vec, na.rm = TRUE)
-  n_years <- length(exceed_vec)
-  
-  data.frame(
-    k = 0:max_k,
-    prop_ge_k = sapply(
-      0:max_k,
-      function(k) sum(exceed_vec >= k, na.rm = TRUE) / n_years
-    )
-  )
-}
-
 build_cumulative_exceed_table_fixedCD <- function(region_name, thr_list, df_CD, df_FP) {
   
   # Fixed CD threshold 
@@ -853,13 +902,17 @@ build_rx1day_density_df <- function(region_name, period, thr_list, k = 4) {
   # Full dataset: All years
   all_years_df <- data.frame(
     RX1day = df$RX1day,
-    Group = "All years"
+    Group = "All years",
+    threshold_mm = threshold,
+    threshold_label = "RX1day Threshold (2/3 above)"
   )
   
   # Subset for years with >= k exceedances
   k_exceed_df <- data.frame(
     RX1day = df$RX1day[exceedances >= k],
-    Group = paste0("≥ ", k, " exceedance days")
+    Group = paste0("≥ ", k, " exceedance days"),
+    threshold_mm = threshold,
+    threshold_label = "RX1day Threshold (2/3 above)"
   )
   
   # Combine
@@ -876,6 +929,9 @@ build_rx1day_density_df <- function(region_name, period, thr_list, k = 4) {
 plot_rx1day_density <- function(df_density, k = 4, show_region_title = TRUE, show_y_title = TRUE) {
   
   group_levels <- levels(df_density$Group)
+  threshold_df <- df_density %>%
+    distinct(threshold_mm, threshold_label) %>%
+    filter(!is.na(threshold_mm))
   
   colour_vals <- setNames(
     c("darkgrey", "#93acff"),
@@ -905,6 +961,28 @@ plot_rx1day_density <- function(df_density, k = 4, show_region_title = TRUE, sho
     ) +
     scale_colour_manual(values = colour_vals) +
     scale_fill_manual(values = colour_vals) +
+    geom_vline(
+      data = threshold_df,
+      aes(xintercept = threshold_mm),
+      colour = "#93acff",
+      linewidth = 1,
+      linetype = "dashed",
+      inherit.aes = FALSE
+    ) +
+    geom_text(
+      data = threshold_df,
+      aes(
+        x = threshold_mm,
+        y = density_y_upper_limit * 0.98,
+        label = threshold_label
+      ),
+      angle = 90,
+      hjust = 1,
+      vjust = -0.4,
+      size = 2.4,
+      colour = "#93acff",
+      inherit.aes = FALSE
+    ) +
     scale_y_continuous(
       limits = c(0, density_y_upper_limit),
       breaks = seq(0, density_y_upper_limit, by = 0.005),
@@ -1079,10 +1157,17 @@ build_rx1day_density_df_all_regions <- function(period, regions_mod, thr_list, k
     exceedances <- count_exceedances_per_year(df, threshold)
     
     bind_rows(
-      data.frame(RX1day = df$RX1day, Group = "All years"),
+      data.frame(
+        RX1day = df$RX1day,
+        Group = "All years",
+        threshold_mm = threshold,
+        threshold_label = paste0(region_labels[[reg]], " threshold")
+      ),
       data.frame(
         RX1day = df$RX1day[exceedances >= k],
-        Group = paste0("≥ ", k, " exceedance days")
+        Group = paste0("≥ ", k, " exceedance days"),
+        threshold_mm = threshold,
+        threshold_label = paste0(region_labels[[reg]], " threshold")
       )
     )
   })) %>%
