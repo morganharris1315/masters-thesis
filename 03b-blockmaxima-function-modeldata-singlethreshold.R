@@ -583,6 +583,14 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
   exceed_max <- heatmap_data$exceed_max
   exceedance_cutoff <- heatmap_data$exceedance_cutoff
 
+  x_label_df <- tile_df %>%
+    distinct(Period) %>%
+    mutate(
+      xmid = exceed_max / 2,
+      ymid = 0,
+      x_label = "Number of exceedance days per year"
+    )
+
   ggplot(tile_df) +
     geom_rect(
       aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = pct_years),
@@ -592,6 +600,13 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
     geom_text(aes(x = xmid, y = ymid, label = pct_label), colour = "black", size = 3.2, fontface = "bold") +
     geom_vline(xintercept = exceedance_cutoff, colour = "black", linewidth = 0.35) +
     geom_hline(aes(yintercept = rx1day_top10_threshold), colour = "black", linewidth = 0.35, linetype = "solid") +
+    geom_text(
+      data = x_label_df,
+      aes(x = xmid, y = ymid, label = x_label),
+      vjust = 3.2,
+      size = 3.2,
+      inherit.aes = FALSE
+    ) +
     facet_grid(Region ~ Period, switch = "y") +
     scale_x_continuous(
       breaks = 0:exceed_max,
@@ -606,9 +621,10 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
       name = "% of years"
     ) +
     labs(
-      x = "Number of exceedances per year",
+      x = NULL,
       y = "RX1day (mm)"
     ) +
+    coord_cartesian(clip = "off") +
     theme_thesis +
     theme(
       strip.placement = "outside",
@@ -616,7 +632,8 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
       strip.text.y.left = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
       panel.spacing = unit(1.1, "lines"),
       panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
-      axis.line = element_blank()
+      axis.line = element_blank(),
+      plot.margin = margin(8, 10, 24, 8)
     )
 }
 
