@@ -584,7 +584,8 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
   exceedance_cutoff <- heatmap_data$exceedance_cutoff
 
   x_label_df <- tile_df %>%
-    distinct(Period) %>%
+    filter(Region == "Waikato") %>%
+    distinct(Region, Period) %>%
     mutate(
       xmid = exceed_max / 2,
       ymid = 0,
