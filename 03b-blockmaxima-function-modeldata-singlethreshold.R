@@ -204,7 +204,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
     ) +
     scale_y_continuous(
       limits = c(0, NA),
-      expand = expansion(mult = c(0, 0.02))
+      expand = expansion(mult = c(0, 0.12))
     ) +
     labs(
       title = region_title,
@@ -229,7 +229,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
       geom_text(
         aes(
           y = prop_years,
-          label = scales::percent(cum_prop_years, accuracy = 1)
+          label = paste0(round(cum_prop_years * 100, 0), "%")
         ),
         vjust = -0.35,
         size = 2.4,
@@ -241,10 +241,12 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
 }
 
 # Histogram for top 10% annual RX1day years ---------------------------------
-build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, max_exceedance_bin = 10) {
+build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, rx1day_90th_cd, max_exceedance_bin = 10) {
   threshold <- thr_list[[paste0(region_name, "_CD")]]$threshold
   exceed_days <- count_exceedances_per_year(df, threshold)
-  rx1day_90th <- as.numeric(quantile(df$RX1day, probs = 0.9, na.rm = TRUE, type = 7))
+
+  # Use Current Day RX1day 90th percentile threshold for both CD and FP
+  rx1day_90th <- rx1day_90th_cd
   
   top10_df <- df %>%
     transmute(
@@ -270,9 +272,11 @@ build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, max_exce
 }
 
 build_top_rx1day_hist_region_df <- function(region_name, thr_list, df_CD, df_FP, max_exceedance_bin = 10) {
+  rx1day_90th_cd <- as.numeric(quantile(df_CD$RX1day, probs = 0.9, na.rm = TRUE, type = 7))
+
   bind_rows(
-    build_top_rx1day_hist_df(region_name, "CD", thr_list, df_CD, max_exceedance_bin),
-    build_top_rx1day_hist_df(region_name, "FP", thr_list, df_FP, max_exceedance_bin)
+    build_top_rx1day_hist_df(region_name, "CD", thr_list, df_CD, rx1day_90th_cd, max_exceedance_bin),
+    build_top_rx1day_hist_df(region_name, "FP", thr_list, df_FP, rx1day_90th_cd, max_exceedance_bin)
   ) %>%
     rename(days = exceedance_bin)
 }
@@ -453,9 +457,14 @@ plot_rx1day_vs_exceedance_panel <- function(df_panel) {
       y = region_rx1day_max * 1.03
     )
 
-  top10_threshold_df <- df_panel %>%
-    group_by(Region, Period) %>%
+  top10_threshold_cd <- df_panel %>%
+    filter(Period == "Current Day") %>%
+    group_by(Region) %>%
     summarise(rx1day_top10_threshold = quantile(RX1day, probs = 0.9, na.rm = TRUE, type = 7), .groups = "drop")
+
+  top10_threshold_df <- df_panel %>%
+    distinct(Region, Period) %>%
+    left_join(top10_threshold_cd, by = "Region")
 
   exceed_breaks <- as.character(0:exceed_max)
   x_vline_at_4 <- match("4", exceed_breaks)
@@ -904,7 +913,7 @@ build_rx1day_density_df <- function(region_name, period, thr_list, k = 4) {
     RX1day = df$RX1day,
     Group = "All years",
     threshold_mm = threshold,
-    threshold_label = "RX1day Threshold (2/3 above)"
+    threshold_label = "33rd percentile threshold"
   )
   
   # Subset for years with >= k exceedances
@@ -912,7 +921,7 @@ build_rx1day_density_df <- function(region_name, period, thr_list, k = 4) {
     RX1day = df$RX1day[exceedances >= k],
     Group = paste0("≥ ", k, " exceedance days"),
     threshold_mm = threshold,
-    threshold_label = "RX1day Threshold (2/3 above)"
+    threshold_label = "33rd percentile threshold"
   )
   
   # Combine
@@ -1054,16 +1063,7 @@ compute_density_y_upper_limit <- function(
         )
         compute_density_y_max(df_density)
       })
-    })),
-    sapply(c("CD", "FP"), function(per) {
-      df_density_all_regions <- build_rx1day_density_df_all_regions(
-        period = per,
-        regions_mod = regions_mod,
-        thr_list = thr_list,
-        k = k
-      )
-      compute_density_y_max(df_density_all_regions)
-    })
+    }))
   )
 
   max_density <- max(density_max_values, na.rm = TRUE)
@@ -1149,89 +1149,3 @@ for (reg in regions_mod) {
     height = fig_height_short
   )
 }
-
-build_rx1day_density_df_all_regions <- function(period, regions_mod, thr_list, k = 4) {
-  bind_rows(lapply(regions_mod, function(reg) {
-    df <- get(paste0(reg, "_", period))
-    threshold <- thr_list[[paste0(reg, "_CD")]]$threshold
-    exceedances <- count_exceedances_per_year(df, threshold)
-    
-    bind_rows(
-      data.frame(
-        RX1day = df$RX1day,
-        Group = "All years",
-        threshold_mm = threshold,
-        threshold_label = paste0(region_labels[[reg]], " threshold")
-      ),
-      data.frame(
-        RX1day = df$RX1day[exceedances >= k],
-        Group = paste0("≥ ", k, " exceedance days"),
-        threshold_mm = threshold,
-        threshold_label = paste0(region_labels[[reg]], " threshold")
-      )
-    )
-  })) %>%
-    mutate(
-      Group = factor(Group, levels = c("All years", paste0("≥ ", k, " exceedance days"))),
-      Region = "All Regions",
-      Period = period_labels[[period]]
-    )
-}
-
-all_regions_density_plots <- list()
-
-for (per in c("CD", "FP")) {
-  df_density_all_regions <- build_rx1day_density_df_all_regions(
-    period = per,
-    regions_mod = regions_mod,
-    thr_list = thr_list,
-    k = k_exceed
-  )
-  
-  p_density_all_regions <- plot_rx1day_density(df_density_all_regions, k = k_exceed, show_region_title = TRUE, show_y_title = TRUE)
-  
-  save_plot(
-    p_density_all_regions,
-    paste0("all_regions_", tolower(per), "_rx1day_density_ge", k_exceed, "_exceedances.png"),
-    height = fig_height_short
-  )
-  
-  all_regions_density_plots[[per]] <- p_density_all_regions
-}
-
-p_density_all_regions_combined <-
-  plot_rx1day_density(
-    build_rx1day_density_df_all_regions(
-      period = "CD",
-      regions_mod = regions_mod,
-      thr_list = thr_list,
-      k = k_exceed
-    ),
-    k = k_exceed,
-    show_region_title = FALSE,
-    show_y_title = TRUE
-  ) +
-  plot_rx1day_density(
-    build_rx1day_density_df_all_regions(
-      period = "FP",
-      regions_mod = regions_mod,
-      thr_list = thr_list,
-      k = k_exceed
-    ),
-    k = k_exceed,
-    show_region_title = FALSE,
-    show_y_title = FALSE
-  ) +
-  plot_layout(ncol = 2, guides = "collect") +
-  plot_annotation(title = "All Regions") &
-  theme(
-    plot.title = element_text(hjust = 0.5, face = "bold", size = 11),
-    legend.position = c(0.98, 0.98),
-    legend.justification = c(1, 1)
-  )
-
-save_plot(
-  p_density_all_regions_combined,
-  paste0("all_regions_cd_fp_rx1day_density_ge", k_exceed, "_exceedances.png"),
-  height = fig_height_short
-)
