@@ -44,6 +44,7 @@ region_labels <- c(
 )
 period_labels <- c(CD = "Current Day", FP = "Future Projection")
 box_colour <- "#93acff"
+box_colour_light <- "#eff2ff"
 box_colour_dark <- "#6f8dff"
 
 # Calculate thresholds -----------------------------------------------------
@@ -233,7 +234,7 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
           TRUE ~ paste0(round(cum_prop_years * 100, 0), "%")
         )
       )
-
+    
     p <- p +
       geom_text(
         data = cumulative_label_df,
@@ -611,7 +612,7 @@ plot_quadrant_heatmap_panel <- function(heatmap_data) {
     ) +
     scale_y_continuous(limits = c(0, 500), expand = expansion(mult = c(0, 0))) +
     scale_fill_gradient(
-      low = "#f2f2f2",
+      low = box_colour_light,
       high = box_colour_dark,
       limits = c(0, 100),
       name = "% of years"
