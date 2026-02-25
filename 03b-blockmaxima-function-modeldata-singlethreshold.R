@@ -1084,20 +1084,6 @@ plot_rx1day_density <- function(df_density, k = 4, show_region_title = TRUE, sho
       linetype = "dashed",
       inherit.aes = FALSE
     ) +
-    geom_text(
-      data = threshold_df,
-      aes(
-        x = threshold_mm,
-        y = density_y_upper_limit * 0.98,
-        label = threshold_label
-      ),
-      angle = 90,
-      hjust = 1,
-      vjust = -0.4,
-      size = 2.4,
-      colour = "#93acff",
-      inherit.aes = FALSE
-    ) +
     scale_y_continuous(
       limits = c(0, density_y_upper_limit),
       breaks = seq(0, density_y_upper_limit, by = 0.005),
