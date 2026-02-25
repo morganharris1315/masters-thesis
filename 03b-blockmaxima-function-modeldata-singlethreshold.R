@@ -225,15 +225,26 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
     )
   
   if (has_cumulative) {
+    cumulative_label_df <- hist_df_prop %>%
+      mutate(
+        cumulative_label = case_when(
+          is.na(cum_prop_years) ~ NA_character_,
+          cum_prop_years > 0 & (cum_prop_years * 100) < 1 ~ "<1%",
+          TRUE ~ paste0(round(cum_prop_years * 100, 0), "%")
+        )
+      )
+
     p <- p +
       geom_text(
+        data = cumulative_label_df,
         aes(
           y = prop_years,
-          label = paste0(round(cum_prop_years * 100, 0), "%")
+          label = cumulative_label
         ),
         vjust = -0.35,
         size = 2.4,
-        colour = "black"
+        colour = "black",
+        na.rm = TRUE
       )
   }
   
