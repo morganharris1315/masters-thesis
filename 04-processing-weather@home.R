@@ -2,13 +2,10 @@
 # 04-processing-weather@home.R
 # -------------------------------------------------------------------------
 # Feb 2026
-# Loading in .nc files
-# Understanding file structure
-# Caculating RX1day
-# Caculating 33rd Percentile 
-# Caculating Exceedance days 
-# Proportion of greater than or equal to 4 exceedance days
-# Probabilty ratio (Future projection/ Current Day) 
+# Loading in .nc files and understanding file structure
+# Calculating RX1day, 33rd Percentile and exceedance days 
+# Getting the proportion of greater than or equal to 4 exceedance days
+# Creating probability ratio (Future projection/ Current Day) 
 # -------------------------------------------------------------------------
 
 
@@ -57,26 +54,25 @@ close.nc(nc)
 # Calculating RX1day -------------------------------------------------------
 # For all years (files), all grid cells and both current day and future projections
 
+# All current day files
 current_day_files <- list.files ("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/current_decade",
                                  pattern = "\\.nc$",
                                  full.names = TRUE)
 
+# Function to caculate RX1day
 compute_rx1day_NetCDF <- function(file) {
   nc <- open.nc(file)
-  
   pr <- var.get.nc(nc, "item5216_daily_mean")
-  
-  # pr is already [44,44,360]
-  rx <- apply(pr, c(1,2), max, na.rm = TRUE)
-  
+    rx <- apply(pr, c(1,2), max, na.rm = TRUE)
   close.nc(nc)
-  
   return(rx)
 }
 
+#Applying function to current day files
 current_rx_list <- lapply(current_day_files, compute_rx1day_NetCDF)
 
 length(current_rx_list)
+#
 
 current_rx_array <- simplify2array(current_rx_list)
 dim(current_rx_array)
