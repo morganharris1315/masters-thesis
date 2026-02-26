@@ -8,7 +8,6 @@
 # Creating probability ratio (Future projection/ Current Day) 
 # -------------------------------------------------------------------------
 
-
 # Loading in RNetCDF ------------------------------------------------------
 #install.packages("RNetCDF")
 library(RNetCDF)
@@ -22,34 +21,43 @@ current_day_files <- list.files ("C:/Users/morga/OneDrive - The University of Wa
 nc <- open.nc(current_day_files[1])
 
 file.inq.nc(nc)
-
 file.inq.nc(nc)['format']
-
 print.nc(nc)
+
+# 4 dimiensions: longitude0 (44), latitude0 (44), z0 (1), time1 (360)
+# 8 vaiables, with rain in `item5216_daily_mean'
 
 var.get.nc(nc,"longitude0")
 var.get.nc(nc,"latitude0")
 
+# Have rotated-model grid coordinates (not plain lat/lon)
+# longitude0 runs ~194.52 to 213.44, latitude0 runs ~-4.84 to -23.76.
+
 var.inq.nc(nc, "item5216_daily_mean")
-pr <- var.get.nc(nc, "item5216_daily_mean")
+precip <- var.get.nc(nc, "item5216_daily_mean")
+dim(precip)
 
-dim(pr)
+# `item5216_daily_mean` is precipitation with dimensions
+# Dimensions are (longitude0, latitude0, z0, time1). But as z0 is length 1, R drops it when read and dimesions are...
+# 44 x 44 x 360
 
-single_gird_cell <- pr[10, 20, ]
+#Random single grid cell
+single_gird_cell <- precip[10, 20, ]
 
 plot(single_gird_cell, type = "l")
 max(single_gird_cell, na.rm = TRUE)
 
-rx1day <- apply(pr, c(1,2), max, na.rm = TRUE)
-
+#Getting RX1day from precip varaible 
+rx1day <- apply(precip, c(1,2), max, na.rm = TRUE)
 dim(rx1day)
 
 time <- var.get.nc(nc, "time1")
 head(time)
 tail(time)
+# Time uses a 360_day calendar and units "days since 1840-12-01 00:00:00".
+# Values ending in .5 are expected from daily means centred on each day.
 
 close.nc(nc)
-
 
 # Calculating RX1day -------------------------------------------------------
 # For all years (files), all grid cells and both current day and future projections
