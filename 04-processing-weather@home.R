@@ -98,3 +98,55 @@ future_rx_array <- simplify2array(future_rx_list)
 dim(future_rx_array)
 # 44 X 44 X 2535
 
+# Calculating 33rd percentile threshold from current-day RX1day ------------
+# Threshold is calculated for each grid cell using only current-day RX1day.
+# Result is a 44 x 44 matrix where each cell has its own threshold value.
+
+rx1day_threshold_33_current <- apply(
+  current_rx_array,
+  c(1, 2),
+  quantile,
+  probs = 0.33,
+  na.rm = TRUE,
+  type = 7
+)
+
+dim(rx1day_threshold_33_current)
+# 44 X 44
+
+# Calculating exceedance days above threshold for each year and grid cell --
+# For each year file, count daily precipitation values above the cell-specific
+# current-day RX1day 33rd percentile threshold.
+
+count_exceedance_days <- function(file, threshold_matrix) {
+  nc <- open.nc(file)
+  pr <- var.get.nc(nc, "item5216_daily_mean")
+  close.nc(nc)
+
+  # Compare each day to the threshold matrix and count exceedance days.
+  exceedance_days <- apply(pr > threshold_matrix, c(1, 2), sum, na.rm = TRUE)
+  return(exceedance_days)
+}
+
+# Exceedance day counts for all current-day years (44 x 44 x n_years)
+current_exceedance_list <- lapply(
+  current_day_files,
+  count_exceedance_days,
+  threshold_matrix = rx1day_threshold_33_current
+)
+
+current_exceedance_array <- simplify2array(current_exceedance_list)
+dim(current_exceedance_array)
+# 44 X 44 X 3226
+
+# Exceedance day counts for all future years using the same current-day
+# threshold baseline (44 x 44 x n_years)
+future_exceedance_list <- lapply(
+  future_day_files,
+  count_exceedance_days,
+  threshold_matrix = rx1day_threshold_33_current
+)
+
+future_exceedance_array <- simplify2array(future_exceedance_list)
+dim(future_exceedance_array)
+# 44 X 44 X 2535
