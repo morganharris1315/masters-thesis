@@ -15,8 +15,8 @@ library(RNetCDF)
 # Exploring the structure of the data -------------------------------------
 #Looking at a single file in the list of files in the folder current_day
 current_day_files <- list.files ("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/current_decade",
-                      pattern = "\\.nc$",
-                      full.names = TRUE)
+                                 pattern = "\\.nc$",
+                                 full.names = TRUE)
 
 nc <- open.nc(current_day_files[1])
 
@@ -71,7 +71,7 @@ current_day_files <- list.files ("C:/Users/morga/OneDrive - The University of Wa
 compute_rx1day_NetCDF <- function(file) {
   nc <- open.nc(file)
   pr <- var.get.nc(nc, "item5216_daily_mean")
-    rx <- apply(pr, c(1,2), max, na.rm = TRUE)
+  rx <- apply(pr, c(1,2), max, na.rm = TRUE)
   close.nc(nc)
   return(rx)
 }
@@ -86,11 +86,12 @@ current_rx_array <- simplify2array(current_rx_list)
 dim(current_rx_array)
 # 44 X 44 X 3226 
 
-future_day_files <- list.files("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/3k_warmer",
-                    pattern = "\\.nc$",
-                    full.names = TRUE)
+#Applying function to current day files
+future_projection_files <- list.files("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/3k_warmer",
+                               pattern = "\\.nc$",
+                               full.names = TRUE)
 
-future_rx_list <- lapply(future_day_files, compute_rx1day_NetCDF)
+future_rx_list <- lapply(future_projection_files, compute_rx1day_NetCDF)
 length(future_rx_list)
 # the length is 2535 e.g there is an RX1day value for every one of the 2535 years. 
 
@@ -122,7 +123,7 @@ count_exceedance_days <- function(file, threshold_matrix) {
   nc <- open.nc(file)
   pr <- var.get.nc(nc, "item5216_daily_mean")
   close.nc(nc)
-
+  
   # Compare each day to the threshold matrix and count exceedance days.
   exceedance_days <- apply(pr > threshold_matrix, c(1, 2), sum, na.rm = TRUE)
   return(exceedance_days)
@@ -142,7 +143,7 @@ dim(current_exceedance_array)
 # Exceedance day counts for all future years using the same current-day
 # threshold baseline (44 x 44 x n_years)
 future_exceedance_list <- lapply(
-  future_day_files,
+  future_projection_files,
   count_exceedance_days,
   threshold_matrix = rx1day_threshold_33_current
 )
