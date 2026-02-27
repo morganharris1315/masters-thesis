@@ -169,3 +169,77 @@ future_exceedance_list <- lapply(
 future_exceedance_array <- simplify2array(future_exceedance_list)
 dim(future_exceedance_array)
 # 44 X 44 X 2535
+
+# Proportion of years with >= 4 exceedance days ----------------------------
+# For each grid cell, calculate the proportion of years where exceedance
+# day count is greater than or equal to 4.
+
+calc_exceedance_proportion <- function(exceedance_array, min_days = 4) {
+  apply(exceedance_array, c(1, 2), function(x) {
+    mean(x >= min_days, na.rm = TRUE)
+  })
+}
+
+current_prop_ge4 <- calc_exceedance_proportion(current_exceedance_array, min_days = 4)
+future_prop_ge4 <- calc_exceedance_proportion(future_exceedance_array, min_days = 4)
+
+dim(current_prop_ge4)
+dim(future_prop_ge4)
+# both are 44 X 44
+
+# Probability ratio (future/current) ---------------------------------------
+# Ratio > 1 means years with >=4 exceedance days are more frequent in the
+# future simulation than in current climate.
+
+probability_ratio_ge4 <- future_prop_ge4 / current_prop_ge4
+
+# Handle divide-by-zero cases explicitly:
+# - if current proportion is 0 and future > 0, ratio is Inf
+# - if both are 0, set ratio to NA (undefined)
+probability_ratio_ge4[current_prop_ge4 == 0 & future_prop_ge4 > 0] <- Inf
+probability_ratio_ge4[current_prop_ge4 == 0 & future_prop_ge4 == 0] <- NA_real_
+
+# Build a per-grid-cell output table with lon/lat and all required metrics --
+# Includes:
+# - rotated-model longitude0 and latitude0
+# - current-day 33rd percentile RX1day threshold
+# - proportion of years with >=4 exceedance days (current, future)
+# - probability ratio (future/current)
+
+nc_grid <- open.nc(current_day_files[1])
+longitude0 <- var.get.nc(nc_grid, "longitude0")
+latitude0 <- var.get.nc(nc_grid, "latitude0")
+close.nc(nc_grid)
+
+grid_template <- expand.grid(
+  lon_index = seq_along(longitude0),
+  lat_index = seq_along(latitude0)
+)
+
+grid_results <- data.frame(
+  longitude0 = longitude0[grid_template$lon_index],
+  latitude0 = latitude0[grid_template$lat_index],
+  rx1day_threshold_33_current = rx1day_threshold_33_current[cbind(grid_template$lon_index, grid_template$lat_index)],
+  prop_years_ge4_current = current_prop_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
+  prop_years_ge4_future = future_prop_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
+  probability_ratio_future_over_current = probability_ratio_ge4[cbind(grid_template$lon_index, grid_template$lat_index)]
+)
+
+head(grid_results)
+
+# Saving outputs -----------------------------------------------------------
+# Save as both CSV (easy to inspect/share) and RDS (preserves types exactly).
+
+output_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/outputs"
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+write.csv(
+  grid_results,
+  file = file.path(output_dir, "weatherathome_exceedance_ge4_probability_ratio_grid.csv"),
+  row.names = FALSE
+)
+
+saveRDS(
+  grid_results,
+  file = file.path(output_dir, "weatherathome_exceedance_ge4_probability_ratio_grid.rds")
+)
