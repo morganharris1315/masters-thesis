@@ -88,8 +88,8 @@ dim(current_rx_array)
 
 #Applying function to current day files
 future_projection_files <- list.files("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/3k_warmer",
-                               pattern = "\\.nc$",
-                               full.names = TRUE)
+                                      pattern = "\\.nc$",
+                                      full.names = TRUE)
 
 future_rx_list <- lapply(future_projection_files, compute_rx1day_NetCDF)
 length(future_rx_list)
@@ -123,7 +123,7 @@ count_exceedance_days <- function(file, threshold_matrix) {
   nc <- open.nc(file)
   pr <- var.get.nc(nc, "item5216_daily_mean")
   close.nc(nc)
-
+  
   # Ensure precipitation is [lon, lat, time]. Some NetCDF reads retain a
   # singleton z-dimension (e.g., [lon, lat, 1, time]).
   pr_dim <- dim(pr)
@@ -131,11 +131,11 @@ count_exceedance_days <- function(file, threshold_matrix) {
     pr <- pr[, , 1, ]
     pr_dim <- dim(pr)
   }
-
+  
   if (length(pr_dim) != 3) {
     stop("Expected precipitation array with dimensions [lon, lat, time].")
   }
-
+  
   if (!all(pr_dim[1:2] == dim(threshold_matrix))) {
     stop("threshold_matrix dimensions do not match precipitation lon/lat grid.")
   }
@@ -148,11 +148,7 @@ count_exceedance_days <- function(file, threshold_matrix) {
 }
 
 # Exceedance day counts for all current-day years (44 x 44 x n_years)
-current_exceedance_list <- lapply(
-  current_day_files,
-  count_exceedance_days,
-  threshold_matrix = rx1day_threshold_33_current
-)
+current_exceedance_list <- lapply(current_day_files,count_exceedance_days, threshold_matrix = rx1day_threshold_33_current)
 
 current_exceedance_array <- simplify2array(current_exceedance_list)
 dim(current_exceedance_array)
@@ -160,19 +156,15 @@ dim(current_exceedance_array)
 
 # Exceedance day counts for all future years using the same current-day
 # threshold baseline (44 x 44 x n_years)
-future_exceedance_list <- lapply(
-  future_projection_files,
-  count_exceedance_days,
-  threshold_matrix = rx1day_threshold_33_current
-)
+future_exceedance_list <- lapply(future_projection_files, count_exceedance_days, threshold_matrix = rx1day_threshold_33_current)
 
+#############################################
 future_exceedance_array <- simplify2array(future_exceedance_list)
 dim(future_exceedance_array)
-# 44 X 44 X 2535
+# expect 44 X 44 X 2535
 
 # Proportion of years with >= 4 exceedance days ----------------------------
-# For each grid cell, calculate the proportion of years where exceedance
-# day count is greater than or equal to 4.
+# For each grid cell.
 
 calc_exceedance_proportion <- function(exceedance_array, min_days = 4) {
   apply(exceedance_array, c(1, 2), function(x) {
@@ -185,11 +177,10 @@ future_prop_ge4 <- calc_exceedance_proportion(future_exceedance_array, min_days 
 
 dim(current_prop_ge4)
 dim(future_prop_ge4)
-# both are 44 X 44
+# both should be 44 X 44
 
 # Probability ratio (future/current) ---------------------------------------
-# Ratio > 1 means years with >=4 exceedance days are more frequent in the
-# future simulation than in current climate.
+# Ratio > 1 means years with >=4 exceedance days are more frequent in the future simulation than in current climate.
 
 probability_ratio_ge4 <- future_prop_ge4 / current_prop_ge4
 
@@ -228,18 +219,11 @@ grid_results <- data.frame(
 head(grid_results)
 
 # Saving outputs -----------------------------------------------------------
-# Save as both CSV (easy to inspect/share) and RDS (preserves types exactly).
 
 output_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/outputs"
-dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
 
 write.csv(
   grid_results,
-  file = file.path(output_dir, "weatherathome_exceedance_ge4_probability_ratio_grid.csv"),
+  file = file.path(output_dir, "weather@home_exceedance_ge4_probability_ratio_grid.csv"),
   row.names = FALSE
-)
-
-saveRDS(
-  grid_results,
-  file = file.path(output_dir, "weatherathome_exceedance_ge4_probability_ratio_grid.rds")
 )
