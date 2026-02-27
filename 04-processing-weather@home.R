@@ -123,9 +123,27 @@ count_exceedance_days <- function(file, threshold_matrix) {
   nc <- open.nc(file)
   pr <- var.get.nc(nc, "item5216_daily_mean")
   close.nc(nc)
+
+  # Ensure precipitation is [lon, lat, time]. Some NetCDF reads retain a
+  # singleton z-dimension (e.g., [lon, lat, 1, time]).
+  pr_dim <- dim(pr)
+  if (length(pr_dim) == 4 && pr_dim[3] == 1) {
+    pr <- pr[, , 1, ]
+    pr_dim <- dim(pr)
+  }
+
+  if (length(pr_dim) != 3) {
+    stop("Expected precipitation array with dimensions [lon, lat, time].")
+  }
+
+  if (!all(pr_dim[1:2] == dim(threshold_matrix))) {
+    stop("threshold_matrix dimensions do not match precipitation lon/lat grid.")
+  }
   
   # Compare each day to the threshold matrix and count exceedance days.
-  exceedance_days <- apply(pr > threshold_matrix, c(1, 2), sum, na.rm = TRUE)
+  # sweep() applies the 2D threshold across the time dimension safely.
+  exceedance_binary <- sweep(pr, c(1, 2), threshold_matrix, FUN = ">")
+  exceedance_days <- apply(exceedance_binary, c(1, 2), sum, na.rm = TRUE)
   return(exceedance_days)
 }
 
