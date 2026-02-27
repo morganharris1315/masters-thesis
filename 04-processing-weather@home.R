@@ -220,10 +220,11 @@ head(grid_results)
 
 # Saving outputs -----------------------------------------------------------
 
-output_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/outputs"
+weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
 
 write.csv(
   grid_results,
-  file = file.path(output_dir, "weather@home_exceedance_ge4_probability_ratio_grid.csv"),
+  file = file.path(weatherathome_dir, "weather@home_exceedance_ge4_probability_ratio_grid.csv"),
   row.names = FALSE
 )
+
