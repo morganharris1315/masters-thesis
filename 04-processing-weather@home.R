@@ -80,18 +80,21 @@ compute_rx1day_NetCDF <- function(file) {
 current_rx_list <- lapply(current_day_files, compute_rx1day_NetCDF)
 
 length(current_rx_list)
-#
+# the length is 3226 e.g there is an RX1day value for every one of the 3226 years. 
 
 current_rx_array <- simplify2array(current_rx_list)
 dim(current_rx_array)
+# 44 X 44 X 3226 
 
-future_day_files <- list.files(
-  "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/3k_warmer",
-  pattern = "\\.nc$",
-  full.names = TRUE
-)
+future_day_files <- list.files("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/3k_warmer",
+                    pattern = "\\.nc$",
+                    full.names = TRUE)
 
 future_rx_list <- lapply(future_day_files, compute_rx1day_NetCDF)
-future_rx_array <- simplify2array(future_rx_list)
+length(future_rx_list)
+# the length is 2535 e.g there is an RX1day value for every one of the 2535 years. 
 
+future_rx_array <- simplify2array(future_rx_list)
 dim(future_rx_array)
+# 44 X 44 X 2535
+
