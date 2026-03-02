@@ -121,6 +121,8 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
   tile_width <- median(diff(sort(unique(finite_map_data$longitude0))), na.rm = TRUE)
   tile_height <- median(diff(sort(unique(finite_map_data$latitude0))), na.rm = TRUE)
 
+  # Keep rotated-grid coordinates for plotting so model cells remain aligned
+  # and touching in the native weather@home grid.
   rotated_grid_tiles <- finite_map_data |>
     transmute(
       x = longitude0,
@@ -130,35 +132,36 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
       probability_ratio_ge4
     )
 
+  # Build a land-mask outline directly on the rotated grid by testing whether
+  # each cell centre falls on NZ land in geographic lon/lat space. Drawing the
+  # contour in rotated x/y keeps the coastline aligned with the rotated tiles.
+  rotated_grid_tiles$nz_land <- ifelse(
+    is.na(map.where("nz", rotated_grid_tiles$lon, rotated_grid_tiles$lat)),
+    0,
+    1
+  )
+
   plot_mode <- "rotated_tile"
 }
 
 # Save plotting data for reproducibility
 write.csv(finite_map_data, output_csv, row.names = FALSE)
 
-# Outline of New Zealand in lon/lat for overlay.
+# Outline of New Zealand in lon/lat for overlay (fallback mode).
 nz_outline <- map_data("nz")
 
 # Plot ---------------------------------------------------------------------
-# If rotated-grid coordinates are available, draw aligned tiles in rotated
-# x/y space and place them geospatially using coord_map(project = "azequalarea",
-# orientation = c(-41, 173, 0)). This keeps weather@home cells lined up while
-# still allowing a coastline overlay.
 if (plot_mode == "rotated_tile") {
   p_ge4_ratio <- ggplot(rotated_grid_tiles, aes(x = x, y = y, fill = probability_ratio_ge4)) +
     geom_tile(width = tile_width, height = tile_height) +
-    geom_path(
-      data = nz_outline,
-      aes(x = long, y = lat, group = group),
-      inherit.aes = FALSE,
+    geom_contour(
+      aes(z = nz_land),
+      breaks = 0.5,
       colour = "white",
       linewidth = 0.45,
       alpha = 0.9
     ) +
-    coord_map(
-      projection = "azequalarea",
-      orientation = c(-41, 173, 0)
-    ) +
+    coord_fixed() +
     scale_fill_viridis(
       option = "magma",
       name = "Probability\nratio",
@@ -166,9 +169,9 @@ if (plot_mode == "rotated_tile") {
     ) +
     labs(
       title = "weather@home: Probability ratio for >=4 exceedance days",
-      subtitle = "Future (3k warmer) / Current decade, aligned to model grid + NZ outline",
-      x = "Longitude",
-      y = "Latitude"
+      subtitle = "Future (3k warmer) / Current decade, rotated grid with NZ land-mask outline",
+      x = "Rotated longitude0",
+      y = "Rotated latitude0"
     ) +
     theme_minimal(base_size = 12) +
     theme(
