@@ -228,3 +228,7 @@ write.csv(
   row.names = FALSE
 )
 
+max(probability_ratio_ge4, na.rm = TRUE) #  Max = 4.435144 
+mean(probability_ratio_ge4[is.finite(probability_ratio_ge4)], na.rm = TRUE) # Mean = 2.403923
+min(probability_ratio_ge4, na.rm = TRUE) # Min = 0.8620729
+
