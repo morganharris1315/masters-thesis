@@ -75,10 +75,16 @@ if (nrow(finite_map_data) == 0) {
 write.csv(map_data, output_csv, row.names = FALSE)
 
 # Plot ---------------------------------------------------------------------
-p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, fill = probability_ratio_ge4)) +
-  geom_tile() +
+# NOTE:
+# global_longitude0/global_latitude0 are from a rotated-model grid transformed
+# to geographic coordinates. The resulting grid is curvilinear, so lon/lat are
+# not on a regular rectangular raster in x/y space. `geom_tile()` infers tile
+# width/height from x/y resolution, which can become tiny and look blank.
+# Use points (square marker) for a robust map in geographic coordinates.
+p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, color = probability_ratio_ge4)) +
+  geom_point(shape = 15, size = 2.2, stroke = 0) +
   coord_fixed() +
-  scale_fill_viridis(
+  scale_color_viridis(
     option = "magma",
     name = "Probability\nratio",
     direction = 1
@@ -113,4 +119,6 @@ ggsave(
 # Quick diagnostics ---------------------------------------------------------
 cat("Finite cell count:", nrow(finite_map_data), "\n")
 cat("Infinite cell count:", sum(is.infinite(map_data$probability_ratio_ge4)), "\n")
+cat("Unique longitudes:", length(unique(finite_map_data$lon)), "\n")
+cat("Unique latitudes:", length(unique(finite_map_data$lat)), "\n")
 cat("Saved map to:", output_png, "\n")
