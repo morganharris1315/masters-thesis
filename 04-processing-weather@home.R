@@ -200,6 +200,8 @@ probability_ratio_ge4[current_prop_ge4 == 0 & future_prop_ge4 == 0] <- NA_real_
 nc_grid <- open.nc(current_day_files[1])
 longitude0 <- var.get.nc(nc_grid, "longitude0")
 latitude0 <- var.get.nc(nc_grid, "latitude0")
+global_longitude0 <- var.get.nc(nc_grid, "global_longitude0")
+global_latitude0 <- var.get.nc(nc_grid, "global_latitude0")
 close.nc(nc_grid)
 
 grid_template <- expand.grid(
@@ -208,8 +210,8 @@ grid_template <- expand.grid(
 )
 
 grid_results <- data.frame(
-  longitude0 = longitude0[grid_template$lon_index],
-  latitude0 = latitude0[grid_template$lat_index],
+  global_longitude0 = global_longitude0[cbind(grid_template$lon_index, grid_template$lat_index)],
+  global_latitude0 = global_latitude0[cbind(grid_template$lon_index, grid_template$lat_index)],
   rx1day_threshold_33_current = rx1day_threshold_33_current[cbind(grid_template$lon_index, grid_template$lat_index)],
   prop_years_ge4_current = current_prop_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
   prop_years_ge4_future = future_prop_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
@@ -231,4 +233,3 @@ write.csv(
 max(probability_ratio_ge4, na.rm = TRUE) #  Max = 4.435144 
 mean(probability_ratio_ge4[is.finite(probability_ratio_ge4)], na.rm = TRUE) # Mean = 2.403923
 min(probability_ratio_ge4, na.rm = TRUE) # Min = 0.8620729
-
