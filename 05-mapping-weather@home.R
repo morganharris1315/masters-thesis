@@ -125,10 +125,8 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
   # and touching in the native weather@home grid.
   rotated_grid_tiles <- finite_map_data |>
     transmute(
-      x = longitude0,
-      y = latitude0,
-      lon,
-      lat,
+      x = lon,
+      y = lat,
       probability_ratio_ge4
     )
 
