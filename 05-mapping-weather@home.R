@@ -71,16 +71,11 @@ if (nrow(finite_map_data) == 0) {
   stop("No finite probability-ratio values available to plot.")
 }
 
-# Optional clipping to make map colours easier to interpret.
-# This keeps the plotted scale stable if a few cells are very large.
-q99 <- as.numeric(quantile(finite_map_data$probability_ratio_ge4, probs = 0.99, na.rm = TRUE))
-finite_map_data$probability_ratio_ge4_plot <- pmin(finite_map_data$probability_ratio_ge4, q99)
-
 # Save plotting data for reproducibility
 write.csv(map_data, output_csv, row.names = FALSE)
 
 # Plot ---------------------------------------------------------------------
-p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, fill = probability_ratio_ge4_plot)) +
+p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, fill = probability_ratio_ge4)) +
   geom_tile() +
   coord_fixed() +
   scale_fill_viridis(
@@ -92,12 +87,7 @@ p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, fill = probability_
     title = "weather@home: Probability ratio for >=4 exceedance days",
     subtitle = "Future (3k warmer) / Current decade, by model grid cell",
     x = "Longitude",
-    y = "Latitude",
-    caption = paste0(
-      "Finite values are plotted. Values above the 99th percentile are clipped at ",
-      round(q99, 2),
-      "."
-    )
+    y = "Latitude"
   ) +
   theme_minimal(base_size = 12) +
   theme(
@@ -105,7 +95,12 @@ p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, fill = probability_
     axis.title = element_text(face = "bold")
   )
 
-print(p_ge4_ratio)
+if (interactive()) {
+  while (grDevices::dev.cur() > 1) {
+    grDevices::dev.off()
+  }
+  print(p_ge4_ratio)
+}
 
 ggsave(
   filename = output_png,
