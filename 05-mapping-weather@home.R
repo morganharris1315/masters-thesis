@@ -121,14 +121,22 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
   tile_width <- median(diff(sort(unique(finite_map_data$longitude0))), na.rm = TRUE)
   tile_height <- median(diff(sort(unique(finite_map_data$latitude0))), na.rm = TRUE)
 
+  # Plot in geographic lon/lat so coastlines and extent line up correctly.
+  # We still use tile sizing from model-grid spacing where possible.
   rotated_grid_tiles <- finite_map_data |>
     transmute(
-      x = longitude0,
-      y = latitude0,
-      lon,
-      lat,
+      x = lon,
+      y = lat,
       probability_ratio_ge4
     )
+
+  # Fallback tile sizes in case spacing cannot be inferred from rotated grid.
+  if (!is.finite(tile_width) || tile_width <= 0) {
+    tile_width <- median(diff(sort(unique(finite_map_data$lon))), na.rm = TRUE)
+  }
+  if (!is.finite(tile_height) || tile_height <= 0) {
+    tile_height <- median(diff(sort(unique(finite_map_data$lat))), na.rm = TRUE)
+  }
 
   plot_mode <- "rotated_tile"
 }
@@ -140,10 +148,9 @@ write.csv(finite_map_data, output_csv, row.names = FALSE)
 nz_outline <- map_data("nz")
 
 # Plot ---------------------------------------------------------------------
-# If rotated-grid coordinates are available, draw aligned tiles in rotated
-# x/y space and place them geospatially using coord_map(project = "azequalarea",
-# orientation = c(-41, 173, 0)). This keeps weather@home cells lined up while
-# still allowing a coastline overlay.
+# If rotated-grid metadata are available, we still draw in geographic lon/lat
+# so the weather@home tiles and NZ coastline are in the same coordinate system,
+# then apply an NZ-centred map projection.
 if (plot_mode == "rotated_tile") {
   p_ge4_ratio <- ggplot(rotated_grid_tiles, aes(x = x, y = y, fill = probability_ratio_ge4)) +
     geom_tile(width = tile_width, height = tile_height) +
@@ -157,7 +164,9 @@ if (plot_mode == "rotated_tile") {
     ) +
     coord_map(
       projection = "azequalarea",
-      orientation = c(-41, 173, 0)
+      orientation = c(-41, 173, 0),
+      xlim = c(165, 180),
+      ylim = c(-49, -33)
     ) +
     scale_fill_viridis(
       option = "magma",
@@ -166,7 +175,7 @@ if (plot_mode == "rotated_tile") {
     ) +
     labs(
       title = "weather@home: Probability ratio for >=4 exceedance days",
-      subtitle = "Future (3k warmer) / Current decade, aligned to model grid + NZ outline",
+      subtitle = "Future (3k warmer) / Current decade, centred on NZ with coastline overlay",
       x = "Longitude",
       y = "Latitude"
     ) +
