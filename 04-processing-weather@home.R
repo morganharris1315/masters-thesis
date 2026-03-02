@@ -298,6 +298,10 @@ grid_template <- expand.grid(
 )
 
 grid_results <- data.frame(
+  lon_index = grid_template$lon_index,
+  lat_index = grid_template$lat_index,
+  longitude0 = longitude0[grid_template$lon_index],
+  latitude0 = latitude0[grid_template$lat_index],
   global_longitude0 = global_longitude0[cbind(grid_template$lon_index, grid_template$lat_index)],
   global_latitude0 = global_latitude0[cbind(grid_template$lon_index, grid_template$lat_index)],
   rx1day_threshold_33_current = rx1day_threshold_33_current[cbind(grid_template$lon_index, grid_template$lat_index)],
