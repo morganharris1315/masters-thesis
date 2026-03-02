@@ -7,9 +7,12 @@
 # -------------------------------------------------------------------------
 
 # Packages -----------------------------------------------------------------
-# install.packages(c("ggplot2", "viridis"))
+# install.packages(c("ggplot2", "viridis", "maps", "mapdata", "tidyr"))
 library(ggplot2)
 library(viridis)
+library(maps)
+library(mapdata)
+library(tidyr)
 
 # Input/output paths --------------------------------------------------------
 weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
@@ -71,35 +74,137 @@ if (nrow(finite_map_data) == 0) {
   stop("No finite probability-ratio values available to plot.")
 }
 
+# For aligned model-grid plotting we need rotated-grid coordinates and matrix
+# indices exported by 04-processing-weather@home.R.
+plot_mode <- "point"
+if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_results))) {
+  finite_map_data <- grid_results[is.finite(grid_results$probability_ratio_ge4_future_over_current), c(
+    "lon_index", "lat_index", "longitude0", "latitude0",
+    "global_longitude0", "global_latitude0",
+    "probability_ratio_ge4_future_over_current"
+  )]
+
+  finite_map_data <- finite_map_data |>
+    rename(
+      lon = global_longitude0,
+      lat = global_latitude0,
+      probability_ratio_ge4 = probability_ratio_ge4_future_over_current
+    )
+
+  # Reconstruct ordered matrix for the georeferenced raster and keep one value
+  # per cell even if duplicate lon/lat values exist.
+  ratio_wide <- finite_map_data |>
+    select(lon_index, lat_index, probability_ratio_ge4) |>
+    distinct() |>
+    pivot_wider(
+      names_from = lat_index,
+      values_from = probability_ratio_ge4
+    ) |>
+    arrange(lon_index)
+
+  lon_lookup <- finite_map_data |>
+    select(lon_index, longitude0) |>
+    distinct() |>
+    arrange(lon_index)
+
+  lat_lookup <- finite_map_data |>
+    select(lat_index, latitude0) |>
+    distinct() |>
+    arrange(lat_index)
+
+  ratio_matrix <- as.matrix(ratio_wide[, -1, drop = FALSE])
+  rownames(ratio_matrix) <- lon_lookup$longitude0
+  colnames(ratio_matrix) <- lat_lookup$latitude0
+
+  # geom_raster requires equal spacing, so use geom_tile with explicit width /
+  # height from rotated-grid spacing.
+  tile_width <- median(diff(sort(unique(finite_map_data$longitude0))), na.rm = TRUE)
+  tile_height <- median(diff(sort(unique(finite_map_data$latitude0))), na.rm = TRUE)
+
+  rotated_grid_tiles <- finite_map_data |>
+    transmute(
+      x = longitude0,
+      y = latitude0,
+      lon,
+      lat,
+      probability_ratio_ge4
+    )
+
+  plot_mode <- "rotated_tile"
+}
+
 # Save plotting data for reproducibility
-write.csv(map_data, output_csv, row.names = FALSE)
+write.csv(finite_map_data, output_csv, row.names = FALSE)
+
+# Outline of New Zealand in lon/lat for overlay.
+nz_outline <- map_data("nz")
 
 # Plot ---------------------------------------------------------------------
-# NOTE:
-# global_longitude0/global_latitude0 are from a rotated-model grid transformed
-# to geographic coordinates. The resulting grid is curvilinear, so lon/lat are
-# not on a regular rectangular raster in x/y space. `geom_tile()` infers tile
-# width/height from x/y resolution, which can become tiny and look blank.
-# Use points (square marker) for a robust map in geographic coordinates.
-p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, color = probability_ratio_ge4)) +
-  geom_point(shape = 15, size = 2.2, stroke = 0) +
-  coord_fixed() +
-  scale_color_viridis(
-    option = "magma",
-    name = "Probability\nratio",
-    direction = 1
-  ) +
-  labs(
-    title = "weather@home: Probability ratio for >=4 exceedance days",
-    subtitle = "Future (3k warmer) / Current decade, by model grid cell",
-    x = "Longitude",
-    y = "Latitude"
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    plot.title = element_text(face = "bold"),
-    axis.title = element_text(face = "bold")
-  )
+# If rotated-grid coordinates are available, draw aligned tiles in rotated
+# x/y space and place them geospatially using coord_map(project = "azequalarea",
+# orientation = c(-41, 173, 0)). This keeps weather@home cells lined up while
+# still allowing a coastline overlay.
+if (plot_mode == "rotated_tile") {
+  p_ge4_ratio <- ggplot(rotated_grid_tiles, aes(x = x, y = y, fill = probability_ratio_ge4)) +
+    geom_tile(width = tile_width, height = tile_height) +
+    geom_path(
+      data = nz_outline,
+      aes(x = long, y = lat, group = group),
+      inherit.aes = FALSE,
+      colour = "white",
+      linewidth = 0.45,
+      alpha = 0.9
+    ) +
+    coord_map(
+      projection = "azequalarea",
+      orientation = c(-41, 173, 0)
+    ) +
+    scale_fill_viridis(
+      option = "magma",
+      name = "Probability\nratio",
+      direction = 1
+    ) +
+    labs(
+      title = "weather@home: Probability ratio for >=4 exceedance days",
+      subtitle = "Future (3k warmer) / Current decade, aligned to model grid + NZ outline",
+      x = "Longitude",
+      y = "Latitude"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold"),
+      axis.title = element_text(face = "bold")
+    )
+} else {
+  # Fallback for older CSVs that do not contain rotated-grid metadata.
+  p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, color = probability_ratio_ge4)) +
+    geom_point(shape = 15, size = 2.2, stroke = 0) +
+    geom_path(
+      data = nz_outline,
+      aes(x = long, y = lat, group = group),
+      inherit.aes = FALSE,
+      colour = "white",
+      linewidth = 0.45,
+      alpha = 0.9
+    ) +
+    coord_fixed() +
+    scale_color_viridis(
+      option = "magma",
+      name = "Probability\nratio",
+      direction = 1
+    ) +
+    labs(
+      title = "weather@home: Probability ratio for >=4 exceedance days",
+      subtitle = "Future (3k warmer) / Current decade, by model grid cell",
+      x = "Longitude",
+      y = "Latitude"
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      plot.title = element_text(face = "bold"),
+      axis.title = element_text(face = "bold")
+    )
+}
 
 if (interactive()) {
   while (grDevices::dev.cur() > 1) {
@@ -119,6 +224,7 @@ ggsave(
 # Quick diagnostics ---------------------------------------------------------
 cat("Finite cell count:", nrow(finite_map_data), "\n")
 cat("Infinite cell count:", sum(is.infinite(map_data$probability_ratio_ge4)), "\n")
-cat("Unique longitudes:", length(unique(finite_map_data$lon)), "\n")
-cat("Unique latitudes:", length(unique(finite_map_data$lat)), "\n")
+cat("Unique longitudes:", length(unique(map_data$lon)), "\n")
+cat("Unique latitudes:", length(unique(map_data$lat)), "\n")
+cat("Plot mode:", plot_mode, "\n")
 cat("Saved map to:", output_png, "\n")
