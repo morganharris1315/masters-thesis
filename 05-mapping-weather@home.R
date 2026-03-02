@@ -52,7 +52,7 @@ if (length(missing_cols) > 0) {
   )
 }
 
-# Keep finite values for colour scaling; track Inf/NA for diagnostics.
+# Keep finite values for colour scaling; keep Inf separately for diagnostics.
 map_data <- data.frame(
   lon = grid_results$global_longitude0,
   lat = grid_results$global_latitude0,
@@ -60,13 +60,9 @@ map_data <- data.frame(
 )
 
 map_data$ratio_class <- ifelse(
-  is.na(map_data$probability_ratio_ge4),
-  "NA (current=0, future=0)",
-  ifelse(
-    is.infinite(map_data$probability_ratio_ge4),
-    "Inf (current=0, future>0)",
-    "Finite"
-  )
+  is.infinite(map_data$probability_ratio_ge4),
+  "Inf (current=0, future>0)",
+  "Finite"
 )
 
 finite_map_data <- map_data[is.finite(map_data$probability_ratio_ge4), ]
@@ -109,6 +105,8 @@ p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, fill = probability_
     axis.title = element_text(face = "bold")
   )
 
+print(p_ge4_ratio)
+
 ggsave(
   filename = output_png,
   plot = p_ge4_ratio,
@@ -118,14 +116,6 @@ ggsave(
 )
 
 # Quick diagnostics ---------------------------------------------------------
-finite_count <- sum(is.finite(map_data$probability_ratio_ge4))
-inf_count <- sum(is.infinite(map_data$probability_ratio_ge4))
-na_count <- sum(is.na(map_data$probability_ratio_ge4))
-
-cat("Finite cell count:", finite_count, "\n")
-cat("Infinite cell count:", inf_count, "\n")
-cat("NA cell count:", na_count, "\n")
-cat("Finite ratio min:", round(min(finite_map_data$probability_ratio_ge4, na.rm = TRUE), 4), "\n")
-cat("Finite ratio median:", round(median(finite_map_data$probability_ratio_ge4, na.rm = TRUE), 4), "\n")
-cat("Finite ratio max:", round(max(finite_map_data$probability_ratio_ge4, na.rm = TRUE), 4), "\n")
+cat("Finite cell count:", nrow(finite_map_data), "\n")
+cat("Infinite cell count:", sum(is.infinite(map_data$probability_ratio_ge4)), "\n")
 cat("Saved map to:", output_png, "\n")
