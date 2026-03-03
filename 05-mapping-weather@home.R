@@ -100,6 +100,9 @@ build_discrete_ratio_bins <- function(x, n_bins = 6) {
   cut(x, breaks = brks, include.lowest = TRUE, right = TRUE, labels = labels, ordered_result = TRUE)
 }
 
+# Keep the highest ratio class at the top of the legend for quick scanning.
+ratio_legend_guide <- guide_legend(reverse = TRUE)
+
 # For aligned model-grid plotting we need rotated-grid coordinates and matrix
 # indices exported by 04-processing-weather@home.R.
 plot_mode <- "point"
@@ -238,6 +241,7 @@ if (plot_mode == "rotated_polygon") {
       direction = -1,
       drop = FALSE
     ) +
+    guides(fill = ratio_legend_guide) +
     labs(
       title = "weather@home: Probability ratio for >=4 exceedance days",
       x = "Longitude",
@@ -267,6 +271,7 @@ if (plot_mode == "rotated_polygon") {
       direction = -1,
       drop = FALSE
     ) +
+    guides(color = ratio_legend_guide) +
     labs(
       title = "weather@home: Probability ratio for >=4 exceedance days",
       x = "Longitude",
