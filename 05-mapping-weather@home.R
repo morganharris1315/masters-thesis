@@ -93,6 +93,33 @@ get_ratio_bin_spec <- function(x, n_bins = 6) {
   )
 }
 
+get_fixed_width_bin_spec <- function(x, bin_width = 0.5) {
+  r <- range(x, na.rm = TRUE)
+  if (!all(is.finite(r))) {
+    stop("Non-finite values found while building fixed-width ratio bins.")
+  }
+
+  min_break <- floor(r[1] / bin_width) * bin_width
+  max_break <- ceiling(r[2] / bin_width) * bin_width
+
+  if (min_break == max_break) {
+    max_break <- min_break + bin_width
+  }
+
+  brks <- seq(min_break, max_break, by = bin_width)
+
+  labels <- paste0(
+    format(head(brks, -1), trim = TRUE, scientific = FALSE, nsmall = 1),
+    " to ",
+    format(tail(brks, -1), trim = TRUE, scientific = FALSE, nsmall = 1)
+  )
+
+  list(
+    breaks = brks,
+    labels = labels
+  )
+}
+
 build_discrete_ratio_bins <- function(x, bin_spec = NULL, n_bins = 6) {
   if (is.null(bin_spec)) {
     bin_spec <- get_ratio_bin_spec(x, n_bins = n_bins)
@@ -306,7 +333,7 @@ if (length(shared_ratio_values) == 0) {
   stop("No finite values found for shared binning across >=4, top 10%, and joint ratios.")
 }
 
-shared_ratio_bin_spec <- get_ratio_bin_spec(shared_ratio_values)
+shared_ratio_bin_spec <- get_fixed_width_bin_spec(shared_ratio_values, bin_width = 0.5)
 
 layers_ge4 <- build_metric_layers(
   "probability_ratio_ge4_future_over_current",
@@ -369,8 +396,8 @@ p_joint_ratio <- make_ratio_plot(
 
 # Combined 3-panel figure requested: >=4, top 10%, and joint event --------
 p_combined <- (p_ge4_ratio + p_top10_ratio + p_joint_ratio) +
-  plot_layout(ncol = 1, guides = "collect") &
-  theme(legend.position = "right")
+  plot_layout(ncol = 3, guides = "collect") &
+  theme(legend.position = "left")
 
 if (interactive()) {
   while (grDevices::dev.cur() > 1) {
@@ -388,7 +415,7 @@ ggsave(filename = output_png_ge4, plot = p_ge4_ratio, width = 8, height = 7, dpi
 ggsave(filename = output_png_ge5, plot = p_ge5_ratio, width = 8, height = 7, dpi = 300)
 ggsave(filename = output_png_top10, plot = p_top10_ratio, width = 8, height = 7, dpi = 300)
 ggsave(filename = output_png_joint, plot = p_joint_ratio, width = 8, height = 7, dpi = 300)
-ggsave(filename = output_png_combined, plot = p_combined, width = 8.5, height = 16, dpi = 300)
+ggsave(filename = output_png_combined, plot = p_combined, width = 18, height = 6.5, dpi = 300)
 
 # Quick diagnostics ---------------------------------------------------------
 cat("Finite cell count (>=4):", nrow(layers_ge4$finite_data), "\n")
