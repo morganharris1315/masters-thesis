@@ -75,6 +75,31 @@ if (nrow(finite_map_data) == 0) {
   stop("No finite probability-ratio values available to plot.")
 }
 
+build_discrete_ratio_bins <- function(x, n_bins = 6) {
+  r <- range(x, na.rm = TRUE)
+  if (!all(is.finite(r))) {
+    stop("Non-finite values found while building discrete ratio bins.")
+  }
+
+  if (diff(r) == 0) {
+    brks <- c(r[1] - 1e-8, r[2] + 1e-8)
+  } else {
+    brks <- pretty(r, n = n_bins)
+    if (min(brks) > r[1]) brks <- c(r[1], brks)
+    if (max(brks) < r[2]) brks <- c(brks, r[2])
+    brks <- sort(unique(brks))
+    if (length(brks) < 2) brks <- c(r[1], r[2])
+  }
+
+  labels <- paste0(
+    format(head(brks, -1), trim = TRUE, scientific = FALSE),
+    " to ",
+    format(tail(brks, -1), trim = TRUE, scientific = FALSE)
+  )
+
+  cut(x, breaks = brks, include.lowest = TRUE, right = TRUE, labels = labels, ordered_result = TRUE)
+}
+
 # For aligned model-grid plotting we need rotated-grid coordinates and matrix
 # indices exported by 04-processing-weather@home.R.
 plot_mode <- "point"
@@ -93,11 +118,13 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
       probability_ratio_ge4 = probability_ratio_ge4_future_over_current
     )
 
+  finite_map_data$ratio_bin <- build_discrete_ratio_bins(finite_map_data$probability_ratio_ge4)
+
   # Build touching quadrilateral polygons from local grid vectors so the map
   # honours the rotated weather@home grid even after conversion to lon/lat.
   build_cell_polygons <- function(df) {
     centres <- df |>
-      select(lon_index, lat_index, lon, lat, probability_ratio_ge4) |>
+      select(lon_index, lat_index, lon, lat, probability_ratio_ge4, ratio_bin) |>
       distinct()
 
     key <- paste(centres$lon_index, centres$lat_index, sep = "_")
@@ -163,7 +190,8 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
         vertex_id = seq_len(5),
         lon = corners[, 1],
         lat = corners[, 2],
-        probability_ratio_ge4 = centres$probability_ratio_ge4[r]
+        probability_ratio_ge4 = centres$probability_ratio_ge4[r],
+        ratio_bin = centres$ratio_bin[r]
       )
     }
 
@@ -181,6 +209,10 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
   }
 }
 
+if (!"ratio_bin" %in% names(finite_map_data)) {
+  finite_map_data$ratio_bin <- build_discrete_ratio_bins(finite_map_data$probability_ratio_ge4)
+}
+
 # Save plotting data for reproducibility
 write.csv(finite_map_data, output_csv, row.names = FALSE)
 
@@ -189,7 +221,7 @@ nz_outline <- map_data("nz")
 
 # Plot ---------------------------------------------------------------------
 if (plot_mode == "rotated_polygon") {
-  p_ge4_ratio <- ggplot(cell_polygons, aes(x = lon, y = lat, fill = probability_ratio_ge4)) +
+  p_ge4_ratio <- ggplot(cell_polygons, aes(x = lon, y = lat, fill = ratio_bin)) +
     geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
     geom_path(
       data = nz_outline,
@@ -200,14 +232,14 @@ if (plot_mode == "rotated_polygon") {
       alpha = 0.9
     ) +
     coord_fixed() +
-    scale_fill_viridis(
+    scale_fill_viridis_d(
       option = "magma",
       name = "Probability\nratio",
-      direction = 1
+      direction = -1,
+      drop = FALSE
     ) +
     labs(
       title = "weather@home: Probability ratio for >=4 exceedance days",
-      subtitle = "Future (3k warmer) / Current decade, by touching rotated-grid polygons",
       x = "Longitude",
       y = "Latitude"
     ) +
@@ -218,7 +250,7 @@ if (plot_mode == "rotated_polygon") {
     )
 } else {
   # Fallback for older CSVs that do not contain rotated-grid metadata.
-  p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, color = probability_ratio_ge4)) +
+  p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, color = ratio_bin)) +
     geom_point(shape = 15, size = 2.2, stroke = 0) +
     geom_path(
       data = nz_outline,
@@ -229,14 +261,14 @@ if (plot_mode == "rotated_polygon") {
       alpha = 0.9
     ) +
     coord_fixed() +
-    scale_color_viridis(
+    scale_color_viridis_d(
       option = "magma",
       name = "Probability\nratio",
-      direction = 1
+      direction = -1,
+      drop = FALSE
     ) +
     labs(
       title = "weather@home: Probability ratio for >=4 exceedance days",
-      subtitle = "Future (3k warmer) / Current decade, by model grid cell",
       x = "Longitude",
       y = "Latitude"
     ) +
