@@ -7,12 +7,13 @@
 # -------------------------------------------------------------------------
 
 # Packages -----------------------------------------------------------------
-# install.packages(c("ggplot2", "viridis", "maps", "mapdata", "tidyr"))
+# install.packages(c("ggplot2", "viridis", "maps", "mapdata", "tidyr", "dplyr"))
 library(ggplot2)
 library(viridis)
 library(maps)
 library(mapdata)
 library(tidyr)
+library(dplyr)
 
 # Input/output paths --------------------------------------------------------
 weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
@@ -77,6 +78,7 @@ if (nrow(finite_map_data) == 0) {
 # For aligned model-grid plotting we need rotated-grid coordinates and matrix
 # indices exported by 04-processing-weather@home.R.
 plot_mode <- "point"
+cell_polygons <- NULL
 if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_results))) {
   finite_map_data <- grid_results[is.finite(grid_results$probability_ratio_ge4_future_over_current), c(
     "lon_index", "lat_index", "longitude0", "latitude0",
@@ -91,55 +93,92 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
       probability_ratio_ge4 = probability_ratio_ge4_future_over_current
     )
 
-  # Reconstruct ordered matrix for the georeferenced raster and keep one value
-  # per cell even if duplicate lon/lat values exist.
-  ratio_wide <- finite_map_data |>
-    select(lon_index, lat_index, probability_ratio_ge4) |>
-    distinct() |>
-    pivot_wider(
-      names_from = lat_index,
-      values_from = probability_ratio_ge4
-    ) |>
-    arrange(lon_index)
+  # Build touching quadrilateral polygons from local grid vectors so the map
+  # honours the rotated weather@home grid even after conversion to lon/lat.
+  build_cell_polygons <- function(df) {
+    centres <- df |>
+      select(lon_index, lat_index, lon, lat, probability_ratio_ge4) |>
+      distinct()
 
-  lon_lookup <- finite_map_data |>
-    select(lon_index, longitude0) |>
-    distinct() |>
-    arrange(lon_index)
+    key <- paste(centres$lon_index, centres$lat_index, sep = "_")
+    key_lookup <- setNames(seq_len(nrow(centres)), key)
 
-  lat_lookup <- finite_map_data |>
-    select(lat_index, latitude0) |>
-    distinct() |>
-    arrange(lat_index)
+    get_xy <- function(i, j) {
+      k <- paste(i, j, sep = "_")
+      idx <- key_lookup[[k]]
+      if (is.null(idx) || is.na(idx)) {
+        return(c(NA_real_, NA_real_))
+      }
+      c(centres$lon[idx], centres$lat[idx])
+    }
 
-  ratio_matrix <- as.matrix(ratio_wide[, -1, drop = FALSE])
-  rownames(ratio_matrix) <- lon_lookup$longitude0
-  colnames(ratio_matrix) <- lat_lookup$latitude0
+    polygon_parts <- vector("list", nrow(centres))
+    part_i <- 0L
 
-  # geom_raster requires equal spacing, so use geom_tile with explicit width /
-  # height from rotated-grid spacing.
-  tile_width <- median(diff(sort(unique(finite_map_data$longitude0))), na.rm = TRUE)
-  tile_height <- median(diff(sort(unique(finite_map_data$latitude0))), na.rm = TRUE)
+    for (r in seq_len(nrow(centres))) {
+      i <- centres$lon_index[r]
+      j <- centres$lat_index[r]
+      c0 <- c(centres$lon[r], centres$lat[r])
 
-  # Keep rotated-grid coordinates for plotting so model cells remain aligned
-  # and touching in the native weather@home grid.
-  rotated_grid_tiles <- finite_map_data |>
-    transmute(
-      x = lon,
-      y = lat,
-      probability_ratio_ge4
-    )
+      c_w <- get_xy(i - 1, j)
+      c_e <- get_xy(i + 1, j)
+      c_s <- get_xy(i, j - 1)
+      c_n <- get_xy(i, j + 1)
 
-  # Build a land-mask outline directly on the rotated grid by testing whether
-  # each cell centre falls on NZ land in geographic lon/lat space. Drawing the
-  # contour in rotated x/y keeps the coastline aligned with the rotated tiles.
-  rotated_grid_tiles$nz_land <- ifelse(
-    is.na(map.where("nz", rotated_grid_tiles$lon, rotated_grid_tiles$lat)),
-    0,
-    1
-  )
+      v_i <- if (all(is.finite(c_w)) && all(is.finite(c_e))) {
+        (c_e - c_w) / 2
+      } else if (all(is.finite(c_e))) {
+        c_e - c0
+      } else if (all(is.finite(c_w))) {
+        c0 - c_w
+      } else {
+        c(NA_real_, NA_real_)
+      }
 
-  plot_mode <- "rotated_tile"
+      v_j <- if (all(is.finite(c_s)) && all(is.finite(c_n))) {
+        (c_n - c_s) / 2
+      } else if (all(is.finite(c_n))) {
+        c_n - c0
+      } else if (all(is.finite(c_s))) {
+        c0 - c_s
+      } else {
+        c(NA_real_, NA_real_)
+      }
+
+      if (!all(is.finite(v_i)) || !all(is.finite(v_j))) {
+        next
+      }
+
+      corners <- rbind(
+        c0 - 0.5 * v_i - 0.5 * v_j,
+        c0 + 0.5 * v_i - 0.5 * v_j,
+        c0 + 0.5 * v_i + 0.5 * v_j,
+        c0 - 0.5 * v_i + 0.5 * v_j,
+        c0 - 0.5 * v_i - 0.5 * v_j
+      )
+
+      part_i <- part_i + 1L
+      polygon_parts[[part_i]] <- data.frame(
+        cell_id = paste(i, j, sep = "_"),
+        vertex_id = seq_len(5),
+        lon = corners[, 1],
+        lat = corners[, 2],
+        probability_ratio_ge4 = centres$probability_ratio_ge4[r]
+      )
+    }
+
+    if (part_i == 0L) {
+      return(data.frame())
+    }
+
+    do.call(rbind, polygon_parts[seq_len(part_i)])
+  }
+
+  cell_polygons <- build_cell_polygons(finite_map_data)
+
+  if (nrow(cell_polygons) > 0) {
+    plot_mode <- "rotated_polygon"
+  }
 }
 
 # Save plotting data for reproducibility
@@ -149,12 +188,13 @@ write.csv(finite_map_data, output_csv, row.names = FALSE)
 nz_outline <- map_data("nz")
 
 # Plot ---------------------------------------------------------------------
-if (plot_mode == "rotated_tile") {
-  p_ge4_ratio <- ggplot(rotated_grid_tiles, aes(x = x, y = y, fill = probability_ratio_ge4)) +
-    geom_tile(width = tile_width, height = tile_height) +
-    geom_contour(
-      aes(z = nz_land),
-      breaks = 0.5,
+if (plot_mode == "rotated_polygon") {
+  p_ge4_ratio <- ggplot(cell_polygons, aes(x = lon, y = lat, fill = probability_ratio_ge4)) +
+    geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
+    geom_path(
+      data = nz_outline,
+      aes(x = long, y = lat, group = group),
+      inherit.aes = FALSE,
       colour = "white",
       linewidth = 0.45,
       alpha = 0.9
@@ -167,9 +207,9 @@ if (plot_mode == "rotated_tile") {
     ) +
     labs(
       title = "weather@home: Probability ratio for >=4 exceedance days",
-      subtitle = "Future (3k warmer) / Current decade, rotated grid with NZ land-mask outline",
-      x = "Rotated longitude0",
-      y = "Rotated latitude0"
+      subtitle = "Future (3k warmer) / Current decade, by touching rotated-grid polygons",
+      x = "Longitude",
+      y = "Latitude"
     ) +
     theme_minimal(base_size = 12) +
     theme(
