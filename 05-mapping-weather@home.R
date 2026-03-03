@@ -65,7 +65,7 @@ if (length(missing_cols) > 0) {
   )
 }
 
-build_discrete_ratio_bins <- function(x, n_bins = 6) {
+get_ratio_bin_spec <- function(x, n_bins = 6) {
   r <- range(x, na.rm = TRUE)
   if (!all(is.finite(r))) {
     stop("Non-finite values found while building discrete ratio bins.")
@@ -87,7 +87,25 @@ build_discrete_ratio_bins <- function(x, n_bins = 6) {
     format(tail(brks, -1), trim = TRUE, scientific = FALSE)
   )
 
-  cut(x, breaks = brks, include.lowest = TRUE, right = TRUE, labels = labels, ordered_result = TRUE)
+  list(
+    breaks = brks,
+    labels = labels
+  )
+}
+
+build_discrete_ratio_bins <- function(x, bin_spec = NULL, n_bins = 6) {
+  if (is.null(bin_spec)) {
+    bin_spec <- get_ratio_bin_spec(x, n_bins = n_bins)
+  }
+
+  cut(
+    x,
+    breaks = bin_spec$breaks,
+    include.lowest = TRUE,
+    right = TRUE,
+    labels = bin_spec$labels,
+    ordered_result = TRUE
+  )
 }
 
 # Keep the highest ratio class at the top of the legend for quick scanning.
@@ -241,7 +259,7 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
   }
 }
 
-build_metric_layers <- function(ratio_col) {
+build_metric_layers <- function(ratio_col, bin_spec = NULL) {
   base_data <- data.frame(
     lon_index = grid_results$lon_index,
     lat_index = grid_results$lat_index,
@@ -255,7 +273,7 @@ build_metric_layers <- function(ratio_col) {
     stop(sprintf("No finite probability-ratio values available to plot for %s.", ratio_col))
   }
 
-  finite_data$ratio_bin <- build_discrete_ratio_bins(finite_data$ratio_value)
+  finite_data$ratio_bin <- build_discrete_ratio_bins(finite_data$ratio_value, bin_spec = bin_spec)
 
   plot_mode <- "point"
   cell_polygons <- data.frame()
@@ -277,10 +295,32 @@ build_metric_layers <- function(ratio_col) {
 }
 
 # Build plot layers for all requested metrics ------------------------------
-layers_ge4 <- build_metric_layers("probability_ratio_ge4_future_over_current")
+shared_ratio_values <- c(
+  grid_results$probability_ratio_ge4_future_over_current,
+  grid_results$probability_ratio_rx1day_top10_future_over_current,
+  grid_results$probability_ratio_joint_top10_ge4_future_over_current
+)
+shared_ratio_values <- shared_ratio_values[is.finite(shared_ratio_values)]
+
+if (length(shared_ratio_values) == 0) {
+  stop("No finite values found for shared binning across >=4, top 10%, and joint ratios.")
+}
+
+shared_ratio_bin_spec <- get_ratio_bin_spec(shared_ratio_values)
+
+layers_ge4 <- build_metric_layers(
+  "probability_ratio_ge4_future_over_current",
+  bin_spec = shared_ratio_bin_spec
+)
 layers_ge5 <- build_metric_layers("probability_ratio_ge5_future_over_current")
-layers_top10 <- build_metric_layers("probability_ratio_rx1day_top10_future_over_current")
-layers_joint <- build_metric_layers("probability_ratio_joint_top10_ge4_future_over_current")
+layers_top10 <- build_metric_layers(
+  "probability_ratio_rx1day_top10_future_over_current",
+  bin_spec = shared_ratio_bin_spec
+)
+layers_joint <- build_metric_layers(
+  "probability_ratio_joint_top10_ge4_future_over_current",
+  bin_spec = shared_ratio_bin_spec
+)
 
 # Save plotting data for reproducibility
 output_map_data <- grid_results |>
