@@ -2,18 +2,23 @@
 # 05-mapping-weather@home.R
 # -------------------------------------------------------------------------
 # Feb 2026
-# Mapping the probability ratio (future/current) for years with
-# greater than or equal to 4 exceedance days at each weather@home grid cell.
+# Mapping weather@home probability ratios (future/current) for:
+# - >= 4 exceedance days
+# - >= 5 exceedance days
+# - top 10% RX1day years
+# - joint event (top 10% RX1day and >= 4 exceedance days)
+# Saves each map separately and also saves a combined 3-panel figure
+# (>=4 exceedance days, top 10% RX1day, and joint event).
 # -------------------------------------------------------------------------
 
 # Packages -----------------------------------------------------------------
-# install.packages(c("ggplot2", "viridis", "maps", "mapdata", "tidyr", "dplyr"))
+# install.packages(c("ggplot2", "viridis", "maps", "mapdata", "dplyr", "patchwork"))
 library(ggplot2)
 library(viridis)
 library(maps)
 library(mapdata)
-library(tidyr)
 library(dplyr)
+library(patchwork)
 
 # Input/output paths --------------------------------------------------------
 weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
@@ -23,14 +28,15 @@ input_file <- file.path(
   "weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv"
 )
 
-output_png <- file.path(
-  weatherathome_dir,
-  "weather@home_probability_ratio_ge4_map.png"
-)
+output_png_ge4 <- file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_map.png")
+output_png_ge5 <- file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_map.png")
+output_png_top10 <- file.path(weatherathome_dir, "weather@home_probability_ratio_rx1day_top10_map.png")
+output_png_joint <- file.path(weatherathome_dir, "weather@home_probability_ratio_joint_top10_ge4_map.png")
+output_png_combined <- file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_combined_map.png")
 
 output_csv <- file.path(
   weatherathome_dir,
-  "weather@home_probability_ratio_ge4_map_data.csv"
+  "weather@home_probability_ratio_map_data.csv"
 )
 
 # Read outputs from Script 04 ----------------------------------------------
@@ -43,7 +49,10 @@ grid_results <- read.csv(input_file)
 required_cols <- c(
   "global_longitude0",
   "global_latitude0",
-  "probability_ratio_ge4_future_over_current"
+  "probability_ratio_ge4_future_over_current",
+  "probability_ratio_ge5_future_over_current",
+  "probability_ratio_rx1day_top10_future_over_current",
+  "probability_ratio_joint_top10_ge4_future_over_current"
 )
 
 missing_cols <- setdiff(required_cols, names(grid_results))
@@ -54,25 +63,6 @@ if (length(missing_cols) > 0) {
       paste(missing_cols, collapse = ", ")
     )
   )
-}
-
-# Keep finite values for colour scaling; keep Inf separately for diagnostics.
-map_data <- data.frame(
-  lon = grid_results$global_longitude0,
-  lat = grid_results$global_latitude0,
-  probability_ratio_ge4 = grid_results$probability_ratio_ge4_future_over_current
-)
-
-map_data$ratio_class <- ifelse(
-  is.infinite(map_data$probability_ratio_ge4),
-  "Inf (current=0, future>0)",
-  "Finite"
-)
-
-finite_map_data <- map_data[is.finite(map_data$probability_ratio_ge4), ]
-
-if (nrow(finite_map_data) == 0) {
-  stop("No finite probability-ratio values available to plot.")
 }
 
 build_discrete_ratio_bins <- function(x, n_bins = 6) {
@@ -103,206 +93,278 @@ build_discrete_ratio_bins <- function(x, n_bins = 6) {
 # Keep the highest ratio class at the top of the legend for quick scanning.
 ratio_legend_guide <- guide_legend(reverse = TRUE)
 
-# For aligned model-grid plotting we need rotated-grid coordinates and matrix
-# indices exported by 04-processing-weather@home.R.
-plot_mode <- "point"
-cell_polygons <- NULL
-if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_results))) {
-  finite_map_data <- grid_results[is.finite(grid_results$probability_ratio_ge4_future_over_current), c(
-    "lon_index", "lat_index", "longitude0", "latitude0",
-    "global_longitude0", "global_latitude0",
-    "probability_ratio_ge4_future_over_current"
-  )]
+# Build touching quadrilateral polygons from local grid vectors so the map
+# honours the rotated weather@home grid even after conversion to lon/lat.
+build_cell_polygons <- function(df, ratio_col, ratio_bin_col) {
+  centres <- df |>
+    select(lon_index, lat_index, lon, lat, !!sym(ratio_col), !!sym(ratio_bin_col)) |>
+    distinct()
 
-  finite_map_data <- finite_map_data |>
-    rename(
-      lon = global_longitude0,
-      lat = global_latitude0,
-      probability_ratio_ge4 = probability_ratio_ge4_future_over_current
+  names(centres)[5:6] <- c("ratio_value", "ratio_bin")
+
+  key <- paste(centres$lon_index, centres$lat_index, sep = "_")
+  key_lookup <- setNames(seq_len(nrow(centres)), key)
+
+  get_xy <- function(i, j) {
+    k <- paste(i, j, sep = "_")
+    idx <- unname(key_lookup[k])
+    if (length(idx) == 0L || is.na(idx)) {
+      return(c(NA_real_, NA_real_))
+    }
+    c(centres$lon[idx], centres$lat[idx])
+  }
+
+  polygon_parts <- vector("list", nrow(centres))
+  part_i <- 0L
+
+  for (r in seq_len(nrow(centres))) {
+    i <- centres$lon_index[r]
+    j <- centres$lat_index[r]
+    c0 <- c(centres$lon[r], centres$lat[r])
+
+    c_w <- get_xy(i - 1, j)
+    c_e <- get_xy(i + 1, j)
+    c_s <- get_xy(i, j - 1)
+    c_n <- get_xy(i, j + 1)
+
+    v_i <- if (all(is.finite(c_w)) && all(is.finite(c_e))) {
+      (c_e - c_w) / 2
+    } else if (all(is.finite(c_e))) {
+      c_e - c0
+    } else if (all(is.finite(c_w))) {
+      c0 - c_w
+    } else {
+      c(NA_real_, NA_real_)
+    }
+
+    v_j <- if (all(is.finite(c_s)) && all(is.finite(c_n))) {
+      (c_n - c_s) / 2
+    } else if (all(is.finite(c_n))) {
+      c_n - c0
+    } else if (all(is.finite(c_s))) {
+      c0 - c_s
+    } else {
+      c(NA_real_, NA_real_)
+    }
+
+    if (!all(is.finite(v_i)) || !all(is.finite(v_j))) {
+      next
+    }
+
+    corners <- rbind(
+      c0 - 0.5 * v_i - 0.5 * v_j,
+      c0 + 0.5 * v_i - 0.5 * v_j,
+      c0 + 0.5 * v_i + 0.5 * v_j,
+      c0 - 0.5 * v_i + 0.5 * v_j,
+      c0 - 0.5 * v_i - 0.5 * v_j
     )
 
-  finite_map_data$ratio_bin <- build_discrete_ratio_bins(finite_map_data$probability_ratio_ge4)
-
-  # Build touching quadrilateral polygons from local grid vectors so the map
-  # honours the rotated weather@home grid even after conversion to lon/lat.
-  build_cell_polygons <- function(df) {
-    centres <- df |>
-      select(lon_index, lat_index, lon, lat, probability_ratio_ge4, ratio_bin) |>
-      distinct()
-
-    key <- paste(centres$lon_index, centres$lat_index, sep = "_")
-    key_lookup <- setNames(seq_len(nrow(centres)), key)
-
-    get_xy <- function(i, j) {
-      k <- paste(i, j, sep = "_")
-      idx <- unname(key_lookup[k])
-      if (length(idx) == 0L || is.na(idx)) {
-        return(c(NA_real_, NA_real_))
-      }
-      c(centres$lon[idx], centres$lat[idx])
-    }
-
-    polygon_parts <- vector("list", nrow(centres))
-    part_i <- 0L
-
-    for (r in seq_len(nrow(centres))) {
-      i <- centres$lon_index[r]
-      j <- centres$lat_index[r]
-      c0 <- c(centres$lon[r], centres$lat[r])
-
-      c_w <- get_xy(i - 1, j)
-      c_e <- get_xy(i + 1, j)
-      c_s <- get_xy(i, j - 1)
-      c_n <- get_xy(i, j + 1)
-
-      v_i <- if (all(is.finite(c_w)) && all(is.finite(c_e))) {
-        (c_e - c_w) / 2
-      } else if (all(is.finite(c_e))) {
-        c_e - c0
-      } else if (all(is.finite(c_w))) {
-        c0 - c_w
-      } else {
-        c(NA_real_, NA_real_)
-      }
-
-      v_j <- if (all(is.finite(c_s)) && all(is.finite(c_n))) {
-        (c_n - c_s) / 2
-      } else if (all(is.finite(c_n))) {
-        c_n - c0
-      } else if (all(is.finite(c_s))) {
-        c0 - c_s
-      } else {
-        c(NA_real_, NA_real_)
-      }
-
-      if (!all(is.finite(v_i)) || !all(is.finite(v_j))) {
-        next
-      }
-
-      corners <- rbind(
-        c0 - 0.5 * v_i - 0.5 * v_j,
-        c0 + 0.5 * v_i - 0.5 * v_j,
-        c0 + 0.5 * v_i + 0.5 * v_j,
-        c0 - 0.5 * v_i + 0.5 * v_j,
-        c0 - 0.5 * v_i - 0.5 * v_j
-      )
-
-      part_i <- part_i + 1L
-      polygon_parts[[part_i]] <- data.frame(
-        cell_id = paste(i, j, sep = "_"),
-        vertex_id = seq_len(5),
-        lon = corners[, 1],
-        lat = corners[, 2],
-        probability_ratio_ge4 = centres$probability_ratio_ge4[r],
-        ratio_bin = centres$ratio_bin[r]
-      )
-    }
-
-    if (part_i == 0L) {
-      return(data.frame())
-    }
-
-    do.call(rbind, polygon_parts[seq_len(part_i)])
+    part_i <- part_i + 1L
+    polygon_parts[[part_i]] <- data.frame(
+      cell_id = paste(i, j, sep = "_"),
+      vertex_id = seq_len(5),
+      lon = corners[, 1],
+      lat = corners[, 2],
+      ratio_value = centres$ratio_value[r],
+      ratio_bin = centres$ratio_bin[r]
+    )
   }
 
-  cell_polygons <- build_cell_polygons(finite_map_data)
+  if (part_i == 0L) {
+    return(data.frame())
+  }
 
-  if (nrow(cell_polygons) > 0) {
-    plot_mode <- "rotated_polygon"
+  do.call(rbind, polygon_parts[seq_len(part_i)])
+}
+
+make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
+  nz_outline <- map_data("nz")
+
+  if (plot_mode == "rotated_polygon") {
+    ggplot(cell_polygons, aes(x = lon, y = lat, fill = ratio_bin)) +
+      geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
+      geom_path(
+        data = nz_outline,
+        aes(x = long, y = lat, group = group),
+        inherit.aes = FALSE,
+        colour = "white",
+        linewidth = 0.45,
+        alpha = 0.9
+      ) +
+      coord_fixed() +
+      scale_fill_viridis_d(
+        option = "magma",
+        name = "Probability\nratio",
+        direction = -1,
+        drop = FALSE
+      ) +
+      guides(fill = ratio_legend_guide) +
+      labs(
+        title = title_text,
+        x = "Longitude",
+        y = "Latitude"
+      ) +
+      theme_minimal(base_size = 12) +
+      theme(
+        plot.title = element_text(face = "bold"),
+        axis.title = element_text(face = "bold")
+      )
+  } else {
+    ggplot(df_finite, aes(x = lon, y = lat, color = ratio_bin)) +
+      geom_point(shape = 15, size = 2.2, stroke = 0) +
+      geom_path(
+        data = nz_outline,
+        aes(x = long, y = lat, group = group),
+        inherit.aes = FALSE,
+        colour = "white",
+        linewidth = 0.45,
+        alpha = 0.9
+      ) +
+      coord_fixed() +
+      scale_color_viridis_d(
+        option = "magma",
+        name = "Probability\nratio",
+        direction = -1,
+        drop = FALSE
+      ) +
+      guides(color = ratio_legend_guide) +
+      labs(
+        title = title_text,
+        x = "Longitude",
+        y = "Latitude"
+      ) +
+      theme_minimal(base_size = 12) +
+      theme(
+        plot.title = element_text(face = "bold"),
+        axis.title = element_text(face = "bold")
+      )
   }
 }
 
-if (!"ratio_bin" %in% names(finite_map_data)) {
-  finite_map_data$ratio_bin <- build_discrete_ratio_bins(finite_map_data$probability_ratio_ge4)
+build_metric_layers <- function(ratio_col) {
+  base_data <- data.frame(
+    lon_index = grid_results$lon_index,
+    lat_index = grid_results$lat_index,
+    lon = grid_results$global_longitude0,
+    lat = grid_results$global_latitude0,
+    ratio_value = grid_results[[ratio_col]]
+  )
+
+  finite_data <- base_data[is.finite(base_data$ratio_value), ]
+  if (nrow(finite_data) == 0) {
+    stop(sprintf("No finite probability-ratio values available to plot for %s.", ratio_col))
+  }
+
+  finite_data$ratio_bin <- build_discrete_ratio_bins(finite_data$ratio_value)
+
+  plot_mode <- "point"
+  cell_polygons <- data.frame()
+
+  has_rotated_metadata <- all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_results))
+  if (has_rotated_metadata) {
+    cell_polygons <- build_cell_polygons(finite_data, "ratio_value", "ratio_bin")
+    if (nrow(cell_polygons) > 0) {
+      plot_mode <- "rotated_polygon"
+    }
+  }
+
+  list(
+    base_data = base_data,
+    finite_data = finite_data,
+    cell_polygons = cell_polygons,
+    plot_mode = plot_mode
+  )
 }
+
+# Build plot layers for all requested metrics ------------------------------
+layers_ge4 <- build_metric_layers("probability_ratio_ge4_future_over_current")
+layers_ge5 <- build_metric_layers("probability_ratio_ge5_future_over_current")
+layers_top10 <- build_metric_layers("probability_ratio_rx1day_top10_future_over_current")
+layers_joint <- build_metric_layers("probability_ratio_joint_top10_ge4_future_over_current")
 
 # Save plotting data for reproducibility
-write.csv(finite_map_data, output_csv, row.names = FALSE)
+output_map_data <- grid_results |>
+  select(
+    lon_index,
+    lat_index,
+    longitude0,
+    latitude0,
+    global_longitude0,
+    global_latitude0,
+    probability_ratio_ge4_future_over_current,
+    probability_ratio_ge5_future_over_current,
+    probability_ratio_rx1day_top10_future_over_current,
+    probability_ratio_joint_top10_ge4_future_over_current
+  )
+write.csv(output_map_data, output_csv, row.names = FALSE)
 
-# Outline of New Zealand in lon/lat for overlay (fallback mode).
-nz_outline <- map_data("nz")
+# Create the four requested maps -------------------------------------------
+p_ge4_ratio <- make_ratio_plot(
+  df_finite = layers_ge4$finite_data,
+  cell_polygons = layers_ge4$cell_polygons,
+  plot_mode = layers_ge4$plot_mode,
+  title_text = "weather@home: Probability ratio for >=4 exceedance days"
+)
 
-# Plot ---------------------------------------------------------------------
-if (plot_mode == "rotated_polygon") {
-  p_ge4_ratio <- ggplot(cell_polygons, aes(x = lon, y = lat, fill = ratio_bin)) +
-    geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
-    geom_path(
-      data = nz_outline,
-      aes(x = long, y = lat, group = group),
-      inherit.aes = FALSE,
-      colour = "white",
-      linewidth = 0.45,
-      alpha = 0.9
-    ) +
-    coord_fixed() +
-    scale_fill_viridis_d(
-      option = "magma",
-      name = "Probability\nratio",
-      direction = -1,
-      drop = FALSE
-    ) +
-    guides(fill = ratio_legend_guide) +
-    labs(
-      title = "weather@home: Probability ratio for >=4 exceedance days",
-      x = "Longitude",
-      y = "Latitude"
-    ) +
-    theme_minimal(base_size = 12) +
-    theme(
-      plot.title = element_text(face = "bold"),
-      axis.title = element_text(face = "bold")
-    )
-} else {
-  # Fallback for older CSVs that do not contain rotated-grid metadata.
-  p_ge4_ratio <- ggplot(finite_map_data, aes(x = lon, y = lat, color = ratio_bin)) +
-    geom_point(shape = 15, size = 2.2, stroke = 0) +
-    geom_path(
-      data = nz_outline,
-      aes(x = long, y = lat, group = group),
-      inherit.aes = FALSE,
-      colour = "white",
-      linewidth = 0.45,
-      alpha = 0.9
-    ) +
-    coord_fixed() +
-    scale_color_viridis_d(
-      option = "magma",
-      name = "Probability\nratio",
-      direction = -1,
-      drop = FALSE
-    ) +
-    guides(color = ratio_legend_guide) +
-    labs(
-      title = "weather@home: Probability ratio for >=4 exceedance days",
-      x = "Longitude",
-      y = "Latitude"
-    ) +
-    theme_minimal(base_size = 12) +
-    theme(
-      plot.title = element_text(face = "bold"),
-      axis.title = element_text(face = "bold")
-    )
-}
+p_ge5_ratio <- make_ratio_plot(
+  df_finite = layers_ge5$finite_data,
+  cell_polygons = layers_ge5$cell_polygons,
+  plot_mode = layers_ge5$plot_mode,
+  title_text = "weather@home: Probability ratio for >=5 exceedance days"
+)
+
+p_top10_ratio <- make_ratio_plot(
+  df_finite = layers_top10$finite_data,
+  cell_polygons = layers_top10$cell_polygons,
+  plot_mode = layers_top10$plot_mode,
+  title_text = "weather@home: Probability ratio for top 10% RX1day"
+)
+
+p_joint_ratio <- make_ratio_plot(
+  df_finite = layers_joint$finite_data,
+  cell_polygons = layers_joint$cell_polygons,
+  plot_mode = layers_joint$plot_mode,
+  title_text = "weather@home: Probability ratio for top 10% RX1day and >=4 exceedance days"
+)
+
+# Combined 3-panel figure requested: >=4, top 10%, and joint event --------
+p_combined <- (p_ge4_ratio + p_top10_ratio + p_joint_ratio) +
+  plot_layout(ncol = 1, guides = "collect") &
+  theme(legend.position = "right")
 
 if (interactive()) {
   while (grDevices::dev.cur() > 1) {
     grDevices::dev.off()
   }
   print(p_ge4_ratio)
+  print(p_ge5_ratio)
+  print(p_top10_ratio)
+  print(p_joint_ratio)
+  print(p_combined)
 }
 
-ggsave(
-  filename = output_png,
-  plot = p_ge4_ratio,
-  width = 8,
-  height = 7,
-  dpi = 300
-)
+# Save all outputs ----------------------------------------------------------
+ggsave(filename = output_png_ge4, plot = p_ge4_ratio, width = 8, height = 7, dpi = 300)
+ggsave(filename = output_png_ge5, plot = p_ge5_ratio, width = 8, height = 7, dpi = 300)
+ggsave(filename = output_png_top10, plot = p_top10_ratio, width = 8, height = 7, dpi = 300)
+ggsave(filename = output_png_joint, plot = p_joint_ratio, width = 8, height = 7, dpi = 300)
+ggsave(filename = output_png_combined, plot = p_combined, width = 8.5, height = 16, dpi = 300)
 
 # Quick diagnostics ---------------------------------------------------------
-cat("Finite cell count:", nrow(finite_map_data), "\n")
-cat("Infinite cell count:", sum(is.infinite(map_data$probability_ratio_ge4)), "\n")
-cat("Unique longitudes:", length(unique(map_data$lon)), "\n")
-cat("Unique latitudes:", length(unique(map_data$lat)), "\n")
-cat("Plot mode:", plot_mode, "\n")
-cat("Saved map to:", output_png, "\n")
+cat("Finite cell count (>=4):", nrow(layers_ge4$finite_data), "\n")
+cat("Finite cell count (>=5):", nrow(layers_ge5$finite_data), "\n")
+cat("Finite cell count (top 10%):", nrow(layers_top10$finite_data), "\n")
+cat("Finite cell count (joint top10 + >=4):", nrow(layers_joint$finite_data), "\n")
+cat("Infinite cell count (>=4):", sum(is.infinite(layers_ge4$base_data$ratio_value)), "\n")
+cat("Infinite cell count (>=5):", sum(is.infinite(layers_ge5$base_data$ratio_value)), "\n")
+cat("Infinite cell count (top 10%):", sum(is.infinite(layers_top10$base_data$ratio_value)), "\n")
+cat("Infinite cell count (joint top10 + >=4):", sum(is.infinite(layers_joint$base_data$ratio_value)), "\n")
+cat("Plot mode (>=4):", layers_ge4$plot_mode, "\n")
+cat("Plot mode (>=5):", layers_ge5$plot_mode, "\n")
+cat("Plot mode (top 10%):", layers_top10$plot_mode, "\n")
+cat("Plot mode (joint top10 + >=4):", layers_joint$plot_mode, "\n")
+cat("Saved map to:", output_png_ge4, "\n")
+cat("Saved map to:", output_png_ge5, "\n")
+cat("Saved map to:", output_png_top10, "\n")
+cat("Saved map to:", output_png_joint, "\n")
+cat("Saved combined map to:", output_png_combined, "\n")
