@@ -105,8 +105,8 @@ if (all(c("lon_index", "lat_index", "longitude0", "latitude0") %in% names(grid_r
 
     get_xy <- function(i, j) {
       k <- paste(i, j, sep = "_")
-      idx <- key_lookup[[k]]
-      if (is.null(idx) || is.na(idx)) {
+      idx <- unname(key_lookup[k])
+      if (length(idx) == 0L || is.na(idx)) {
         return(c(NA_real_, NA_real_))
       }
       c(centres$lon[idx], centres$lat[idx])
