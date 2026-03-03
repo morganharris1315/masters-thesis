@@ -224,6 +224,11 @@ build_cell_polygons <- function(df, ratio_col, ratio_bin_col) {
 
 make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
   nz_outline <- map_data("nz")
+  ratio_levels <- levels(df_finite$ratio_bin)
+  ratio_palette <- setNames(
+    viridisLite::viridis(length(ratio_levels), option = "magma", direction = -1),
+    ratio_levels
+  )
 
   if (plot_mode == "rotated_polygon") {
     ggplot(cell_polygons, aes(x = lon, y = lat, fill = ratio_bin)) +
@@ -237,10 +242,10 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
         alpha = 0.9
       ) +
       coord_fixed() +
-      scale_fill_viridis_d(
-        option = "magma",
+      scale_fill_manual(
+        values = ratio_palette,
+        limits = ratio_levels,
         name = "Probability\nratio",
-        direction = -1,
         drop = FALSE
       ) +
       guides(fill = ratio_legend_guide) +
@@ -251,7 +256,7 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
       ) +
       theme_minimal(base_size = 12) +
       theme(
-        plot.title = element_text(face = "bold"),
+        plot.title = element_text(face = "bold", size = 11, lineheight = 0.95),
         axis.title = element_text(face = "bold")
       )
   } else {
@@ -266,10 +271,10 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
         alpha = 0.9
       ) +
       coord_fixed() +
-      scale_color_viridis_d(
-        option = "magma",
+      scale_color_manual(
+        values = ratio_palette,
+        limits = ratio_levels,
         name = "Probability\nratio",
-        direction = -1,
         drop = FALSE
       ) +
       guides(color = ratio_legend_guide) +
@@ -280,7 +285,7 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
       ) +
       theme_minimal(base_size = 12) +
       theme(
-        plot.title = element_text(face = "bold"),
+        plot.title = element_text(face = "bold", size = 11, lineheight = 0.95),
         axis.title = element_text(face = "bold")
       )
   }
@@ -397,7 +402,7 @@ p_joint_ratio <- make_ratio_plot(
 # Combined 3-panel figure requested: >=4, top 10%, and joint event --------
 p_combined <- (p_ge4_ratio + p_top10_ratio + p_joint_ratio) +
   plot_layout(ncol = 3, guides = "collect") &
-  theme(legend.position = "left")
+  theme(legend.position = "right")
 
 if (interactive()) {
   while (grDevices::dev.cur() > 1) {
