@@ -93,14 +93,23 @@ get_ratio_bin_spec <- function(x, n_bins = 6) {
   )
 }
 
-get_fixed_width_bin_spec <- function(x, bin_width = 0.5) {
+get_fixed_width_bin_spec <- function(x, bin_width = 0.5, min_value = NULL, max_value = NULL) {
   r <- range(x, na.rm = TRUE)
   if (!all(is.finite(r))) {
     stop("Non-finite values found while building fixed-width ratio bins.")
   }
 
-  min_break <- floor(r[1] / bin_width) * bin_width
-  max_break <- ceiling(r[2] / bin_width) * bin_width
+  if (is.null(min_value)) {
+    min_break <- floor(r[1] / bin_width) * bin_width
+  } else {
+    min_break <- min_value
+  }
+
+  if (is.null(max_value)) {
+    max_break <- ceiling(r[2] / bin_width) * bin_width
+  } else {
+    max_break <- max_value
+  }
 
   if (min_break == max_break) {
     max_break <- min_break + bin_width
@@ -260,8 +269,8 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
         axis.title = element_text(face = "bold")
       )
   } else {
-    ggplot(df_finite, aes(x = lon, y = lat, color = ratio_bin)) +
-      geom_point(shape = 15, size = 2.2, stroke = 0) +
+    ggplot(df_finite, aes(x = lon, y = lat, fill = ratio_bin)) +
+      geom_point(shape = 22, size = 2.2, stroke = 0, colour = NA) +
       geom_path(
         data = nz_outline,
         aes(x = long, y = lat, group = group),
@@ -271,13 +280,13 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
         alpha = 0.9
       ) +
       coord_fixed() +
-      scale_color_manual(
+      scale_fill_manual(
         values = ratio_palette,
         limits = ratio_levels,
         name = "Probability\nratio",
         drop = FALSE
       ) +
-      guides(color = ratio_legend_guide) +
+      guides(fill = ratio_legend_guide) +
       labs(
         title = title_text,
         x = "Longitude",
@@ -338,7 +347,12 @@ if (length(shared_ratio_values) == 0) {
   stop("No finite values found for shared binning across >=4, top 10%, and joint ratios.")
 }
 
-shared_ratio_bin_spec <- get_fixed_width_bin_spec(shared_ratio_values, bin_width = 0.5)
+shared_ratio_bin_spec <- get_fixed_width_bin_spec(
+  shared_ratio_values,
+  bin_width = 0.5,
+  min_value = 0,
+  max_value = 6.5
+)
 
 layers_ge4 <- build_metric_layers(
   "probability_ratio_ge4_future_over_current",
