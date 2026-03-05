@@ -288,6 +288,11 @@ build_metric_layers <- function(ratio_col, bin_spec = NULL) {
   }
   
   finite_data$ratio_bin <- build_discrete_ratio_bins(finite_data$ratio_value, bin_spec = bin_spec)
+  finite_data$ratio_bin <- factor(
+    finite_data$ratio_bin,
+    levels = bin_spec$labels,
+    ordered = TRUE
+  )
   
   plot_mode <- "point"
   cell_polygons <- data.frame()
@@ -328,10 +333,15 @@ shared_ratio_bin_spec <- get_fixed_width_bin_spec(
 )
 
 shared_ratio_levels <- shared_ratio_bin_spec$labels
-shared_ratio_palette <- setNames(
-  viridisLite::viridis(length(shared_ratio_levels), option = "magma", direction = -1),
-  shared_ratio_levels
+shared_ratio_palette <- viridisLite::viridis(
+  length(shared_ratio_levels),
+  option = "magma",
+  direction = -1
 )
+
+if (length(shared_ratio_palette) != length(shared_ratio_levels)) {
+  stop("Shared ratio palette length does not match shared ratio levels.")
+}
 
 layers_ge4 <- build_metric_layers(
   "probability_ratio_ge4_future_over_current",
