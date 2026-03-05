@@ -205,13 +205,8 @@ build_cell_polygons <- function(df, ratio_col, ratio_bin_col) {
   do.call(rbind, polygon_parts[seq_len(part_i)])
 }
 
-make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
+make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text, ratio_levels, ratio_palette) {
   nz_outline <- map_data("nz")
-  ratio_levels <- levels(df_finite$ratio_bin)
-  ratio_palette <- setNames(
-    viridisLite::viridis(length(ratio_levels), option = "magma", direction = -1),
-    ratio_levels
-  )
   
   if (plot_mode == "rotated_polygon") {
     ggplot(cell_polygons, aes(x = lon, y = lat, fill = ratio_bin)) +
@@ -227,9 +222,11 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
       coord_fixed() +
       scale_fill_manual(
         values = ratio_palette,
+        breaks = ratio_levels,
         limits = ratio_levels,
         name = "Probability\nratio",
-        drop = FALSE
+        drop = FALSE,
+        na.translate = FALSE
       ) +
       guides(fill = ratio_legend_guide) +
       labs(
@@ -256,9 +253,11 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text) {
       coord_fixed() +
       scale_fill_manual(
         values = ratio_palette,
+        breaks = ratio_levels,
         limits = ratio_levels,
         name = "Probability\nratio",
-        drop = FALSE
+        drop = FALSE,
+        na.translate = FALSE
       ) +
       guides(fill = ratio_legend_guide) +
       labs(
@@ -289,6 +288,11 @@ build_metric_layers <- function(ratio_col, bin_spec = NULL) {
   }
   
   finite_data$ratio_bin <- build_discrete_ratio_bins(finite_data$ratio_value, bin_spec = bin_spec)
+  finite_data$ratio_bin <- factor(
+    finite_data$ratio_bin,
+    levels = bin_spec$labels,
+    ordered = TRUE
+  )
   
   plot_mode <- "point"
   cell_polygons <- data.frame()
@@ -312,27 +316,41 @@ build_metric_layers <- function(ratio_col, bin_spec = NULL) {
 # Build plot layers for all requested metrics ------------------------------
 shared_ratio_values <- c(
   grid_results$probability_ratio_ge4_future_over_current,
+  grid_results$probability_ratio_ge5_future_over_current,
   grid_results$probability_ratio_rx1day_top10_future_over_current,
   grid_results$probability_ratio_joint_top10_ge4_future_over_current
 )
 shared_ratio_values <- shared_ratio_values[is.finite(shared_ratio_values)]
 
 if (length(shared_ratio_values) == 0) {
-  stop("No finite values found for shared binning across >=4, top 10%, and joint ratios.")
+  stop("No finite values found for shared binning across >=4, >=5, top 10%, and joint ratios.")
 }
 
 shared_ratio_bin_spec <- get_fixed_width_bin_spec(
   shared_ratio_values,
   bin_width = 0.5,
-  min_value = 0,
-  max_value = 6.5
+  min_value = 0
 )
+
+shared_ratio_levels <- shared_ratio_bin_spec$labels
+shared_ratio_palette <- viridisLite::viridis(
+  length(shared_ratio_levels),
+  option = "magma",
+  direction = -1
+)
+
+if (length(shared_ratio_palette) != length(shared_ratio_levels)) {
+  stop("Shared ratio palette length does not match shared ratio levels.")
+}
 
 layers_ge4 <- build_metric_layers(
   "probability_ratio_ge4_future_over_current",
   bin_spec = shared_ratio_bin_spec
 )
-layers_ge5 <- build_metric_layers("probability_ratio_ge5_future_over_current")
+layers_ge5 <- build_metric_layers(
+  "probability_ratio_ge5_future_over_current",
+  bin_spec = shared_ratio_bin_spec
+)
 layers_top10 <- build_metric_layers(
   "probability_ratio_rx1day_top10_future_over_current",
   bin_spec = shared_ratio_bin_spec
@@ -361,25 +379,33 @@ p_ge4_ratio <- make_ratio_plot(
   df_finite = layers_ge4$finite_data,
   cell_polygons = layers_ge4$cell_polygons,
   plot_mode = layers_ge4$plot_mode,
-  title_text = "≥ 4 Exceedance Days")
+  title_text = "≥ 4 Exceedance Days",
+  ratio_levels = shared_ratio_levels,
+  ratio_palette = shared_ratio_palette)
 
 p_ge5_ratio <- make_ratio_plot(
   df_finite = layers_ge5$finite_data,
   cell_polygons = layers_ge5$cell_polygons,
   plot_mode = layers_ge5$plot_mode,
-  title_text = "≥ 5 Exceedance Days")
+  title_text = "≥ 5 Exceedance Days",
+  ratio_levels = shared_ratio_levels,
+  ratio_palette = shared_ratio_palette)
 
 p_top10_ratio <- make_ratio_plot(
   df_finite = layers_top10$finite_data,
   cell_polygons = layers_top10$cell_polygons,
   plot_mode = layers_top10$plot_mode,
-  title_text = "Top 10% RX1day")
+  title_text = "Top 10% RX1day",
+  ratio_levels = shared_ratio_levels,
+  ratio_palette = shared_ratio_palette)
 
 p_joint_ratio <- make_ratio_plot(
   df_finite = layers_joint$finite_data,
   cell_polygons = layers_joint$cell_polygons,
   plot_mode = layers_joint$plot_mode,
-  title_text = "Top 10% RX1day and ≥ 4 Exceedance Days")
+  title_text = "Top 10% RX1day and ≥ 4 Exceedance Days",
+  ratio_levels = shared_ratio_levels,
+  ratio_palette = shared_ratio_palette)
 
 p_ge4_ratio
 p_ge5_ratio
