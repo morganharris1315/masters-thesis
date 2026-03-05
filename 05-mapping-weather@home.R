@@ -18,6 +18,7 @@ library(maps)
 library(mapdata)
 library(dplyr)
 library(patchwork)
+library(RColorBrewer)
 
 # Input/output paths --------------------------------------------------------
 weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
@@ -25,20 +26,13 @@ weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Master
 input_file <- file.path(weatherathome_dir,"weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv")
 
 # Read outputs from the processing script (04) ----------------------------------------------
-if (!file.exists(input_file)) {
-  stop("Input file not found. Run 04-processing-weather@home.R first.")
-}
-
 grid_results <- read.csv(input_file)
 
-required_cols <- c(
-  "global_longitude0",
-  "global_latitude0",
+required_cols <- c("global_longitude0", "global_latitude0",
   "probability_ratio_ge4_future_over_current",
   "probability_ratio_ge5_future_over_current",
   "probability_ratio_rx1day_top10_future_over_current",
-  "probability_ratio_joint_top10_ge4_future_over_current"
-)
+  "probability_ratio_joint_top10_ge4_future_over_current")
 
 get_ratio_bin_spec <- function(x, n_bins = 6) {
   r <- range(x, na.rm = TRUE)
@@ -206,8 +200,10 @@ build_cell_polygons <- function(df, ratio_col, ratio_bin_col) {
 }
 
 make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text, ratio_levels, ratio_palette) {
+  df_finite$ratio_bin <- factor(df_finite$ratio_bin, levels = ratio_levels)
+  if (nrow(cell_polygons) > 0) {
+    cell_polygons$ratio_bin <- factor(cell_polygons$ratio_bin, levels = ratio_levels)}
   nz_outline <- map_data("nz")
-  
   if (plot_mode == "rotated_polygon") {
     ggplot(cell_polygons, aes(x = lon, y = lat, fill = ratio_bin)) +
       geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
@@ -221,12 +217,11 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text, rat
       ) +
       coord_fixed() +
       scale_fill_manual(
-        values = ratio_palette,
-        breaks = ratio_levels,
-        limits = ratio_levels,
-        name = "Probability\nratio",
+        values = shared_ratio_palette,
+        limits = names(shared_ratio_palette),
+        breaks = names(shared_ratio_palette),
         drop = FALSE,
-        na.translate = FALSE
+        name = "Probability\nratio"
       ) +
       guides(fill = ratio_legend_guide) +
       labs(
@@ -287,10 +282,14 @@ build_metric_layers <- function(ratio_col, bin_spec = NULL) {
     stop(sprintf("No finite probability-ratio values available to plot for %s.", ratio_col))
   }
   
-  finite_data$ratio_bin <- build_discrete_ratio_bins(finite_data$ratio_value, bin_spec = bin_spec)
+  finite_data$ratio_bin <- build_discrete_ratio_bins(
+    finite_data$ratio_value,
+    bin_spec = bin_spec
+  )
+  
   finite_data$ratio_bin <- factor(
     finite_data$ratio_bin,
-    levels = bin_spec$labels,
+    levels = shared_ratio_levels,
     ordered = TRUE
   )
   
@@ -333,15 +332,8 @@ shared_ratio_bin_spec <- get_fixed_width_bin_spec(
 )
 
 shared_ratio_levels <- shared_ratio_bin_spec$labels
-shared_ratio_palette <- viridisLite::viridis(
-  length(shared_ratio_levels),
-  option = "magma",
-  direction = -1
-)
-
-if (length(shared_ratio_palette) != length(shared_ratio_levels)) {
-  stop("Shared ratio palette length does not match shared ratio levels.")
-}
+palette_values <- viridisLite::viridis(length(shared_ratio_levels), option = "magma", direction = -1)
+shared_ratio_palette <- setNames(palette_values, shared_ratio_levels)
 
 layers_ge4 <- build_metric_layers(
   "probability_ratio_ge4_future_over_current",
@@ -473,8 +465,3 @@ cat("Plot mode (>=5):", layers_ge5$plot_mode, "\n")
 cat("Plot mode (top 10%):", layers_top10$plot_mode, "\n")
 cat("Plot mode (joint top10 + >=4):", layers_joint$plot_mode, "\n")
 
-cat("Saved map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_map.png"), "\n")
-cat("Saved map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_map.png"), "\n")
-cat("Saved map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_rx1day_top10_map.png"), "\n")
-cat("Saved map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_joint_top10_ge4_map.png"), "\n")
-cat("Saved combined map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_combined_map.png"), "\n")
