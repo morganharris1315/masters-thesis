@@ -29,10 +29,10 @@ input_file <- file.path(weatherathome_dir,"weather@home_exceedance_ge4_ge5_top10
 grid_results <- read.csv(input_file)
 
 required_cols <- c("global_longitude0", "global_latitude0",
-  "probability_ratio_ge4_future_over_current",
-  "probability_ratio_ge5_future_over_current",
-  "probability_ratio_rx1day_top10_future_over_current",
-  "probability_ratio_joint_top10_ge4_future_over_current")
+                   "probability_ratio_ge4_future_over_current",
+                   "probability_ratio_ge5_future_over_current",
+                   "probability_ratio_rx1day_top10_future_over_current",
+                   "probability_ratio_joint_top10_ge4_future_over_current")
 
 get_ratio_bin_spec <- function(x, n_bins = 6) {
   r <- range(x, na.rm = TRUE)
@@ -480,33 +480,33 @@ cell_polygons_to_sf <- function(cell_polygons_df) {
   if (nrow(cell_polygons_df) == 0) {
     return(sf::st_sf(cell_id = character(0), geometry = sf::st_sfc(crs = 4326)))
   }
-
+  
   split_polys <- split(cell_polygons_df, cell_polygons_df$cell_id)
-
+  
   sf_list <- lapply(names(split_polys), function(id) {
     piece <- split_polys[[id]]
     coords <- as.matrix(piece[order(piece$vertex_id), c("lon", "lat")])
-
+    
     coords <- coords[stats::complete.cases(coords), , drop = FALSE]
     if (nrow(coords) < 4) {
       return(NULL)
     }
-
+    
     if (!all(coords[1, ] == coords[nrow(coords), ])) {
       coords <- rbind(coords, coords[1, ])
     }
-
+    
     sf::st_sf(
       cell_id = id,
       geometry = sf::st_sfc(sf::st_polygon(list(coords)), crs = 4326)
     )
   })
-
+  
   sf_list <- Filter(Negate(is.null), sf_list)
   if (length(sf_list) == 0) {
     return(sf::st_sf(cell_id = character(0), geometry = sf::st_sfc(crs = 4326)))
   }
-
+  
   do.call(rbind, sf_list)
 }
 
@@ -514,7 +514,7 @@ get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
   if (nrow(cell_polygons_df) == 0) {
     return(character(0))
   }
-
+  
   sanitize_geometry <- function(x) {
     x <- suppressWarnings(sf::st_make_valid(x))
     x <- sf::st_collection_extract(x, "POLYGON", warn = FALSE)
@@ -523,27 +523,27 @@ get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
     x <- x[non_empty, ]
     x
   }
-
+  
   old_s2 <- sf::sf_use_s2()
   on.exit(sf::sf_use_s2(old_s2), add = TRUE)
   sf::sf_use_s2(FALSE)
-
+  
   nz_map <- maps::map("nz", fill = TRUE, plot = FALSE)
   nz_sf <- sf::st_as_sf(nz_map)
   nz_sf <- sf::st_set_crs(nz_sf, 4326)
   nz_sf <- sanitize_geometry(nz_sf)
-
+  
   nz_union <- sf::st_union(nz_sf)
   nz_union <- sf::st_sf(geometry = nz_union)
   nz_union <- sanitize_geometry(nz_union)
-
+  
   cells_sf <- cell_polygons_to_sf(cell_polygons_df)
   cells_sf <- sanitize_geometry(cells_sf)
-
+  
   if (nrow(cells_sf) == 0 || nrow(nz_union) == 0) {
     return(character(0))
   }
-
+  
   intersects <- sf::st_intersects(cells_sf, nz_union, sparse = FALSE)[, 1]
   cells_sf$cell_id[intersects]
 }
@@ -553,22 +553,22 @@ plot_nz_intersection_ratio_map <- function(layer_obj, title_text, ratio_levels, 
     warning(sprintf("NZ-intersection alternative plot skipped for '%s' (polygon metadata not available).", title_text))
     return(NULL)
   }
-
+  
   keep_cell_ids <- get_nz_intersecting_cell_ids(layer_obj$cell_polygons)
   cell_polygons_nz <- layer_obj$cell_polygons[layer_obj$cell_polygons$cell_id %in% keep_cell_ids, ]
-
+  
   if (nrow(cell_polygons_nz) == 0) {
     warning(sprintf("NZ-intersection alternative plot skipped for '%s' (no intersecting cells found).", title_text))
     return(NULL)
   }
-
+  
   df_finite_nz <- layer_obj$finite_data[paste(layer_obj$finite_data$lon_index, layer_obj$finite_data$lat_index, sep = "_") %in% keep_cell_ids, ]
-
+  
   make_ratio_plot(
     df_finite = df_finite_nz,
     cell_polygons = cell_polygons_nz,
     plot_mode = "rotated_polygon",
-    title_text = paste0(title_text, " (NZ-intersecting cells)"),
+    title_text = paste0(title_text),
     ratio_levels = ratio_levels,
     ratio_palette = ratio_palette
   )
@@ -602,7 +602,7 @@ p_joint_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
   ratio_palette = shared_ratio_palette
 )
 
-if (!is.null(p_ge4_ratio_nz_intersection)) p_ge4_ratio_nz_intersection
-if (!is.null(p_ge5_ratio_nz_intersection)) p_ge5_ratio_nz_intersection
-if (!is.null(p_top10_ratio_nz_intersection)) p_top10_ratio_nz_intersection
-if (!is.null(p_joint_ratio_nz_intersection)) p_joint_ratio_nz_intersection
+p_ge4_ratio_nz_intersection
+p_ge5_ratio_nz_intersection
+p_top10_ratio_nz_intersection
+p_joint_ratio_nz_intersection
