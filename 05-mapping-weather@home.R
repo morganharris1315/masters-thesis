@@ -606,3 +606,62 @@ p_ge4_ratio_nz_intersection
 p_ge5_ratio_nz_intersection
 p_top10_ratio_nz_intersection
 p_joint_ratio_nz_intersection
+
+p_combined_nz_intersection <- NULL
+if (!is.null(p_ge4_ratio_nz_intersection) && !is.null(p_top10_ratio_nz_intersection) && !is.null(p_joint_ratio_nz_intersection)) {
+  p_combined_nz_intersection <- (p_ge4_ratio_nz_intersection + p_top10_ratio_nz_intersection + p_joint_ratio_nz_intersection) +
+    plot_layout(ncol = 3, guides = "collect") &
+    theme(legend.position = "right")
+
+  p_combined_nz_intersection
+}
+
+if (!is.null(p_ge4_ratio_nz_intersection)) {
+  ggsave(
+    filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_nz_intersection_map.png"),
+    plot = p_ge4_ratio_nz_intersection,
+    width = 8,
+    height = 7,
+    dpi = 300
+  )
+}
+
+if (!is.null(p_ge5_ratio_nz_intersection)) {
+  ggsave(
+    filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_nz_intersection_map.png"),
+    plot = p_ge5_ratio_nz_intersection,
+    width = 8,
+    height = 7,
+    dpi = 300
+  )
+}
+
+if (!is.null(p_top10_ratio_nz_intersection)) {
+  ggsave(
+    filename = file.path(weatherathome_dir, "weather@home_probability_ratio_rx1day_top10_nz_intersection_map.png"),
+    plot = p_top10_ratio_nz_intersection,
+    width = 8,
+    height = 7,
+    dpi = 300
+  )
+}
+
+if (!is.null(p_joint_ratio_nz_intersection)) {
+  ggsave(
+    filename = file.path(weatherathome_dir, "weather@home_probability_ratio_joint_top10_ge4_nz_intersection_map.png"),
+    plot = p_joint_ratio_nz_intersection,
+    width = 8,
+    height = 7,
+    dpi = 300
+  )
+}
+
+if (!is.null(p_ge4_ratio_nz_intersection) && !is.null(p_top10_ratio_nz_intersection) && !is.null(p_joint_ratio_nz_intersection)) {
+  ggsave(
+    filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_nz_intersection_combined_map.png"),
+    plot = p_combined_nz_intersection,
+    width = 18,
+    height = 6.5,
+    dpi = 300
+  )
+}
