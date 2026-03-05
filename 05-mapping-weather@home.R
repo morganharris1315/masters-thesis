@@ -24,14 +24,6 @@ weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Master
 
 input_file <- file.path(weatherathome_dir,"weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv")
 
-output_png_ge4 <- file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_map.png")
-output_png_ge5 <- file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_map.png")
-output_png_top10 <- file.path(weatherathome_dir, "weather@home_probability_ratio_rx1day_top10_map.png")
-output_png_joint <- file.path(weatherathome_dir, "weather@home_probability_ratio_joint_top10_ge4_map.png")
-output_png_combined <- file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_combined_map.png")
-
-output_csv <- file.path(weatherathome_dir,"weather@home_probability_ratio_map_data.csv")
-
 # Read outputs from the processing script (04) ----------------------------------------------
 if (!file.exists(input_file)) {
   stop("Input file not found. Run 04-processing-weather@home.R first.")
@@ -364,8 +356,6 @@ output_map_data <- grid_results |>
     probability_ratio_rx1day_top10_future_over_current,
     probability_ratio_joint_top10_ge4_future_over_current
   )
-write.csv(output_map_data, output_csv, row.names = FALSE)
-
 # Creating maps -------------------------------------------
 p_ge4_ratio <- make_ratio_plot(
   df_finite = layers_ge4$finite_data,
@@ -404,11 +394,47 @@ p_combined <- (p_ge4_ratio + p_top10_ratio + p_joint_ratio) +
 p_combined
 
 # Saving outputs ----------------------------------------------------------
-ggsave(filename = output_png_ge4, plot = p_ge4_ratio, width = 8, height = 7, dpi = 300)
-ggsave(filename = output_png_ge5, plot = p_ge5_ratio, width = 8, height = 7, dpi = 300)
-ggsave(filename = output_png_top10, plot = p_top10_ratio, width = 8, height = 7, dpi = 300)
-ggsave(filename = output_png_joint, plot = p_joint_ratio, width = 8, height = 7, dpi = 300)
-ggsave(filename = output_png_combined, plot = p_combined, width = 18, height = 6.5, dpi = 300)
+write.csv(
+  output_map_data,
+  file.path(weatherathome_dir, "weather@home_probability_ratio_map_data.csv"),
+  row.names = FALSE
+)
+
+ggsave(
+  filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_map.png"),
+  plot = p_ge4_ratio,
+  width = 8,
+  height = 7,
+  dpi = 300
+)
+ggsave(
+  filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_map.png"),
+  plot = p_ge5_ratio,
+  width = 8,
+  height = 7,
+  dpi = 300
+)
+ggsave(
+  filename = file.path(weatherathome_dir, "weather@home_probability_ratio_rx1day_top10_map.png"),
+  plot = p_top10_ratio,
+  width = 8,
+  height = 7,
+  dpi = 300
+)
+ggsave(
+  filename = file.path(weatherathome_dir, "weather@home_probability_ratio_joint_top10_ge4_map.png"),
+  plot = p_joint_ratio,
+  width = 8,
+  height = 7,
+  dpi = 300
+)
+ggsave(
+  filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_combined_map.png"),
+  plot = p_combined,
+  width = 18,
+  height = 6.5,
+  dpi = 300
+)
 
 # Diagnostics ---------------------------------------------------------
 cat("Finite cell count (>=4):", nrow(layers_ge4$finite_data), "\n")
@@ -421,8 +447,8 @@ cat("Plot mode (>=5):", layers_ge5$plot_mode, "\n")
 cat("Plot mode (top 10%):", layers_top10$plot_mode, "\n")
 cat("Plot mode (joint top10 + >=4):", layers_joint$plot_mode, "\n")
 
-cat("Saved map to:", output_png_ge4, "\n")
-cat("Saved map to:", output_png_ge5, "\n")
-cat("Saved map to:", output_png_top10, "\n")
-cat("Saved map to:", output_png_joint, "\n")
-cat("Saved combined map to:", output_png_combined, "\n")
+cat("Saved map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_map.png"), "\n")
+cat("Saved map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_map.png"), "\n")
+cat("Saved map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_rx1day_top10_map.png"), "\n")
+cat("Saved map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_joint_top10_ge4_map.png"), "\n")
+cat("Saved combined map to:", file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_combined_map.png"), "\n")
