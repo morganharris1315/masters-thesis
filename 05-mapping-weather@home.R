@@ -465,3 +465,91 @@ cat("Plot mode (>=5):", layers_ge5$plot_mode, "\n")
 cat("Plot mode (top 10%):", layers_top10$plot_mode, "\n")
 cat("Plot mode (joint top10 + >=4):", layers_joint$plot_mode, "\n")
 
+# -------------------------------------------------------------------------
+# Alternate maps: category-specific maximum ratio bins (not shared/fixed)
+# -------------------------------------------------------------------------
+
+get_category_max_bin_spec <- function(x, bin_width = 0.5, min_value = 0) {
+  finite_x <- x[is.finite(x)]
+  if (length(finite_x) == 0) {
+    stop("No finite values found while building category-specific bin spec.")
+  }
+  category_max <- max(finite_x)
+  category_max_break <- ceiling(category_max / bin_width) * bin_width
+  get_fixed_width_bin_spec(
+    finite_x,
+    bin_width = bin_width,
+    min_value = min_value,
+    max_value = category_max_break
+  )
+}
+
+build_metric_layers_with_levels <- function(ratio_col, bin_spec, ratio_levels) {
+  metric_layers <- build_metric_layers(ratio_col = ratio_col, bin_spec = bin_spec)
+  metric_layers$finite_data$ratio_bin <- factor(
+    metric_layers$finite_data$ratio_bin,
+    levels = ratio_levels,
+    ordered = TRUE
+  )
+  if (nrow(metric_layers$cell_polygons) > 0) {
+    metric_layers$cell_polygons$ratio_bin <- factor(
+      metric_layers$cell_polygons$ratio_bin,
+      levels = ratio_levels,
+      ordered = TRUE
+    )
+  }
+  metric_layers
+}
+
+make_category_plot <- function(ratio_col, title_text) {
+  category_bin_spec <- get_category_max_bin_spec(grid_results[[ratio_col]], bin_width = 0.5, min_value = 0)
+  category_levels <- category_bin_spec$labels
+  category_palette <- setNames(
+    viridisLite::viridis(length(category_levels), option = "magma", direction = -1),
+    category_levels
+  )
+
+  category_layers <- build_metric_layers_with_levels(
+    ratio_col = ratio_col,
+    bin_spec = category_bin_spec,
+    ratio_levels = category_levels
+  )
+
+  make_ratio_plot(
+    df_finite = category_layers$finite_data,
+    cell_polygons = category_layers$cell_polygons,
+    plot_mode = category_layers$plot_mode,
+    title_text = title_text,
+    ratio_levels = category_levels,
+    ratio_palette = category_palette
+  )
+}
+
+p_ge4_ratio_category_max <- make_category_plot(
+  ratio_col = "probability_ratio_ge4_future_over_current",
+  title_text = "≥ 4 Exceedance Days (Category Max Bins)"
+)
+p_ge5_ratio_category_max <- make_category_plot(
+  ratio_col = "probability_ratio_ge5_future_over_current",
+  title_text = "≥ 5 Exceedance Days (Category Max Bins)"
+)
+p_top10_ratio_category_max <- make_category_plot(
+  ratio_col = "probability_ratio_rx1day_top10_future_over_current",
+  title_text = "Top 10% RX1day (Category Max Bins)"
+)
+p_joint_ratio_category_max <- make_category_plot(
+  ratio_col = "probability_ratio_joint_top10_ge4_future_over_current",
+  title_text = "Top 10% RX1day and ≥ 4 Exceedance Days (Category Max Bins)"
+)
+
+# Print to plotting window (no saving).
+p_ge4_ratio_category_max
+p_ge5_ratio_category_max
+p_top10_ratio_category_max
+p_joint_ratio_category_max
+
+p_combined_category_max <- (p_ge4_ratio_category_max + p_top10_ratio_category_max + p_joint_ratio_category_max) +
+  plot_layout(ncol = 3, guides = "collect") &
+  theme(legend.position = "right")
+
+p_combined_category_max
