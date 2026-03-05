@@ -466,3 +466,112 @@ cat("Plot mode (top 10%):", layers_top10$plot_mode, "\n")
 cat("Plot mode (joint top10 + >=4):", layers_joint$plot_mode, "\n")
 
 
+# -------------------------------------------------------------------------
+# Alternative plotting: only grid cells that intersect the NZ land polygon
+# -------------------------------------------------------------------------
+# This block can be run on its own after the objects created above are in
+# memory. It leaves the existing plotting workflow unchanged.
+
+if (!requireNamespace("sf", quietly = TRUE)) {
+  stop("Package 'sf' is required for the NZ-intersection plotting block.")
+}
+
+cell_polygons_to_sf <- function(cell_polygons_df) {
+  if (nrow(cell_polygons_df) == 0) {
+    return(sf::st_sf(cell_id = character(0), geometry = sf::st_sfc(crs = 4326)))
+  }
+
+  split_polys <- split(cell_polygons_df, cell_polygons_df$cell_id)
+
+  sf_list <- lapply(names(split_polys), function(id) {
+    piece <- split_polys[[id]]
+    coords <- as.matrix(piece[order(piece$vertex_id), c("lon", "lat")])
+
+    if (!all(coords[1, ] == coords[nrow(coords), ])) {
+      coords <- rbind(coords, coords[1, ])
+    }
+
+    sf::st_sf(
+      cell_id = id,
+      geometry = sf::st_sfc(sf::st_polygon(list(coords)), crs = 4326)
+    )
+  })
+
+  do.call(rbind, sf_list)
+}
+
+get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
+  if (nrow(cell_polygons_df) == 0) {
+    return(character(0))
+  }
+
+  nz_map <- maps::map("nz", fill = TRUE, plot = FALSE)
+  nz_sf <- sf::st_as_sf(nz_map)
+  nz_sf <- sf::st_set_crs(nz_sf, 4326)
+  nz_union <- sf::st_union(sf::st_make_valid(nz_sf))
+
+  cells_sf <- cell_polygons_to_sf(cell_polygons_df)
+  intersects <- sf::st_intersects(cells_sf, nz_union, sparse = FALSE)[, 1]
+  cells_sf$cell_id[intersects]
+}
+
+plot_nz_intersection_ratio_map <- function(layer_obj, title_text, ratio_levels, ratio_palette) {
+  if (layer_obj$plot_mode != "rotated_polygon" || nrow(layer_obj$cell_polygons) == 0) {
+    warning(sprintf("NZ-intersection alternative plot skipped for '%s' (polygon metadata not available).", title_text))
+    return(NULL)
+  }
+
+  keep_cell_ids <- get_nz_intersecting_cell_ids(layer_obj$cell_polygons)
+  cell_polygons_nz <- layer_obj$cell_polygons[layer_obj$cell_polygons$cell_id %in% keep_cell_ids, ]
+
+  if (nrow(cell_polygons_nz) == 0) {
+    warning(sprintf("NZ-intersection alternative plot skipped for '%s' (no intersecting cells found).", title_text))
+    return(NULL)
+  }
+
+  df_finite_nz <- layer_obj$finite_data[paste(layer_obj$finite_data$lon_index, layer_obj$finite_data$lat_index, sep = "_") %in% keep_cell_ids, ]
+
+  make_ratio_plot(
+    df_finite = df_finite_nz,
+    cell_polygons = cell_polygons_nz,
+    plot_mode = "rotated_polygon",
+    title_text = paste0(title_text, " (NZ-intersecting cells)"),
+    ratio_levels = ratio_levels,
+    ratio_palette = ratio_palette
+  )
+}
+
+p_ge4_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
+  layer_obj = layers_ge4,
+  title_text = "≥ 4 Exceedance Days",
+  ratio_levels = shared_ratio_levels,
+  ratio_palette = shared_ratio_palette
+)
+
+p_ge5_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
+  layer_obj = layers_ge5,
+  title_text = "≥ 5 Exceedance Days",
+  ratio_levels = shared_ratio_levels,
+  ratio_palette = shared_ratio_palette
+)
+
+p_top10_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
+  layer_obj = layers_top10,
+  title_text = "Top 10% RX1day",
+  ratio_levels = shared_ratio_levels,
+  ratio_palette = shared_ratio_palette
+)
+
+p_joint_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
+  layer_obj = layers_joint,
+  title_text = "Top 10% RX1day and ≥ 4 Exceedance Days",
+  ratio_levels = shared_ratio_levels,
+  ratio_palette = shared_ratio_palette
+)
+
+if (!is.null(p_ge4_ratio_nz_intersection)) p_ge4_ratio_nz_intersection
+if (!is.null(p_ge5_ratio_nz_intersection)) p_ge5_ratio_nz_intersection
+if (!is.null(p_top10_ratio_nz_intersection)) p_top10_ratio_nz_intersection
+if (!is.null(p_joint_ratio_nz_intersection)) p_joint_ratio_nz_intersection
+
+
