@@ -505,12 +505,32 @@ get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
     return(character(0))
   }
 
+  sanitize_geometry <- function(x) {
+    x <- suppressWarnings(sf::st_make_valid(x))
+    x <- sf::st_collection_extract(x, "POLYGON", warn = FALSE)
+    x <- x[!sf::st_is_empty(x), ]
+    x
+  }
+
+  old_s2 <- sf::sf_use_s2()
+  on.exit(sf::sf_use_s2(old_s2), add = TRUE)
+  sf::sf_use_s2(FALSE)
+
   nz_map <- maps::map("nz", fill = TRUE, plot = FALSE)
   nz_sf <- sf::st_as_sf(nz_map)
   nz_sf <- sf::st_set_crs(nz_sf, 4326)
-  nz_union <- sf::st_union(sf::st_make_valid(nz_sf))
+  nz_sf <- sanitize_geometry(nz_sf)
+
+  nz_union <- sf::st_union(nz_sf)
+  nz_union <- sanitize_geometry(nz_union)
 
   cells_sf <- cell_polygons_to_sf(cell_polygons_df)
+  cells_sf <- sanitize_geometry(cells_sf)
+
+  if (nrow(cells_sf) == 0 || nrow(nz_union) == 0) {
+    return(character(0))
+  }
+
   intersects <- sf::st_intersects(cells_sf, nz_union, sparse = FALSE)[, 1]
   cells_sf$cell_id[intersects]
 }
@@ -573,5 +593,4 @@ if (!is.null(p_ge4_ratio_nz_intersection)) p_ge4_ratio_nz_intersection
 if (!is.null(p_ge5_ratio_nz_intersection)) p_ge5_ratio_nz_intersection
 if (!is.null(p_top10_ratio_nz_intersection)) p_top10_ratio_nz_intersection
 if (!is.null(p_joint_ratio_nz_intersection)) p_joint_ratio_nz_intersection
-
 
