@@ -487,6 +487,11 @@ cell_polygons_to_sf <- function(cell_polygons_df) {
     piece <- split_polys[[id]]
     coords <- as.matrix(piece[order(piece$vertex_id), c("lon", "lat")])
 
+    coords <- coords[stats::complete.cases(coords), , drop = FALSE]
+    if (nrow(coords) < 4) {
+      return(NULL)
+    }
+
     if (!all(coords[1, ] == coords[nrow(coords), ])) {
       coords <- rbind(coords, coords[1, ])
     }
@@ -496,6 +501,11 @@ cell_polygons_to_sf <- function(cell_polygons_df) {
       geometry = sf::st_sfc(sf::st_polygon(list(coords)), crs = 4326)
     )
   })
+
+  sf_list <- Filter(Negate(is.null), sf_list)
+  if (length(sf_list) == 0) {
+    return(sf::st_sf(cell_id = character(0), geometry = sf::st_sfc(crs = 4326)))
+  }
 
   do.call(rbind, sf_list)
 }
@@ -508,7 +518,9 @@ get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
   sanitize_geometry <- function(x) {
     x <- suppressWarnings(sf::st_make_valid(x))
     x <- sf::st_collection_extract(x, "POLYGON", warn = FALSE)
-    x <- x[!sf::st_is_empty(x), ]
+    non_empty <- !sf::st_is_empty(x)
+    non_empty[is.na(non_empty)] <- FALSE
+    x <- x[non_empty, ]
     x
   }
 
@@ -522,6 +534,7 @@ get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
   nz_sf <- sanitize_geometry(nz_sf)
 
   nz_union <- sf::st_union(nz_sf)
+  nz_union <- sf::st_sf(geometry = nz_union)
   nz_union <- sanitize_geometry(nz_union)
 
   cells_sf <- cell_polygons_to_sf(cell_polygons_df)
@@ -593,4 +606,3 @@ if (!is.null(p_ge4_ratio_nz_intersection)) p_ge4_ratio_nz_intersection
 if (!is.null(p_ge5_ratio_nz_intersection)) p_ge5_ratio_nz_intersection
 if (!is.null(p_top10_ratio_nz_intersection)) p_top10_ratio_nz_intersection
 if (!is.null(p_joint_ratio_nz_intersection)) p_joint_ratio_nz_intersection
-
