@@ -217,9 +217,9 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text, rat
       ) +
       coord_fixed() +
       scale_fill_manual(
-        values = shared_ratio_palette,
-        limits = names(shared_ratio_palette),
-        breaks = names(shared_ratio_palette),
+        values = ratio_palette,
+        limits = ratio_levels,
+        breaks = ratio_levels,
         drop = FALSE,
         name = "Probability\nratio"
       ) +
@@ -574,32 +574,77 @@ plot_nz_intersection_ratio_map <- function(layer_obj, title_text, ratio_levels, 
   )
 }
 
+build_nz_intersection_ratio_spec <- function(layer_objects, bin_width = 0.5, min_value = 0) {
+  intersection_values <- c()
+
+  for (layer_obj in layer_objects) {
+    if (layer_obj$plot_mode != "rotated_polygon" || nrow(layer_obj$cell_polygons) == 0) {
+      next
+    }
+
+    keep_cell_ids <- get_nz_intersecting_cell_ids(layer_obj$cell_polygons)
+    if (length(keep_cell_ids) == 0) {
+      next
+    }
+
+    matching_rows <- paste(layer_obj$finite_data$lon_index, layer_obj$finite_data$lat_index, sep = "_") %in% keep_cell_ids
+    intersection_values <- c(intersection_values, layer_obj$finite_data$ratio_value[matching_rows])
+  }
+
+  intersection_values <- intersection_values[is.finite(intersection_values)]
+
+  if (length(intersection_values) == 0) {
+    return(list(levels = shared_ratio_levels, palette = shared_ratio_palette))
+  }
+
+  ratio_bin_spec <- get_fixed_width_bin_spec(
+    intersection_values,
+    bin_width = bin_width,
+    min_value = min_value
+  )
+
+  ratio_levels <- ratio_bin_spec$labels
+  ratio_palette <- setNames(
+    viridisLite::viridis(length(ratio_levels), option = "magma", direction = -1),
+    ratio_levels
+  )
+
+  list(
+    levels = ratio_levels,
+    palette = ratio_palette
+  )
+}
+
+nz_intersection_ratio_spec <- build_nz_intersection_ratio_spec(
+  list(layers_ge4, layers_ge5, layers_top10, layers_joint)
+)
+
 p_ge4_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
   layer_obj = layers_ge4,
   title_text = "≥ 4 Exceedance Days",
-  ratio_levels = shared_ratio_levels,
-  ratio_palette = shared_ratio_palette
+  ratio_levels = nz_intersection_ratio_spec$levels,
+  ratio_palette = nz_intersection_ratio_spec$palette
 )
 
 p_ge5_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
   layer_obj = layers_ge5,
   title_text = "≥ 5 Exceedance Days",
-  ratio_levels = shared_ratio_levels,
-  ratio_palette = shared_ratio_palette
+  ratio_levels = nz_intersection_ratio_spec$levels,
+  ratio_palette = nz_intersection_ratio_spec$palette
 )
 
 p_top10_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
   layer_obj = layers_top10,
   title_text = "Top 10% RX1day",
-  ratio_levels = shared_ratio_levels,
-  ratio_palette = shared_ratio_palette
+  ratio_levels = nz_intersection_ratio_spec$levels,
+  ratio_palette = nz_intersection_ratio_spec$palette
 )
 
 p_joint_ratio_nz_intersection <- plot_nz_intersection_ratio_map(
   layer_obj = layers_joint,
   title_text = "Top 10% RX1day and ≥ 4 Exceedance Days",
-  ratio_levels = shared_ratio_levels,
-  ratio_palette = shared_ratio_palette
+  ratio_levels = nz_intersection_ratio_spec$levels,
+  ratio_palette = nz_intersection_ratio_spec$palette
 )
 
 p_ge4_ratio_nz_intersection
