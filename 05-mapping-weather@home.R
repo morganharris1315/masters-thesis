@@ -349,10 +349,11 @@ p_ge5 <- make_nz_ratio_plot(
 )
 
 # Top row has two plots; bottom row centers the joint plot while keeping panel size equal.
-combined_design <- "
-AABB
-.CC.
-"
+combined_design <- c(
+  area(t = 1, l = 1, b = 1, r = 2),
+  area(t = 1, l = 3, b = 1, r = 4),
+  area(t = 2, l = 2, b = 2, r = 3)
+)
 
 p_combined <- (p_ge4 + p_top10 + p_joint) +
   plot_layout(
