@@ -14,6 +14,7 @@ library(maps)
 library(dplyr)
 library(patchwork)
 library(sf)
+library(grid)
 
 # Input/output paths -------------------------------------------------------
 weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
@@ -226,7 +227,7 @@ build_metric_layer <- function(ratio_col) {
   )
 }
 
-make_nz_ratio_plot <- function(layer_obj, title_text, ratio_levels, ratio_palette) {
+make_nz_ratio_plot <- function(layer_obj, title_text, ratio_levels, ratio_palette, show_legend = TRUE) {
   cell_polygons_nz <- layer_obj$cell_polygons[layer_obj$cell_polygons$cell_id %in% layer_obj$keep_cell_ids, ]
 
   if (nrow(cell_polygons_nz) == 0) {
@@ -235,6 +236,8 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_levels, ratio_palett
 
   cell_polygons_nz$ratio_bin <- factor(cell_polygons_nz$ratio_bin, levels = ratio_levels)
   nz_outline <- map_data("nz")
+
+  legend_position <- if (isTRUE(show_legend)) "right" else "none"
 
   ggplot(cell_polygons_nz, aes(x = lon, y = lat, fill = ratio_bin)) +
     geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
@@ -254,14 +257,23 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_levels, ratio_palett
       drop = FALSE,
       name = "Probability\nratio"
     ) +
-    guides(fill = guide_legend(reverse = TRUE)) +
+    guides(
+      fill = guide_legend(
+        reverse = TRUE,
+        keyheight = unit(0.9, "cm"),
+        keywidth = unit(0.55, "cm")
+      )
+    ) +
     labs(title = title_text, x = NULL, y = NULL) +
     theme_minimal(base_size = 13) +
     theme(
       plot.title = element_text(face = "bold", size = 14),
       axis.title = element_blank(),
       legend.title = element_text(size = 12),
-      legend.text = element_text(size = 10)
+      legend.text = element_text(size = 9),
+      legend.key.height = unit(0.9, "cm"),
+      legend.key.width = unit(0.55, "cm"),
+      legend.position = legend_position
     )
 }
 
@@ -317,14 +329,16 @@ p_top10 <- make_nz_ratio_plot(
   layers_top10,
   "(b) Years with extreme Rx1day",
   ratio_levels,
-  ratio_palette
+  ratio_palette,
+  show_legend = FALSE
 )
 
 p_joint <- make_nz_ratio_plot(
   layers_joint,
   "(c) Years with extreme Rx1day AND ≥4 exceedances",
   ratio_levels,
-  ratio_palette
+  ratio_palette,
+  show_legend = FALSE
 )
 
 p_ge5 <- make_nz_ratio_plot(
@@ -334,16 +348,15 @@ p_ge5 <- make_nz_ratio_plot(
   ratio_palette
 )
 
-# Top row has two plots; bottom row centers the joint plot.
-empty_plot <- patchwork::plot_spacer()
+# Top row has two plots; bottom row centers the joint plot while keeping panel size equal.
+combined_design <- "
+AABB
+.CC.
+"
 
-p_combined <- (
-  (p_ge4 + p_top10) /
-    (empty_plot + p_joint + empty_plot)
-) +
+p_combined <- (p_ge4 + p_top10 + p_joint) +
   plot_layout(
-    widths = c(1, 1, 1),
-    heights = c(1, 1),
+    design = combined_design,
     guides = "collect"
   ) &
   theme(legend.position = "right")
