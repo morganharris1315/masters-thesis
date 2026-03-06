@@ -227,19 +227,20 @@ build_metric_layer <- function(ratio_col) {
   )
 }
 
-make_nz_ratio_plot <- function(layer_obj, title_text, ratio_levels, ratio_palette, show_legend = TRUE) {
+make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palette, show_legend = TRUE) {
   cell_polygons_nz <- layer_obj$cell_polygons[layer_obj$cell_polygons$cell_id %in% layer_obj$keep_cell_ids, ]
 
   if (nrow(cell_polygons_nz) == 0) {
     stop(sprintf("No NZ-intersecting cells found for '%s'.", title_text))
   }
 
-  cell_polygons_nz$ratio_bin <- factor(cell_polygons_nz$ratio_bin, levels = ratio_levels)
+  ratio_limits <- range(ratio_breaks)
+  ratio_labels <- format(ratio_breaks, trim = TRUE, scientific = FALSE, nsmall = 1)
   nz_outline <- map_data("nz")
 
   legend_position <- if (isTRUE(show_legend)) "right" else "none"
 
-  ggplot(cell_polygons_nz, aes(x = lon, y = lat, fill = ratio_bin)) +
+  ggplot(cell_polygons_nz, aes(x = lon, y = lat, fill = ratio_value)) +
     geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
     geom_path(
       data = nz_outline,
@@ -250,18 +251,29 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_levels, ratio_palett
       alpha = 0.9
     ) +
     coord_fixed() +
-    scale_fill_manual(
-      values = ratio_palette,
-      limits = ratio_levels,
-      breaks = ratio_levels,
-      drop = FALSE,
-      name = "Probability\nratio"
+    scale_fill_stepsn(
+      colours = ratio_palette,
+      breaks = ratio_breaks,
+      labels = ratio_labels,
+      limits = ratio_limits,
+      oob = scales::squish,
+      show.limits = TRUE,
+      name = "Probability\nratio",
+      guide = guide_coloursteps(
+        reverse = TRUE,
+        even.steps = TRUE,
+        show.limits = TRUE,
+        barheight = unit(15, "cm"),
+        barwidth = unit(0.55, "cm")
+      )
     ) +
     guides(
-      fill = guide_legend(
+      fill = guide_coloursteps(
         reverse = TRUE,
-        keyheight = unit(0.9, "cm"),
-        keywidth = unit(0.55, "cm")
+        even.steps = TRUE,
+        show.limits = TRUE,
+        barheight = unit(15, "cm"),
+        barwidth = unit(0.55, "cm")
       )
     ) +
     labs(title = title_text, x = NULL, y = NULL) +
@@ -302,8 +314,8 @@ if (length(intersection_values) == 0) {
 }
 
 ratio_bin_spec <- get_fixed_width_bin_spec(intersection_values, bin_width = 0.5, min_value = 0)
-ratio_levels <- ratio_bin_spec$labels
-ratio_palette <- setNames(viridisLite::viridis(length(ratio_levels), option = "magma", direction = -1), ratio_levels)
+ratio_breaks <- ratio_bin_spec$breaks
+ratio_palette <- viridisLite::viridis(length(ratio_breaks) - 1, option = "magma", direction = -1)
 
 # Attach ratio bins ---------------------------------------------------------
 add_ratio_bins <- function(layer_obj) {
@@ -321,14 +333,14 @@ layers_joint <- add_ratio_bins(layers_joint)
 p_ge4 <- make_nz_ratio_plot(
   layers_ge4,
   "(a) Years with ≥4 exceedances",
-  ratio_levels,
+  ratio_breaks,
   ratio_palette
 )
 
 p_top10 <- make_nz_ratio_plot(
   layers_top10,
   "(b) Years with extreme Rx1day",
-  ratio_levels,
+  ratio_breaks,
   ratio_palette,
   show_legend = FALSE
 )
@@ -336,7 +348,7 @@ p_top10 <- make_nz_ratio_plot(
 p_joint <- make_nz_ratio_plot(
   layers_joint,
   "(c) Years with extreme Rx1day AND ≥4 exceedances",
-  ratio_levels,
+  ratio_breaks,
   ratio_palette,
   show_legend = FALSE
 )
@@ -344,7 +356,7 @@ p_joint <- make_nz_ratio_plot(
 p_ge5 <- make_nz_ratio_plot(
   layers_ge5,
   "Years with ≥5 exceedances",
-  ratio_levels,
+  ratio_breaks,
   ratio_palette
 )
 
@@ -359,8 +371,10 @@ p_combined <- (p_ge4 + p_top10 + p_joint) +
   plot_layout(
     design = combined_design,
     guides = "collect"
-  ) &
-  theme(legend.position = "right")
+  ) +
+  plot_annotation(
+    theme = theme(legend.position = "right")
+  )
 
 p_combined
 p_ge5
