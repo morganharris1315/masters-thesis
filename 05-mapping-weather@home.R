@@ -15,7 +15,6 @@
 library(ggplot2)
 library(viridis)
 library(maps)
-library(mapdata)
 library(dplyr)
 library(patchwork)
 library(RColorBrewer)
@@ -469,12 +468,6 @@ cat("Plot mode (joint top10 + >=4):", layers_joint$plot_mode, "\n")
 # -------------------------------------------------------------------------
 # Alternative plotting: only grid cells that intersect the NZ land polygon
 # -------------------------------------------------------------------------
-# This block can be run on its own after the objects created above are in
-# memory. It leaves the existing plotting workflow unchanged.
-
-if (!requireNamespace("sf", quietly = TRUE)) {
-  stop("Package 'sf' is required for the NZ-intersection plotting block.")
-}
 
 cell_polygons_to_sf <- function(cell_polygons_df) {
   if (nrow(cell_polygons_df) == 0) {
@@ -576,39 +569,39 @@ plot_nz_intersection_ratio_map <- function(layer_obj, title_text, ratio_levels, 
 
 build_nz_intersection_ratio_spec <- function(layer_objects, bin_width = 0.5, min_value = 0) {
   intersection_values <- c()
-
+  
   for (layer_obj in layer_objects) {
     if (layer_obj$plot_mode != "rotated_polygon" || nrow(layer_obj$cell_polygons) == 0) {
       next
     }
-
+    
     keep_cell_ids <- get_nz_intersecting_cell_ids(layer_obj$cell_polygons)
     if (length(keep_cell_ids) == 0) {
       next
     }
-
+    
     matching_rows <- paste(layer_obj$finite_data$lon_index, layer_obj$finite_data$lat_index, sep = "_") %in% keep_cell_ids
     intersection_values <- c(intersection_values, layer_obj$finite_data$ratio_value[matching_rows])
   }
-
+  
   intersection_values <- intersection_values[is.finite(intersection_values)]
-
+  
   if (length(intersection_values) == 0) {
     return(list(levels = shared_ratio_levels, palette = shared_ratio_palette))
   }
-
+  
   ratio_bin_spec <- get_fixed_width_bin_spec(
     intersection_values,
     bin_width = bin_width,
     min_value = min_value
   )
-
+  
   ratio_levels <- ratio_bin_spec$labels
   ratio_palette <- setNames(
     viridisLite::viridis(length(ratio_levels), option = "magma", direction = -1),
     ratio_levels
   )
-
+  
   list(
     levels = ratio_levels,
     palette = ratio_palette
@@ -657,56 +650,42 @@ if (!is.null(p_ge4_ratio_nz_intersection) && !is.null(p_top10_ratio_nz_intersect
   p_combined_nz_intersection <- (p_ge4_ratio_nz_intersection + p_top10_ratio_nz_intersection + p_joint_ratio_nz_intersection) +
     plot_layout(ncol = 3, guides = "collect") &
     theme(legend.position = "right")
-
+  
   p_combined_nz_intersection
 }
-
-if (!is.null(p_ge4_ratio_nz_intersection)) {
   ggsave(
     filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_nz_intersection_map.png"),
     plot = p_ge4_ratio_nz_intersection,
     width = 8,
     height = 7,
-    dpi = 300
-  )
-}
+    dpi = 300)
 
-if (!is.null(p_ge5_ratio_nz_intersection)) {
   ggsave(
     filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_nz_intersection_map.png"),
     plot = p_ge5_ratio_nz_intersection,
     width = 8,
     height = 7,
-    dpi = 300
-  )
-}
+    dpi = 300)
 
-if (!is.null(p_top10_ratio_nz_intersection)) {
   ggsave(
     filename = file.path(weatherathome_dir, "weather@home_probability_ratio_rx1day_top10_nz_intersection_map.png"),
     plot = p_top10_ratio_nz_intersection,
     width = 8,
     height = 7,
-    dpi = 300
-  )
-}
+    dpi = 300)
 
-if (!is.null(p_joint_ratio_nz_intersection)) {
   ggsave(
     filename = file.path(weatherathome_dir, "weather@home_probability_ratio_joint_top10_ge4_nz_intersection_map.png"),
     plot = p_joint_ratio_nz_intersection,
     width = 8,
     height = 7,
-    dpi = 300
-  )
-}
+    dpi = 300)
 
-if (!is.null(p_ge4_ratio_nz_intersection) && !is.null(p_top10_ratio_nz_intersection) && !is.null(p_joint_ratio_nz_intersection)) {
   ggsave(
     filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_nz_intersection_combined_map.png"),
     plot = p_combined_nz_intersection,
     width = 18,
     height = 6.5,
-    dpi = 300
-  )
-}
+    dpi = 300)
+
+  
