@@ -62,10 +62,8 @@ get_ratio_bin_spec <- function(x, n_bins = 6) {
 }
 
 get_fixed_width_bin_spec <- function(x, bin_width = 0.5, min_value = NULL, max_value = NULL) {
+  
   r <- range(x, na.rm = TRUE)
-  if (!all(is.finite(r))) {
-    stop("Non-finite values found while building fixed-width ratio bins.")
-  }
   
   if (is.null(min_value)) {
     min_break <- floor(r[1] / bin_width) * bin_width
@@ -85,33 +83,31 @@ get_fixed_width_bin_spec <- function(x, bin_width = 0.5, min_value = NULL, max_v
   
   brks <- seq(min_break, max_break, by = bin_width)
   
-  labels <- paste0(
-    format(head(brks, -1), trim = TRUE, scientific = FALSE, nsmall = 1),
-    " to ",
-    format(tail(brks, -1), trim = TRUE, scientific = FALSE, nsmall = 1)
-  )
-  
   list(
     breaks = brks,
-    labels = labels
+    labels = format(brks, trim = TRUE, scientific = FALSE, nsmall = 1)
   )
 }
-
 build_discrete_ratio_bins <- function(x, bin_spec = NULL, n_bins = 6) {
+  
   if (is.null(bin_spec)) {
     bin_spec <- get_ratio_bin_spec(x, n_bins = n_bins)
   }
   
+  breaks <- bin_spec$breaks
+  
+  # labels must equal number of intervals
+  labels <- format(head(breaks, -1), trim = TRUE, scientific = FALSE, nsmall = 1)
+  
   cut(
     x,
-    breaks = bin_spec$breaks,
+    breaks = breaks,
     include.lowest = TRUE,
     right = TRUE,
-    labels = bin_spec$labels,
+    labels = labels,
     ordered_result = TRUE
   )
 }
-
 # Keep the highest ratio class at the top of the legend for quick scanning.
 ratio_legend_guide <- guide_legend(reverse = TRUE)
 
@@ -225,13 +221,16 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text, rat
       guides(fill = ratio_legend_guide) +
       labs(
         title = title_text,
-        x = "Longitude",
-        y = "Latitude"
+        x = NULL,
+        y = NULL
       ) +
-      theme_minimal(base_size = 12) +
+      theme_minimal(base_size = 14) +
       theme(
-        plot.title = element_text(face = "bold", size = 11, lineheight = 0.95),
-        axis.title = element_text(face = "bold")
+        plot.title = element_text(face = "bold", size = 16),
+        axis.text = element_text(size = 13),
+        axis.title = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)
       )
   } else {
     ggplot(df_finite, aes(x = lon, y = lat, fill = ratio_bin)) +
@@ -256,13 +255,16 @@ make_ratio_plot <- function(df_finite, cell_polygons, plot_mode, title_text, rat
       guides(fill = ratio_legend_guide) +
       labs(
         title = title_text,
-        x = "Longitude",
-        y = "Latitude"
+        x = NULL,
+        y = NULL
       ) +
-      theme_minimal(base_size = 12) +
+      theme_minimal(base_size = 14) +
       theme(
-        plot.title = element_text(face = "bold", size = 11, lineheight = 0.95),
-        axis.title = element_text(face = "bold")
+        plot.title = element_text(face = "bold", size = 16),
+        axis.text = element_text(size = 13),
+        axis.title = element_blank(),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 12)
       )
   }
 }
@@ -404,11 +406,26 @@ p_top10_ratio
 p_joint_ratio
 
 # Combined 3-panel figure ≥4, top 10%, and joint event --------
-p_combined <- (p_ge4_ratio + p_top10_ratio + p_joint_ratio) +
-  plot_layout(ncol = 3, guides = "collect") &
-  theme(legend.position = "right")
+# Combined figure layout ----------------------------------------------------
+
+empty_plot <- patchwork::plot_spacer()
+
+p_combined <- (
+  (p_ge4_ratio + p_top10_ratio) /
+    (empty_plot + p_joint_ratio + empty_plot)
+) +
+  plot_layout(
+    widths = c(1,1,1),
+    heights = c(1,1),
+    guides = "collect"
+  ) +
+  plot_annotation(tag_levels = "a") &
+  theme(
+    legend.position = "right"
+  )
 
 p_combined
+
 
 # Saving outputs ----------------------------------------------------------
 write.csv(
@@ -445,11 +462,12 @@ ggsave(
   height = 7,
   dpi = 300
 )
+
 ggsave(
   filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_combined_map.png"),
   plot = p_combined,
-  width = 18,
-  height = 6.5,
+  width = 12,
+  height = 10,
   dpi = 300
 )
 
