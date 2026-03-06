@@ -227,7 +227,15 @@ build_metric_layer <- function(ratio_col) {
   )
 }
 
-make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palette, show_legend = TRUE) {
+make_nz_ratio_plot <- function(
+  layer_obj,
+  title_text,
+  ratio_breaks,
+  ratio_palette,
+  show_legend = TRUE,
+  legend_height_cm = 18,
+  legend_width_cm = 0.65
+) {
   cell_polygons_nz <- layer_obj$cell_polygons[layer_obj$cell_polygons$cell_id %in% layer_obj$keep_cell_ids, ]
   
   if (nrow(cell_polygons_nz) == 0) {
@@ -239,8 +247,8 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palett
   nz_outline <- map_data("nz")
   
   legend_position <- if (isTRUE(show_legend)) "right" else "none"
-  legend_height <- unit(18, "cm")
-  legend_width <- unit(0.65, "cm")
+  legend_height <- unit(legend_height_cm, "cm")
+  legend_width <- unit(legend_width_cm, "cm")
   
   ggplot(cell_polygons_nz, aes(x = lon, y = lat, fill = ratio_value)) +
     geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
@@ -367,7 +375,8 @@ p_ge5 <- make_nz_ratio_plot(
   layers_ge5,
   "Years with ≥5 exceedances",
   ratio_breaks,
-  ratio_palette
+  ratio_palette,
+  legend_height_cm = 13
 )
 
 # Top row has two plots; bottom row lets the joint map span both columns to reduce empty space.
