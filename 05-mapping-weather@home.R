@@ -239,6 +239,8 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palett
   nz_outline <- map_data("nz")
   
   legend_position <- if (isTRUE(show_legend)) "right" else "none"
+  legend_height <- unit(18, "cm")
+  legend_width <- unit(0.65, "cm")
   
   ggplot(cell_polygons_nz, aes(x = lon, y = lat, fill = ratio_value)) +
     geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
@@ -258,13 +260,15 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palett
       limits = ratio_limits,
       oob = scales::squish,
       show.limits = TRUE,
-      name = "Probability ratio",
+      name = "Probability Ratio",
       guide = guide_coloursteps(
         reverse = FALSE,
         even.steps = TRUE,
         show.limits = TRUE,
-        barheight = unit(15, "cm"),
-        barwidth = unit(0.55, "cm")
+        barheight = legend_height,
+        barwidth = legend_width,
+        title.position = "top",
+        title.hjust = 0.5
       )
     ) +
     guides(
@@ -272,8 +276,10 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palett
         reverse = FALSE,
         even.steps = TRUE,
         show.limits = TRUE,
-        barheight = unit(15, "cm"),
-        barwidth = unit(0.55, "cm")
+        barheight = legend_height,
+        barwidth = legend_width,
+        title.position = "top",
+        title.hjust = 0.5
       )
     ) +
     labs(title = title_text, x = NULL, y = NULL) +
@@ -283,8 +289,9 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palett
       axis.title = element_blank(),
       legend.title = element_text(size = 12),
       legend.text = element_text(size = 9),
-      legend.key.height = unit(0.9, "cm"),
-      legend.key.width = unit(0.55, "cm"),
+      legend.key.height = unit(1.05, "cm"),
+      legend.key.width = legend_width,
+      legend.margin = margin(4, 8, 4, 2),
       legend.position = legend_position
     )
 }
@@ -375,7 +382,7 @@ p_combined <- (p_ge4 + p_top10 + p_joint + guide_area()) +
   plot_layout(
     design = combined_design,
     guides = "collect",
-    widths = c(1, 1, 0.12),
+    widths = c(1, 1, 0.18),
     heights = c(1, 1)
   ) +
   plot_annotation(
