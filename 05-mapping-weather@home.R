@@ -351,7 +351,10 @@ p_joint <- make_nz_ratio_plot(
   ratio_breaks,
   ratio_palette,
   show_legend = FALSE
-)
+) +
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
 
 p_ge5 <- make_nz_ratio_plot(
   layers_ge5,
@@ -364,18 +367,21 @@ p_ge5 <- make_nz_ratio_plot(
 combined_design <- c(
   area(t = 1, l = 1, b = 1, r = 1),
   area(t = 1, l = 2, b = 1, r = 2),
-  area(t = 2, l = 1, b = 2, r = 2)
+  area(t = 2, l = 1, b = 2, r = 2),
+  area(t = 1, l = 3, b = 2, r = 3)
 )
 
-p_combined <- (p_ge4 + p_top10 + p_joint) +
+p_combined <- (p_ge4 + p_top10 + p_joint + guide_area()) +
   plot_layout(
     design = combined_design,
     guides = "collect",
+    widths = c(1, 1, 0.12),
     heights = c(1, 1)
   ) +
   plot_annotation(
     theme = theme(
       legend.position = "right",
+      legend.justification = "center",
       plot.margin = margin(5, 5, 5, 5)
     )
   )
