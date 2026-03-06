@@ -41,13 +41,13 @@ get_fixed_width_bin_spec <- function(x, bin_width = 0.5, min_value = 0, max_valu
   r <- range(x, na.rm = TRUE)
   min_break <- min_value
   max_break <- if (is.null(max_value)) ceiling(r[2] / bin_width) * bin_width else max_value
-
+  
   if (min_break == max_break) {
     max_break <- min_break + bin_width
   }
-
+  
   brks <- seq(min_break, max_break, by = bin_width)
-
+  
   list(
     breaks = brks,
     labels = format(head(brks, -1), trim = TRUE, scientific = FALSE, nsmall = 1)
@@ -67,45 +67,45 @@ build_discrete_ratio_bins <- function(x, bin_spec) {
 
 build_cell_polygons <- function(df) {
   has_ratio_bin <- "ratio_bin" %in% names(df)
-
+  
   centres <- df |>
     select(lon_index, lat_index, lon, lat, ratio_value) |>
     distinct()
-
+  
   if (has_ratio_bin) {
     ratio_bins <- df |>
       select(lon_index, lat_index, ratio_bin) |>
       distinct()
-
+    
     centres <- centres |>
       left_join(ratio_bins, by = c("lon_index", "lat_index"))
   } else {
     centres$ratio_bin <- NA_character_
   }
-
+  
   key <- paste(centres$lon_index, centres$lat_index, sep = "_")
   key_lookup <- setNames(seq_len(nrow(centres)), key)
-
+  
   get_xy <- function(i, j) {
     k <- paste(i, j, sep = "_")
     idx <- unname(key_lookup[k])
     if (length(idx) == 0L || is.na(idx)) return(c(NA_real_, NA_real_))
     c(centres$lon[idx], centres$lat[idx])
   }
-
+  
   polygon_parts <- vector("list", nrow(centres))
   part_i <- 0L
-
+  
   for (r in seq_len(nrow(centres))) {
     i <- centres$lon_index[r]
     j <- centres$lat_index[r]
     c0 <- c(centres$lon[r], centres$lat[r])
-
+    
     c_w <- get_xy(i - 1, j)
     c_e <- get_xy(i + 1, j)
     c_s <- get_xy(i, j - 1)
     c_n <- get_xy(i, j + 1)
-
+    
     v_i <- if (all(is.finite(c_w)) && all(is.finite(c_e))) {
       (c_e - c_w) / 2
     } else if (all(is.finite(c_e))) {
@@ -115,7 +115,7 @@ build_cell_polygons <- function(df) {
     } else {
       c(NA_real_, NA_real_)
     }
-
+    
     v_j <- if (all(is.finite(c_s)) && all(is.finite(c_n))) {
       (c_n - c_s) / 2
     } else if (all(is.finite(c_n))) {
@@ -125,9 +125,9 @@ build_cell_polygons <- function(df) {
     } else {
       c(NA_real_, NA_real_)
     }
-
+    
     if (!all(is.finite(v_i)) || !all(is.finite(v_j))) next
-
+    
     corners <- rbind(
       c0 - 0.5 * v_i - 0.5 * v_j,
       c0 + 0.5 * v_i - 0.5 * v_j,
@@ -135,7 +135,7 @@ build_cell_polygons <- function(df) {
       c0 - 0.5 * v_i + 0.5 * v_j,
       c0 - 0.5 * v_i - 0.5 * v_j
     )
-
+    
     part_i <- part_i + 1L
     polygon_parts[[part_i]] <- data.frame(
       cell_id = paste(i, j, sep = "_"),
@@ -146,7 +146,7 @@ build_cell_polygons <- function(df) {
       ratio_bin = centres$ratio_bin[r]
     )
   }
-
+  
   if (part_i == 0L) return(data.frame())
   do.call(rbind, polygon_parts[seq_len(part_i)])
 }
@@ -155,24 +155,24 @@ cell_polygons_to_sf <- function(cell_polygons_df) {
   if (nrow(cell_polygons_df) == 0) {
     return(st_sf(cell_id = character(0), geometry = st_sfc(crs = 4326)))
   }
-
+  
   split_polys <- split(cell_polygons_df, cell_polygons_df$cell_id)
-
+  
   sf_list <- lapply(names(split_polys), function(id) {
     piece <- split_polys[[id]]
     coords <- as.matrix(piece[order(piece$vertex_id), c("lon", "lat")])
     coords <- coords[stats::complete.cases(coords), , drop = FALSE]
     if (nrow(coords) < 4) return(NULL)
     if (!all(coords[1, ] == coords[nrow(coords), ])) coords <- rbind(coords, coords[1, ])
-
+    
     st_sf(cell_id = id, geometry = st_sfc(st_polygon(list(coords)), crs = 4326))
   })
-
+  
   sf_list <- Filter(Negate(is.null), sf_list)
   if (length(sf_list) == 0) {
     return(st_sf(cell_id = character(0), geometry = st_sfc(crs = 4326)))
   }
-
+  
   do.call(rbind, sf_list)
 }
 
@@ -186,19 +186,19 @@ sanitize_geometry <- function(x) {
 
 get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
   if (nrow(cell_polygons_df) == 0) return(character(0))
-
+  
   old_s2 <- sf_use_s2()
   on.exit(sf_use_s2(old_s2), add = TRUE)
   sf_use_s2(FALSE)
-
+  
   nz_map <- maps::map("nz", fill = TRUE, plot = FALSE)
   nz_sf <- st_as_sf(nz_map) |> st_set_crs(4326) |> sanitize_geometry()
   nz_union <- st_union(nz_sf)
   nz_union <- st_sf(geometry = nz_union) |> sanitize_geometry()
-
+  
   cells_sf <- cell_polygons_to_sf(cell_polygons_df) |> sanitize_geometry()
   if (nrow(cells_sf) == 0 || nrow(nz_union) == 0) return(character(0))
-
+  
   intersects <- st_intersects(cells_sf, nz_union, sparse = FALSE)[, 1]
   cells_sf$cell_id[intersects]
 }
@@ -211,15 +211,15 @@ build_metric_layer <- function(ratio_col) {
     lat = grid_results$global_latitude0,
     ratio_value = grid_results[[ratio_col]]
   )
-
+  
   finite_data <- base_data[is.finite(base_data$ratio_value), ]
   if (nrow(finite_data) == 0) {
     stop(sprintf("No finite values to plot for %s.", ratio_col))
   }
-
+  
   cell_polygons <- build_cell_polygons(finite_data)
   keep_cell_ids <- get_nz_intersecting_cell_ids(cell_polygons)
-
+  
   list(
     finite_data = finite_data,
     cell_polygons = cell_polygons,
@@ -229,17 +229,17 @@ build_metric_layer <- function(ratio_col) {
 
 make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palette, show_legend = TRUE) {
   cell_polygons_nz <- layer_obj$cell_polygons[layer_obj$cell_polygons$cell_id %in% layer_obj$keep_cell_ids, ]
-
+  
   if (nrow(cell_polygons_nz) == 0) {
     stop(sprintf("No NZ-intersecting cells found for '%s'.", title_text))
   }
-
+  
   ratio_limits <- range(ratio_breaks)
   ratio_labels <- format(ratio_breaks, trim = TRUE, scientific = FALSE, nsmall = 1)
   nz_outline <- map_data("nz")
-
+  
   legend_position <- if (isTRUE(show_legend)) "right" else "none"
-
+  
   ggplot(cell_polygons_nz, aes(x = lon, y = lat, fill = ratio_value)) +
     geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
     geom_path(
