@@ -258,9 +258,9 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palett
       limits = ratio_limits,
       oob = scales::squish,
       show.limits = TRUE,
-      name = "Probability\nratio",
+      name = "Probability ratio",
       guide = guide_coloursteps(
-        reverse = TRUE,
+        reverse = FALSE,
         even.steps = TRUE,
         show.limits = TRUE,
         barheight = unit(15, "cm"),
@@ -269,7 +269,7 @@ make_nz_ratio_plot <- function(layer_obj, title_text, ratio_breaks, ratio_palett
     ) +
     guides(
       fill = guide_coloursteps(
-        reverse = TRUE,
+        reverse = FALSE,
         even.steps = TRUE,
         show.limits = TRUE,
         barheight = unit(15, "cm"),
@@ -360,20 +360,24 @@ p_ge5 <- make_nz_ratio_plot(
   ratio_palette
 )
 
-# Top row has two plots; bottom row centers the joint plot while keeping panel size equal.
+# Top row has two plots; bottom row lets the joint map span both columns to reduce empty space.
 combined_design <- c(
-  area(t = 1, l = 1, b = 1, r = 2),
-  area(t = 1, l = 3, b = 1, r = 4),
-  area(t = 2, l = 2, b = 2, r = 3)
+  area(t = 1, l = 1, b = 1, r = 1),
+  area(t = 1, l = 2, b = 1, r = 2),
+  area(t = 2, l = 1, b = 2, r = 2)
 )
 
 p_combined <- (p_ge4 + p_top10 + p_joint) +
   plot_layout(
     design = combined_design,
-    guides = "collect"
+    guides = "collect",
+    heights = c(1, 1)
   ) +
   plot_annotation(
-    theme = theme(legend.position = "right")
+    theme = theme(
+      legend.position = "right",
+      plot.margin = margin(5, 5, 5, 5)
+    )
   )
 
 p_combined
