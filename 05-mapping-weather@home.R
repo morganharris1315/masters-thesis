@@ -65,9 +65,22 @@ build_discrete_ratio_bins <- function(x, bin_spec) {
 }
 
 build_cell_polygons <- function(df) {
+  has_ratio_bin <- "ratio_bin" %in% names(df)
+
   centres <- df |>
-    select(lon_index, lat_index, lon, lat, ratio_value, ratio_bin) |>
+    select(lon_index, lat_index, lon, lat, ratio_value) |>
     distinct()
+
+  if (has_ratio_bin) {
+    ratio_bins <- df |>
+      select(lon_index, lat_index, ratio_bin) |>
+      distinct()
+
+    centres <- centres |>
+      left_join(ratio_bins, by = c("lon_index", "lat_index"))
+  } else {
+    centres$ratio_bin <- NA_character_
+  }
 
   key <- paste(centres$lon_index, centres$lat_index, sep = "_")
   key_lookup <- setNames(seq_len(nrow(centres)), key)
