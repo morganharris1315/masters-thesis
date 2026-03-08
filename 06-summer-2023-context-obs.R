@@ -26,11 +26,6 @@ calculate_rx1day_thresholds_obs <- function(df_station_obs) {
   RX1day_df <- compute_RX1day_obs(df_station_obs)
   rx <- RX1day_df$RX1day
 
-  min_rx <- min(rx, na.rm = TRUE)
-  mean_rx <- mean(rx, na.rm = TRUE)
-  max_rx <- max(rx, na.rm = TRUE)
-  mid_rx <- (min_rx + mean_rx) / 2
-
   # Keep single-threshold definition aligned with
   # 03a-blockmaxima-function-obs-singlethreshold.R:
   # threshold where 2/3 of annual RX1day values are above it.
@@ -42,13 +37,7 @@ calculate_rx1day_thresholds_obs <- function(df_station_obs) {
   )
 
   list(
-    thresholds = c(
-      min = min_rx,
-      mid = mid_rx,
-      mean = mean_rx,
-      max = max_rx,
-      single = as.numeric(single_threshold)
-    )
+    thresholds = c(single = as.numeric(single_threshold))
   )
 }
 
@@ -71,9 +60,23 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
       observation_date <= as.Date("2023-02-28")
     )
 
+  station_safe <- gsub(" ", "_", station_name)
+  plot_path <- file.path(output_dir, glue("{station_safe}_summer2023_context.png"))
+
   if (nrow(hy_df) == 0) {
-    warning(glue("Skipping {station_name}: no hydrological year 2023 data."))
-    return(invisible(NULL))
+    return(list(
+      plot_generated = FALSE,
+      plot_status = "No hydrological year 2023 rows",
+      plot_path = plot_path
+    ))
+  }
+
+  if (all(is.na(hy_df$rainfall_mm))) {
+    return(list(
+      plot_generated = FALSE,
+      plot_status = "HY2023 rainfall values all missing",
+      plot_path = plot_path
+    ))
   }
 
   y_max <- max(hy_df$rainfall_mm, na.rm = TRUE)
@@ -114,17 +117,70 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
 
   p_combined <- p_hy / p_summer
 
-  station_safe <- gsub(" ", "_", station_name)
   ggsave(
-    filename = file.path(output_dir, glue("{station_safe}_summer2023_context.png")),
+    filename = plot_path,
     plot = p_combined,
     width = fig_width_standard,
     height = fig_height_standard * 1.7,
     dpi = 300
   )
 
-  invisible(p_combined)
+  list(
+    plot_generated = TRUE,
+    plot_status = "Plot generated",
+    plot_path = plot_path
+  )
 }
+
+build_region_station_coverage_audit <- function(df_obs, region_name, output_dir) {
+  region_df <- df_obs %>%
+    filter(region == region_name)
+
+  stations <- sort(unique(region_df$station))
+
+  coverage_tbl <- map_dfr(stations, function(stn) {
+    df_station <- region_df %>%
+      filter(station == stn)
+
+    hy2023 <- df_station %>% filter(hydro_year == 2023)
+    summer2023 <- hy2023 %>%
+      filter(
+        observation_date >= as.Date("2022-12-01"),
+        observation_date <= as.Date("2023-02-28")
+      )
+
+    hy2023_non_missing <- sum(!is.na(hy2023$rainfall_mm))
+    summer2023_non_missing <- sum(!is.na(summer2023$rainfall_mm))
+
+    tibble(
+      region = region_name,
+      station = stn,
+      rows_all_years = nrow(df_station),
+      rows_hy2023 = nrow(hy2023),
+      non_missing_hy2023 = hy2023_non_missing,
+      rows_summer2023 = nrow(summer2023),
+      non_missing_summer2023 = summer2023_non_missing,
+      missing_plot_reason = case_when(
+        nrow(hy2023) == 0 ~ "No hydrological year 2023 rows",
+        hy2023_non_missing == 0 ~ "HY2023 rainfall values all missing",
+        TRUE ~ NA_character_
+      ),
+      suggested_action = case_when(
+        nrow(hy2023) == 0 ~ "Review station record alignment or hydrological-year derivation",
+        hy2023_non_missing == 0 ~ "Review source rainfall completeness for HY2023",
+        TRUE ~ "No action needed: station should produce a plot"
+      )
+    )
+  })
+
+  write_csv(
+    coverage_tbl,
+    file.path(output_dir, glue("{region_name}_summer_2023_station_coverage_audit.csv"))
+  )
+
+  coverage_tbl
+}
+
 
 # Region summary table -----------------------------------------------------
 build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
@@ -168,7 +224,7 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
       round(mean(rx1day_all$RX1day <= rx1day_2023_val) * 100, 1)
     }
 
-    create_example_year_plots(
+    plot_result <- create_example_year_plots(
       df_station = df_station,
       station_name = stn,
       threshold = threshold_single,
@@ -189,13 +245,9 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
       rx1day_hy2023_mm = rx1day_2023_val,
       rx1day_hy2023_date = as.character(rx1day_2023_date),
       rx1day_hy2023_percentile = rx1day_percentile,
-      rx1day_hy2023_extremeness = case_when(
-        is.na(rx1day_percentile) ~ NA_character_,
-        rx1day_percentile >= 99 ~ "Very extreme",
-        rx1day_percentile >= 95 ~ "Extreme",
-        rx1day_percentile >= 90 ~ "Highly unusual",
-        TRUE ~ "Within historical range"
-      )
+      plot_generated = plot_result$plot_generated,
+      plot_status = plot_result$plot_status,
+      plot_path = plot_result$plot_path
     )
   })
 
@@ -213,6 +265,12 @@ region_summaries <- map(
   function(region_name) {
     region_context_dir <- glue("{base_raw_dir}/obs_data/{region_name}/summer_2023_context")
     dir.create(region_context_dir, recursive = TRUE, showWarnings = FALSE)
+
+    build_region_station_coverage_audit(
+      df_obs = combined_df_obs,
+      region_name = region_name,
+      output_dir = region_context_dir
+    )
 
     build_region_summer_2023_table(
       df_obs = combined_df_obs,
