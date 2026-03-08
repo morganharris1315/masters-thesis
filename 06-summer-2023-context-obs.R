@@ -14,11 +14,10 @@ compute_RX1day_obs <- function(df_station, missing_day_threshold = 30) {
     group_by(hydro_year) %>%
     summarise(
       missing_days = sum(is.na(rainfall_mm)),
-      RX1day_raw = max(rainfall_mm, na.rm = TRUE),
-      RX1day = ifelse(missing_days >= missing_day_threshold, NA_real_, RX1day_raw),
+      RX1day_raw = if_else(all(is.na(rainfall_mm)), NA_real_, max(rainfall_mm, na.rm = TRUE)),
+      RX1day = if_else(missing_days >= missing_day_threshold, NA_real_, RX1day_raw),
       .groups = "drop"
     ) %>%
-    mutate(RX1day = ifelse(is.infinite(RX1day), NA_real_, RX1day)) %>%
     select(hydro_year, RX1day)
 }
 
@@ -60,33 +59,17 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
       observation_date <= as.Date("2023-02-28")
     )
 
-  station_safe <- gsub(" ", "_", station_name)
+  station_safe <- path_sanitize(station_name)
   plot_path <- file.path(output_dir, glue("{station_safe}_summer2023_context.png"))
-
-  if (nrow(hy_df) == 0) {
-    return(list(
-      plot_generated = FALSE,
-      plot_status = "No hydrological year 2023 rows",
-      plot_path = plot_path
-    ))
-  }
-
-  if (all(is.na(hy_df$rainfall_mm))) {
-    return(list(
-      plot_generated = FALSE,
-      plot_status = "HY2023 rainfall values all missing",
-      plot_path = plot_path
-    ))
-  }
 
   y_max <- max(hy_df$rainfall_mm, na.rm = TRUE)
   if (!is.finite(y_max)) y_max <- 10
   y_max <- y_max + 10
 
   p_hy <- ggplot(hy_df, aes(x = observation_date, y = rainfall_mm, group = 1)) +
-    geom_line(colour = "black") +
-    geom_point(size = 0.8, colour = "black") +
-    geom_hline(yintercept = threshold, linetype = "dashed", colour = "#E69F00", size = 1) +
+    geom_line(colour = "black", na.rm = TRUE) +
+    geom_point(size = 0.8, colour = "black", na.rm = TRUE) +
+    {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#E69F00", size = 1)} +
     annotate(
       "rect",
       xmin = as.Date("2022-12-01"), xmax = as.Date("2023-02-28"),
@@ -103,8 +86,8 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
     theme_thesis
 
   p_summer <- ggplot(summer_df, aes(x = observation_date, y = rainfall_mm, group = 1)) +
-    geom_col(fill = "#0072B2") +
-    geom_hline(yintercept = threshold, linetype = "dashed", colour = "#E69F00", size = 1) +
+    geom_col(fill = "#0072B2", na.rm = TRUE) +
+    {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#E69F00", size = 1)} +
     scale_x_date(date_breaks = "2 weeks", date_labels = "%d %b") +
     scale_y_continuous(limits = c(0, y_max)) +
     labs(
@@ -127,58 +110,8 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
 
   list(
     plot_generated = TRUE,
-    plot_status = "Plot generated",
     plot_path = plot_path
   )
-}
-
-build_region_station_coverage_audit <- function(df_obs, region_name, output_dir) {
-  region_df <- df_obs %>%
-    filter(region == region_name)
-
-  stations <- sort(unique(region_df$station))
-
-  coverage_tbl <- map_dfr(stations, function(stn) {
-    df_station <- region_df %>%
-      filter(station == stn)
-
-    hy2023 <- df_station %>% filter(hydro_year == 2023)
-    summer2023 <- hy2023 %>%
-      filter(
-        observation_date >= as.Date("2022-12-01"),
-        observation_date <= as.Date("2023-02-28")
-      )
-
-    hy2023_non_missing <- sum(!is.na(hy2023$rainfall_mm))
-    summer2023_non_missing <- sum(!is.na(summer2023$rainfall_mm))
-
-    tibble(
-      region = region_name,
-      station = stn,
-      rows_all_years = nrow(df_station),
-      rows_hy2023 = nrow(hy2023),
-      non_missing_hy2023 = hy2023_non_missing,
-      rows_summer2023 = nrow(summer2023),
-      non_missing_summer2023 = summer2023_non_missing,
-      missing_plot_reason = case_when(
-        nrow(hy2023) == 0 ~ "No hydrological year 2023 rows",
-        hy2023_non_missing == 0 ~ "HY2023 rainfall values all missing",
-        TRUE ~ NA_character_
-      ),
-      suggested_action = case_when(
-        nrow(hy2023) == 0 ~ "Review station record alignment or hydrological-year derivation",
-        hy2023_non_missing == 0 ~ "Review source rainfall completeness for HY2023",
-        TRUE ~ "No action needed: station should produce a plot"
-      )
-    )
-  })
-
-  write_csv(
-    coverage_tbl,
-    file.path(output_dir, glue("{region_name}_summer_2023_station_coverage_audit.csv"))
-  )
-
-  coverage_tbl
 }
 
 
@@ -246,7 +179,6 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
       rx1day_hy2023_date = as.character(rx1day_2023_date),
       rx1day_hy2023_percentile = rx1day_percentile,
       plot_generated = plot_result$plot_generated,
-      plot_status = plot_result$plot_status,
       plot_path = plot_result$plot_path
     )
   })
@@ -265,12 +197,6 @@ region_summaries <- map(
   function(region_name) {
     region_context_dir <- glue("{base_raw_dir}/obs_data/{region_name}/summer_2023_context")
     dir.create(region_context_dir, recursive = TRUE, showWarnings = FALSE)
-
-    build_region_station_coverage_audit(
-      df_obs = combined_df_obs,
-      region_name = region_name,
-      output_dir = region_context_dir
-    )
 
     build_region_summer_2023_table(
       df_obs = combined_df_obs,
