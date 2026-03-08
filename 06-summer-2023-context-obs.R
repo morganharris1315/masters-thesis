@@ -48,12 +48,12 @@ collapse_dates <- function(x) {
 }
 
 # Create HY2023 + Summer 2023 example plots -------------------------------
-create_example_year_plots <- function(df_station, station_name, threshold, output_dir) {
+create_example_year_plots <- function(df_station, station_name, threshold, output_dir, rx1day_hy2023_val = NA_real_) {
   hy_df <- df_station %>%
     filter(hydro_year == 2023) %>%
     arrange(observation_date)
 
-  if (nrow(hy_df) == 0) {
+  if (nrow(hy_df) == 0 || is.na(rx1day_hy2023_val)) {
     return(list(
       plot_generated = FALSE,
       plot_path = NA_character_
@@ -168,7 +168,8 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
       df_station = df_station,
       station_name = stn,
       threshold = threshold_single,
-      output_dir = output_dir
+      output_dir = output_dir,
+      rx1day_hy2023_val = rx1day_2023_val
     )
 
     tibble(
