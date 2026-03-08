@@ -53,6 +53,13 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
     filter(hydro_year == 2023) %>%
     arrange(observation_date)
 
+  if (nrow(hy_df) == 0) {
+    return(list(
+      plot_generated = FALSE,
+      plot_path = NA_character_
+    ))
+  }
+
   summer_df <- hy_df %>%
     filter(
       observation_date >= as.Date("2022-12-01"),
@@ -196,8 +203,6 @@ region_summaries <- map(
   regions_to_process,
   function(region_name) {
     region_context_dir <- glue("{base_raw_dir}/obs_data/{region_name}/summer_2023_context")
-    dir.create(region_context_dir, recursive = TRUE, showWarnings = FALSE)
-
     build_region_summer_2023_table(
       df_obs = combined_df_obs,
       region_name = region_name,
