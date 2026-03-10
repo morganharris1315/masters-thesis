@@ -398,7 +398,7 @@ plot_daily_example <- function(df, year, threshold, title, y_max, colour, y_lab 
   ts_df <- extract_daily_timeseries(df, year)
   
   ggplot(ts_df, aes(x = day, y = rainfall_mm)) +
-    geom_line() +
+    geom_col(fill = colour, width = 0.9, na.rm = TRUE) +
     geom_hline(
       yintercept = threshold,
       linetype = "dashed",

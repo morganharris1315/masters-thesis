@@ -243,9 +243,8 @@ plot_daily_example_obs_st <- function(df_station, year, threshold, title, y_max,
   ts_df <- df_station %>%
     filter(hydro_year == year)
   
-  ggplot(ts_df, aes(x = observation_date, y = rainfall_mm, group = 1)) +
-    geom_line() +
-    geom_point(size = 1) +
+  ggplot(ts_df, aes(x = observation_date, y = rainfall_mm)) +
+    geom_col(fill = colour, na.rm = TRUE) +
     geom_hline(
       yintercept = threshold,
       linetype = "dashed",

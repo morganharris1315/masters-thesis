@@ -60,12 +60,6 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
     ))
   }
 
-  summer_df <- hy_df %>%
-    filter(
-      observation_date >= as.Date("2022-12-01"),
-      observation_date <= as.Date("2023-02-28")
-    )
-
   station_safe <- path_sanitize(station_name)
   plot_path <- file.path(output_dir, glue("{station_safe}_summer2023_context.png"))
 
@@ -73,9 +67,8 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
   if (!is.finite(y_max)) y_max <- 10
   y_max <- y_max + 10
 
-  p_hy <- ggplot(hy_df, aes(x = observation_date, y = rainfall_mm, group = 1)) +
-    geom_line(colour = "black", na.rm = TRUE) +
-    geom_point(size = 0.8, colour = "black", na.rm = TRUE) +
+  p_hy <- ggplot(hy_df, aes(x = observation_date, y = rainfall_mm)) +
+    geom_col(fill = "#0072B2", na.rm = TRUE) +
     {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#E69F00", size = 1)} +
     annotate(
       "rect",
@@ -92,26 +85,11 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
     ) +
     theme_thesis
 
-  p_summer <- ggplot(summer_df, aes(x = observation_date, y = rainfall_mm, group = 1)) +
-    geom_col(fill = "#0072B2", na.rm = TRUE) +
-    {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#E69F00", size = 1)} +
-    scale_x_date(date_breaks = "2 weeks", date_labels = "%d %b") +
-    scale_y_continuous(limits = c(0, y_max)) +
-    labs(
-      title = glue("{station_name} — Summer 2023"),
-      x = "Date",
-      y = "Daily Rainfall (mm)"
-    ) +
-    theme_thesis +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-  p_combined <- p_hy / p_summer
-
   ggsave(
     filename = plot_path,
-    plot = p_combined,
+    plot = p_hy,
     width = fig_width_standard,
-    height = fig_height_standard * 1.7,
+    height = fig_height_standard,
     dpi = 300
   )
 
