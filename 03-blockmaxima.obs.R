@@ -93,8 +93,7 @@ labels_tairua_forest
 
 # RX1day time series plot -------------------------------------------------
 p_tairua_forest <- ggplot(tairua_forest_rx1day_df, aes(x = hydro_year, y = RX1day)) +
-  geom_line(color = "black") +
-  geom_point(color = "black") +
+  geom_col(fill = "#0072B2", width = 0.8) +
   geom_hline(aes(yintercept = tairua_forest_minRX1day, colour = "Min RX1day"),
              linetype = "dashed", size = 1.1) +
   geom_hline(aes(yintercept = tairua_forest_meanRX1day, colour = "Mean RX1day"),
@@ -221,8 +220,7 @@ labels_chiltern
 
 # RX1day time series plot -------------------------------------------------
 p_chiltern <- ggplot(chiltern_rx1day_df, aes(x = hydro_year, y = RX1day)) +
-  geom_line(color = "black") +
-  geom_point(color = "black") +
+  geom_col(fill = "#0072B2", width = 0.8) +
   geom_hline(aes(yintercept = chiltern_minRX1day, colour = "Min RX1day"),
              linetype = "dashed", size = 1.1) +
   geom_hline(aes(yintercept = chiltern_meanRX1day, colour = "Mean RX1day"),

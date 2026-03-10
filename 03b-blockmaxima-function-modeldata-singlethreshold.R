@@ -379,8 +379,7 @@ plot_daily_example <- function(df, year, threshold, title, y_max, y_lab = "") {
   ts_df <- extract_daily_timeseries(df, year)
   
   ggplot(ts_df, aes(x = day, y = rainfall_mm)) +
-    geom_segment(aes(xend = day, y = 0, yend = rainfall_mm), colour = "black", alpha = 0.5) +
-    geom_point(size = 0.7, colour = "black") +
+    geom_col(fill = box_colour, width = 0.9, na.rm = TRUE) +
     geom_hline(yintercept = threshold, linetype = "dashed", colour = box_colour, size = 1.1) +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(limits = c(0, y_max), expand = expansion(mult = c(0, 0.02))) +
