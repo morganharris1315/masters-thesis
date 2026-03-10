@@ -68,7 +68,7 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
   y_max <- y_max + 10
 
   p_hy <- ggplot(hy_df, aes(x = observation_date, y = rainfall_mm)) +
-    geom_col(fill = "#0072B2", na.rm = TRUE) +
+    geom_col(fill = "#0072B2", width= 1.5, na.rm = TRUE) +
     {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#93acff", size = 1)} +
     scale_x_date(date_breaks = "1 month", date_labels = "%b") +
     scale_y_continuous(limits = c(0, y_max)) +
