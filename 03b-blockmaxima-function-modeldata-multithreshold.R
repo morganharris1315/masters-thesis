@@ -869,6 +869,8 @@ build_fixedCD_summary_table <- function(hist_df_prop) {
     group_by(Region, Threshold, Period) %>%
     summarise(Mean_exceedances = weighted.mean(days, prop_years), .groups = "drop")}
 
+fixedCD_summary_all <- bind_rows(lapply(hist_fixedCD_all, build_fixedCD_summary_table))
+
 fixedCD_changeinmean_table <- fixedCD_summary_all %>%
   pivot_wider(names_from  = Period, values_from = Mean_exceedances) %>%
   rename(`Mean Exceedance CD` = `Current Day`, `Mean Exceedance FP` = `Future Projection`) %>%
