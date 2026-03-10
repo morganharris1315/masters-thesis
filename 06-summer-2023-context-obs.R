@@ -69,17 +69,11 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
 
   p_hy <- ggplot(hy_df, aes(x = observation_date, y = rainfall_mm)) +
     geom_col(fill = "#0072B2", na.rm = TRUE) +
-    {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#E69F00", size = 1)} +
-    annotate(
-      "rect",
-      xmin = as.Date("2022-12-01"), xmax = as.Date("2023-02-28"),
-      ymin = -Inf, ymax = Inf,
-      alpha = 0.12, fill = "#56B4E9"
-    ) +
+    {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#93acff", size = 1)} +
     scale_x_date(date_breaks = "1 month", date_labels = "%b") +
     scale_y_continuous(limits = c(0, y_max)) +
     labs(
-      title = glue("{station_name} — Hydrological Year 2023 (Summer Highlighted)"),
+      title = glue("{station_name} — Hydrological Year 2023"),
       x = "Date",
       y = "Daily Rainfall (mm)"
     ) +
@@ -164,8 +158,6 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
       rx1day_hy2023_mm = rx1day_2023_val,
       rx1day_hy2023_date = as.character(rx1day_2023_date),
       rx1day_hy2023_percentile = rx1day_percentile,
-      plot_generated = plot_result$plot_generated,
-      plot_path = plot_result$plot_path
     )
   })
 
