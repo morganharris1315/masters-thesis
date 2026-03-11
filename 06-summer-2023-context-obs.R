@@ -343,11 +343,16 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim
       colour = "grey10",
       check_overlap = TRUE
     ) +
-    coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
-    labs(
-      title = event_row$event_title
-    ) +
-    theme_thesis
+  coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
+  labs(
+      title = event_row$event_title,
+      x = NULL,
+      y = NULL
+  ) +
+    theme_thesis +
+    theme(
+      axis.title = element_blank()
+    )
 }
 
 event_maps <- map(
@@ -356,21 +361,26 @@ event_maps <- map(
 )
 
 legend_panel <- ggplot() +
-  annotate("point", x = 0.1, y = 0.7, shape = 21, size = 4, fill = "grey45", colour = "grey20", stroke = 0.4) +
-  annotate("text", x = 0.2, y = 0.7, hjust = 0, label = "Daily Rainfall (mm)", size = 3) +
-  annotate("point", x = 0.1, y = 0.45, shape = 21, size = 4.8, fill = NA, colour = "#93acff", stroke = 1.1) +
-  annotate("text", x = 0.2, y = 0.45, hjust = 0, label = "Above 33rd Rx1day Percentile Threshold", size = 3) +
-  xlim(0, 1.35) +
+  annotate("point", x = 0.15, y = 0.68, shape = 21, size = 3.8, fill = "grey45", colour = "grey20", stroke = 0.4) +
+  annotate("text", x = 0.24, y = 0.68, hjust = 0, label = "Daily Rainfall (mm)", size = 3) +
+  annotate("point", x = 0.15, y = 0.46, shape = 21, size = 4.4, fill = NA, colour = "#93acff", stroke = 1.1) +
+  annotate("text", x = 0.24, y = 0.46, hjust = 0, label = "Above 33rd Rx1day Percentile Threshold", size = 3) +
+  xlim(0, 1.1) +
   ylim(0, 1) +
   theme_void() +
-  labs(title = "Legend")
+  labs(title = "Legend") +
+  theme(
+    plot.title = element_text(size = 11)
+  )
 
 # Keep 3x2 layout with a legend in the sixth panel.
 event_maps[[6]] <- legend_panel
 
 p_coromandel_event_panel <- patchwork::wrap_plots(event_maps, ncol = 2, nrow = 3) +
   patchwork::plot_annotation(
-    title = "Coromandel 2023")
+    title = "Coromandel 2023",
+    theme = theme(plot.title = element_text(hjust = 0.5))
+  )
 
 print(p_coromandel_event_panel)
 
