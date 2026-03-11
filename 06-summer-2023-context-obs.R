@@ -193,17 +193,41 @@ write_csv(
 
 print(summer_2023_all_regions_table)
 
-map_data('nz')
-coromandel_map <-map('nz', xlim = c(172, 179), ylim = c(-42, -34))
-coromandel_map
+
+# Mapping -----------------------------------------------------------------
+
+
+# Base Coromandel Plot ----------------------------------------------------
+
+nz_map_df<-map_data('nz')
 
 sites_path <- glue("{base_raw_dir}/Identified_Sites.csv")
 identified_sites <- read.csv(sites_path)
 
-coromandel_lat_log_data <-identified_sites %>% filter(reigion == coromandel)
+coromandel_lat_log_data <-identified_sites %>% filter(CaseStudy == "Coromandel")
   
-coromandel_sites <- ggplot(coromandel_lat_log_data, aes(x = lon, y = lat, fill = ratio_value))+
-  labs(title= "Coromandel Sites") +
-  theme(legend.position= "right",)
+ggplot() +
+  geom_polygon(
+    data = nz_map_df,
+    aes(x = long, y = lat, group = group),
+    fill = "grey92",
+    colour = "grey40",
+    linewidth = 0.2
+  ) +
+  geom_point(
+    data = coromandel_lat_log_data,
+    aes(x = Longitude, y = Latitude),
+    colour = "#0072B2",
+    size = 2,
+    alpha = 0.9
+  ) +
+  coord_quickmap(xlim = c(174.3, 176.2), ylim = c(-38.1, -35.9), expand = FALSE) +
+  labs(
+    title = "Coromandel stations",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_thesis
+
 
 
