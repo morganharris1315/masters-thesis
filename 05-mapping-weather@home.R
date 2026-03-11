@@ -282,11 +282,11 @@ layers_joint <- add_ratio_bins(layers_joint)
 
 # Build requested plots -----------------------------------------------------
 p_ge4 <- make_nz_ratio_plot(
-  layers_ge4, "(a) Years with ≥4 exceedances",
+  layers_ge4, "(b) Years with ≥4 exceedances",
   ratio_breaks, blues)
 
 p_top10 <- make_nz_ratio_plot(
-  layers_top10, "(b) Years with extreme Rx1day",
+  layers_top10, "(a) Years with extreme Rx1day",
   ratio_breaks, blues, show_legend = FALSE)
 
 p_joint <- make_nz_ratio_plot(
@@ -305,7 +305,7 @@ combined_design <- c(
   area(t = 2, l = 1, b = 2, r = 2),
   area(t = 1, l = 3, b = 2, r = 3))
 
-p_combined <- (p_ge4 + p_top10 + p_joint + guide_area()) +
+p_combined <- (p_top10 + p_ge4 + p_joint + guide_area()) +
   plot_layout(
     design = combined_design,
     guides = "collect",
