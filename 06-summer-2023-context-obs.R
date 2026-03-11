@@ -222,11 +222,9 @@ p_coromandel_map <- ggplot() +
     size = 2,
     alpha = 0.9
   ) +
-  coord_quickmap(xlim = c(174.3, 176.2), ylim = c(-38.1, -35.9), expand = FALSE) +
+  coord_quickmap(xlim = c(175.3, 176.0), ylim = c(-37.6, -36.4), expand = FALSE) +
   labs(
-    title = "Coromandel Stations",
-    x = "Longitude",
-    y = "Latitude"
+    title = "Coromandel Stations"
   ) +
 theme_thesis
     
@@ -284,7 +282,7 @@ event_definitions <- tribble(
   5L, "2023-02-12 to 2023-02-14", as.Date("2023-02-12"), as.Date("2023-02-14")
 )
 
-build_event_map <- function(event_row, base_map_df, xlim = c(174.3, 176.2), ylim = c(-38.1, -35.9)) {
+build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim = c(-37.6, -36.4)) {
   event_data <- coromandel_obs %>%
     filter(
       observation_date >= event_row$start_date,
@@ -347,9 +345,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(174.3, 176.2), ylim
     ) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     labs(
-      title = event_row$event_title,
-      x = "Longitude",
-      y = "Latitude"
+      title = event_row$event_title
     ) +
     theme_thesis
 }
@@ -385,4 +381,3 @@ ggsave(
   height = 14,
   dpi = 300
 )
-
