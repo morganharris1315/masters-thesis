@@ -204,9 +204,10 @@ nz_map_df<-map_data('nz')
 sites_path <- glue("{base_raw_dir}/Identified_Sites.csv")
 identified_sites <- read.csv(sites_path)
 
-coromandel_lat_log_data <-identified_sites %>% filter(CaseStudy == "Coromandel")
-  
-ggplot() +
+coromandel_lat_log_data <- identified_sites %>%
+  filter(CaseStudy == "Coromandel")
+
+p_coromandel_map <- ggplot() +
   geom_polygon(
     data = nz_map_df,
     aes(x = long, y = lat, group = group),
@@ -223,11 +224,16 @@ ggplot() +
   ) +
   coord_quickmap(xlim = c(174.3, 176.2), ylim = c(-38.1, -35.9), expand = FALSE) +
   labs(
-    title = "Coromandel stations",
+    title = "Coromandel Stations",
     x = "Longitude",
     y = "Latitude"
   ) +
+  coord_fixed()
   theme_thesis
 
+print(p_coromandel_map)
 
+ggsave(file.path("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/obs_data/coromandel/coromandel_base_map.png"),
+       plot = p_coromandel_map, , width = 8, height = 7, dpi = 300)
+       
 
