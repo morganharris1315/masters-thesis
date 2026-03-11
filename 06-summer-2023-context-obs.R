@@ -192,3 +192,18 @@ write_csv(
 )
 
 print(summer_2023_all_regions_table)
+
+map_data('nz')
+coromandel_map <-map('nz', xlim = c(172, 179), ylim = c(-42, -34))
+coromandel_map
+
+sites_path <- glue("{base_raw_dir}/Identified_Sites.csv")
+identified_sites <- read.csv(sites_path)
+
+coromandel_lat_log_data <-identified_sites %>% filter(reigion == coromandel)
+  
+coromandel_sites <- ggplot(coromandel_lat_log_data, aes(x = lon, y = lat, fill = ratio_value))+
+  labs(title= "Coromandel Sites") +
+  theme(legend.position= "right",)
+
+
