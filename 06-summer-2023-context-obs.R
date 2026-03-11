@@ -361,12 +361,12 @@ event_maps <- map(
 )
 
 legend_panel <- ggplot() +
-  annotate("point", x = 0.15, y = 0.68, shape = 21, size = 3.8, fill = "grey45", colour = "grey20", stroke = 0.4) +
-  annotate("text", x = 0.24, y = 0.68, hjust = 0, label = "Daily Rainfall (mm)", size = 3) +
-  annotate("point", x = 0.15, y = 0.46, shape = 21, size = 4.4, fill = NA, colour = "#93acff", stroke = 1.1) +
-  annotate("text", x = 0.24, y = 0.46, hjust = 0, label = "Above 33rd Rx1day Percentile Threshold", size = 3) +
-  xlim(0, 1.1) +
-  ylim(0, 1) +
+  annotate("point", x = 0.14, y = 0.64, shape = 21, size = 3.8, fill = "grey45", colour = "grey20", stroke = 0.4) +
+  annotate("text", x = 0.21, y = 0.64, hjust = 0, label = "Daily Rainfall (mm)", size = 3) +
+  annotate("point", x = 0.14, y = 0.56, shape = 21, size = 4.4, fill = NA, colour = "#93acff", stroke = 1.1) +
+  annotate("text", x = 0.21, y = 0.56, hjust = 0, label = "Above 33rd Rx1day Percentile Threshold", size = 3) +
+  xlim(0, 1.25) +
+  ylim(0.4, 0.75) +
   theme_void() +
   labs(title = "Legend") +
   theme(
