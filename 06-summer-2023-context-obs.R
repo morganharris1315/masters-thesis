@@ -228,12 +228,161 @@ p_coromandel_map <- ggplot() +
     x = "Longitude",
     y = "Latitude"
   ) +
-  coord_fixed()
-  theme_thesis
+theme_thesis
+    
+    print(p_coromandel_map)
+    
+    ggsave(file.path("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/obs_data/coromandel/coromandel_base_map.png"),
+    plot = p_coromandel_map, width = 8, height = 7, dpi = 300)
 
-print(p_coromandel_map)
+coromandel_lat_log_data %>%
+  summarise(
+    n = n(),
+    lon_min = min(Longitude, na.rm = TRUE),
+    lon_max = max(Longitude, na.rm = TRUE),
+    lat_min = min(Latitude, na.rm = TRUE),
+    lat_max = max(Latitude, na.rm = TRUE)
+  )
 
-ggsave(file.path("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/obs_data/coromandel/coromandel_base_map.png"),
-       plot = p_coromandel_map, , width = 8, height = 7, dpi = 300)
-       
+
+#  Coromandel key-event rainfall maps  ------------------------------
+
+coromandel_clean_path <- glue("{base_raw_dir}/obs_data/cleaned_datasets/rain_coromandel_cleaned.csv")
+coromandel_obs <- read_csv(coromandel_clean_path, show_col_types = FALSE) %>%
+  mutate(
+    observation_date = as.Date(observation_date),
+    hydro_year = if_else(month(observation_date) >= 7,
+                         year(observation_date) + 1,
+                         year(observation_date))
+  )
+
+# Use the same station thresholds already used in the summary table so
+# exceedance highlighting is directly consistent with reported values.
+station_thresholds <- summer_2023_all_regions_table %>%
+  filter(region == "coromandel") %>%
+  transmute(
+    station,
+    threshold_single = as.numeric(exceedance_threshold_mm)
+  ) %>%
+  distinct(station, .keep_all = TRUE)
+
+station_coords <- coromandel_obs %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  group_by(station) %>%
+  summarise(
+    latitude = first(latitude),
+    longitude = first(longitude),
+    .groups = "drop"
+  )
+
+event_definitions <- tribble(
+  ~event_id, ~event_title, ~start_date, ~end_date,
+  1L, "2022-07-25", as.Date("2022-07-25"), as.Date("2022-07-25"),
+  2L, "2022-12-14", as.Date("2022-12-14"), as.Date("2022-12-14"),
+  3L, "2023-01-09 to 2023-01-11", as.Date("2023-01-09"), as.Date("2023-01-11"),
+  4L, "2023-01-27 to 2023-01-28", as.Date("2023-01-27"), as.Date("2023-01-28"),
+  5L, "2023-02-12 to 2023-02-14", as.Date("2023-02-12"), as.Date("2023-02-14")
+)
+
+build_event_map <- function(event_row, base_map_df, xlim = c(174.3, 176.2), ylim = c(-38.1, -35.9)) {
+  event_data <- coromandel_obs %>%
+    filter(
+      observation_date >= event_row$start_date,
+      observation_date <= event_row$end_date
+    ) %>%
+    group_by(station) %>%
+    filter(!is.na(rainfall_mm)) %>%
+    slice_max(order_by = rainfall_mm, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    transmute(
+      station,
+      event_rainfall_mm = rainfall_mm,
+      event_date_used = observation_date
+    ) %>%
+    left_join(station_coords, by = "station") %>%
+    left_join(station_thresholds, by = "station") %>%
+    mutate(is_above_threshold = !is.na(threshold_single) & event_rainfall_mm > threshold_single) %>%
+    filter(!is.na(latitude), !is.na(longitude), !is.na(event_rainfall_mm))
+  
+  message(
+    glue(
+      "Event {event_row$event_title}: {sum(event_data$is_above_threshold, na.rm = TRUE)} stations above threshold"
+    )
+  )
+  
+  ggplot() +
+    geom_polygon(
+      data = base_map_df,
+      aes(x = long, y = lat, group = group),
+      fill = "grey92",
+      colour = "grey40",
+      linewidth = 0.2
+    ) +
+    geom_point(
+      data = event_data,
+      aes(x = longitude, y = latitude),
+      shape = 21,
+      fill = "grey45",
+      colour = "grey20",
+      size = 2.7,
+      stroke = 0.4,
+      alpha = 0.95
+    ) +
+    geom_point(
+      data = event_data %>% filter(is_above_threshold),
+      aes(x = longitude, y = latitude),
+      shape = 21,
+      fill = NA,
+      colour = "#93acff",
+      size = 3.4,
+      stroke = 1.1
+    ) +
+    geom_text(
+      data = event_data,
+      aes(x = longitude, y = latitude, label = round(event_rainfall_mm, 0)),
+      nudge_y = 0.06,
+      size = 2.5,
+      colour = "grey10",
+      check_overlap = TRUE
+    ) +
+    coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
+    labs(
+      title = event_row$event_title,
+      x = "Longitude",
+      y = "Latitude"
+    ) +
+    theme_thesis
+}
+
+event_maps <- map(
+  split(event_definitions, event_definitions$event_id),
+  ~ build_event_map(.x, nz_map_df)
+)
+
+legend_panel <- ggplot() +
+  annotate("point", x = 0.1, y = 0.7, shape = 21, size = 4, fill = "grey45", colour = "grey20", stroke = 0.4) +
+  annotate("text", x = 0.2, y = 0.7, hjust = 0, label = "Daily Rainfall (mm)", size = 3) +
+  annotate("point", x = 0.1, y = 0.45, shape = 21, size = 4.8, fill = NA, colour = "#93acff", stroke = 1.1) +
+  annotate("text", x = 0.2, y = 0.45, hjust = 0, label = "Above 33rd Rx1day Percentile Threshold", size = 3) +
+  xlim(0, 1.35) +
+  ylim(0, 1) +
+  theme_void() +
+  labs(title = "Legend")
+
+# Keep 3x2 layout with a legend in the sixth panel.
+event_maps[[6]] <- legend_panel
+
+p_coromandel_event_panel <- patchwork::wrap_plots(event_maps, ncol = 2, nrow = 3) +
+  patchwork::plot_annotation(
+    title = "Coromandel 2023")
+
+print(p_coromandel_event_panel)
+
+ggsave(
+  filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2.png"),
+  plot = p_coromandel_event_panel,
+  width = 12,
+  height = 14,
+  dpi = 300
+)
 
