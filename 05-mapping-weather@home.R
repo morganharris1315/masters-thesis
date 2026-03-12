@@ -263,6 +263,30 @@ nc_cell_polygon_template <- load_nc_cell_polygon_template(nc_template_file, nc_g
 nc_grid_metrics <- nc_grid_template |>
   left_join(grid_results, by = c("lon_index", "lat_index"))
 
+harmonise_joined_coordinate_columns <- function(df, col_names) {
+  for (col_name in col_names) {
+    joined_names <- intersect(c(col_name, paste0(col_name, ".x"), paste0(col_name, ".y")), names(df))
+
+    if (length(joined_names) == 0L) next
+
+    # Prefer the unsuffixed column first, then .x, then .y, filling any gaps.
+    merged <- Reduce(function(a, b) dplyr::coalesce(a, b), lapply(joined_names, function(nm) df[[nm]]))
+    df[[col_name]] <- merged
+
+    drop_names <- setdiff(joined_names, col_name)
+    if (length(drop_names) > 0L) {
+      df <- dplyr::select(df, -all_of(drop_names))
+    }
+  }
+
+  df
+}
+
+nc_grid_metrics <- harmonise_joined_coordinate_columns(
+  nc_grid_metrics,
+  c("longitude0", "latitude0", "global_longitude0", "global_latitude0")
+)
+
 missing_metrics <- rowSums(is.na(nc_grid_metrics[, ratio_columns]))
 if (any(missing_metrics == length(ratio_columns))) {
   stop("Some NC grid cells did not match CSV probability-ratio rows. Check lon_index/lat_index alignment.")
