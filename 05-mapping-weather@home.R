@@ -443,8 +443,42 @@ build_cell_polygons <- function(df) {
 }
 
 build_metric_layer <- function(ratio_col) {
-  required_cols <- c("lon_index", "lat_index", "global_longitude0", "global_latitude0")
+  required_cols <- c("lon_index", "lat_index")
   missing_required <- setdiff(required_cols, names(nc_grid_metrics_masked))
+
+  get_preferred_coord <- function(df, preferred_names) {
+    available <- intersect(preferred_names, names(df))
+
+    if (length(available) == 0L) {
+      return(list(values = NULL, source_cols = character(0)))
+    }
+
+    merged_values <- Reduce(
+      function(a, b) dplyr::coalesce(a, b),
+      lapply(available, function(nm) df[[nm]])
+    )
+
+    list(values = merged_values, source_cols = available)
+  }
+
+  lon_coord <- get_preferred_coord(
+    nc_grid_metrics_masked,
+    c("global_longitude0", "global_longitude0.x", "global_longitude0.y", "longitude0", "longitude0.x", "longitude0.y")
+  )
+  lat_coord <- get_preferred_coord(
+    nc_grid_metrics_masked,
+    c("global_latitude0", "global_latitude0.x", "global_latitude0.y", "latitude0", "latitude0.x", "latitude0.y")
+  )
+
+  missing_coord_cols <- c()
+  if (is.null(lon_coord$values)) {
+    missing_coord_cols <- c(missing_coord_cols, "global_longitude0(.x/.y)/longitude0(.x/.y)")
+  }
+  if (is.null(lat_coord$values)) {
+    missing_coord_cols <- c(missing_coord_cols, "global_latitude0(.x/.y)/latitude0(.x/.y)")
+  }
+
+  missing_required <- unique(c(missing_required, missing_coord_cols))
 
   if (length(missing_required) > 0) {
     stop(
@@ -470,8 +504,8 @@ build_metric_layer <- function(ratio_col) {
   base_data <- data.frame(
     lon_index = nc_grid_metrics_masked$lon_index,
     lat_index = nc_grid_metrics_masked$lat_index,
-    lon = nc_grid_metrics_masked$global_longitude0,
-    lat = nc_grid_metrics_masked$global_latitude0,
+    lon = lon_coord$values,
+    lat = lat_coord$values,
     ratio_value = nc_grid_metrics_masked[[ratio_col]]
   )
 
@@ -497,6 +531,7 @@ build_metric_layer <- function(ratio_col) {
     keep_cell_ids = unique(cell_polygons$cell_id)
   )
 }
+
 
 make_nz_ratio_plot <- function(
     layer_obj,
