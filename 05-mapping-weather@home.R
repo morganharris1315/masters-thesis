@@ -409,6 +409,30 @@ build_cell_polygons <- function(df) {
 }
 
 build_metric_layer <- function(ratio_col) {
+  required_cols <- c("lon_index", "lat_index", "global_longitude0", "global_latitude0")
+  missing_required <- setdiff(required_cols, names(nc_grid_metrics_masked))
+
+  if (length(missing_required) > 0) {
+    stop(
+      sprintf(
+        "Cannot build metric layer: missing required column(s): %s",
+        paste(missing_required, collapse = ", ")
+      )
+    )
+  }
+
+  if (!(ratio_col %in% names(nc_grid_metrics_masked))) {
+    available_ratio_cols <- names(nc_grid_metrics_masked)[grepl("probability_ratio", names(nc_grid_metrics_masked), fixed = TRUE)]
+
+    stop(
+      sprintf(
+        "Requested ratio column '%s' is not present. Available ratio columns: %s",
+        ratio_col,
+        if (length(available_ratio_cols) == 0) "<none>" else paste(available_ratio_cols, collapse = ", ")
+      )
+    )
+  }
+
   base_data <- data.frame(
     lon_index = nc_grid_metrics_masked$lon_index,
     lat_index = nc_grid_metrics_masked$lat_index,
