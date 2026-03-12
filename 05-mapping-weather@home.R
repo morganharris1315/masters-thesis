@@ -65,6 +65,134 @@ load_nc_grid_template <- function(nc_file) {
   )
 }
 
+load_nc_cell_polygon_template <- function(nc_file, grid_template) {
+  nc <- open.nc(nc_file)
+  on.exit(close.nc(nc), add = TRUE)
+
+  nlon <- length(unique(grid_template$lon_index))
+  nlat <- length(unique(grid_template$lat_index))
+
+  read_var_if_exists <- function(var_name) {
+    tryCatch(var.get.nc(nc, var_name), error = function(e) NULL)
+  }
+
+  build_from_1d_bounds <- function(lon_bounds, lat_bounds) {
+    if (length(dim(lon_bounds)) != 2 || length(dim(lat_bounds)) != 2) {
+      return(NULL)
+    }
+
+    if (nrow(lon_bounds) != nlon || nrow(lat_bounds) != nlat || ncol(lon_bounds) < 2 || ncol(lat_bounds) < 2) {
+      return(NULL)
+    }
+
+    polygon_parts <- vector("list", nlon * nlat)
+    part_i <- 0L
+
+    for (i in seq_len(nlon)) {
+      for (j in seq_len(nlat)) {
+        lon_lo <- lon_bounds[i, 1]
+        lon_hi <- lon_bounds[i, 2]
+        lat_lo <- lat_bounds[j, 1]
+        lat_hi <- lat_bounds[j, 2]
+
+        if (!all(is.finite(c(lon_lo, lon_hi, lat_lo, lat_hi)))) next
+
+        corners <- rbind(
+          c(lon_lo, lat_lo),
+          c(lon_hi, lat_lo),
+          c(lon_hi, lat_hi),
+          c(lon_lo, lat_hi),
+          c(lon_lo, lat_lo)
+        )
+
+        part_i <- part_i + 1L
+        polygon_parts[[part_i]] <- data.frame(
+          lon_index = i,
+          lat_index = j,
+          cell_id = paste(i, j, sep = "_"),
+          vertex_id = seq_len(5),
+          lon = corners[, 1],
+          lat = corners[, 2]
+        )
+      }
+    }
+
+    if (part_i == 0L) return(NULL)
+    do.call(rbind, polygon_parts[seq_len(part_i)])
+  }
+
+  build_from_2d_bounds <- function(lon_bounds, lat_bounds) {
+    d_lon <- dim(lon_bounds)
+    d_lat <- dim(lat_bounds)
+
+    if (length(d_lon) != 3 || length(d_lat) != 3 || d_lon[3] < 3 || d_lat[3] < 3) {
+      return(NULL)
+    }
+
+    if (!all(d_lon[1:2] == c(nlon, nlat)) || !all(d_lat[1:2] == c(nlon, nlat))) {
+      return(NULL)
+    }
+
+    n_vertices <- min(d_lon[3], d_lat[3])
+    polygon_parts <- vector("list", nlon * nlat)
+    part_i <- 0L
+
+    for (i in seq_len(nlon)) {
+      for (j in seq_len(nlat)) {
+        lon_seq <- as.numeric(lon_bounds[i, j, seq_len(n_vertices)])
+        lat_seq <- as.numeric(lat_bounds[i, j, seq_len(n_vertices)])
+
+        if (!all(is.finite(lon_seq)) || !all(is.finite(lat_seq))) next
+
+        if (lon_seq[1] != lon_seq[length(lon_seq)] || lat_seq[1] != lat_seq[length(lat_seq)]) {
+          lon_seq <- c(lon_seq, lon_seq[1])
+          lat_seq <- c(lat_seq, lat_seq[1])
+        }
+
+        part_i <- part_i + 1L
+        polygon_parts[[part_i]] <- data.frame(
+          lon_index = i,
+          lat_index = j,
+          cell_id = paste(i, j, sep = "_"),
+          vertex_id = seq_along(lon_seq),
+          lon = lon_seq,
+          lat = lat_seq
+        )
+      }
+    }
+
+    if (part_i == 0L) return(NULL)
+    do.call(rbind, polygon_parts[seq_len(part_i)])
+  }
+
+  bounds_candidates <- list(
+    c("global_longitude0_bounds", "global_latitude0_bounds"),
+    c("global_longitude0_bnds", "global_latitude0_bnds"),
+    c("longitude0_bounds", "latitude0_bounds"),
+    c("longitude0_bnds", "latitude0_bnds")
+  )
+
+  for (pair in bounds_candidates) {
+    lon_bounds <- read_var_if_exists(pair[1])
+    lat_bounds <- read_var_if_exists(pair[2])
+
+    if (is.null(lon_bounds) || is.null(lat_bounds)) next
+
+    polygons <- build_from_2d_bounds(lon_bounds, lat_bounds)
+    if (is.null(polygons)) {
+      polygons <- build_from_1d_bounds(lon_bounds, lat_bounds)
+    }
+
+    if (!is.null(polygons)) {
+      message(sprintf("Using NC cell bounds from variables '%s' and '%s'.", pair[1], pair[2]))
+      return(polygons)
+    }
+  }
+
+  message("No NC cell-bound variables found with supported shapes; using neighbour-based polygon reconstruction.")
+  NULL
+}
+
 read_lse_mask <- function(mask_file, nlon, nlat) {
   ext <- tolower(tools::file_ext(mask_file))
 
@@ -130,6 +258,7 @@ apply_lse_mask_to_metrics <- function(grid_df, ratio_cols) {
 
 # Build NC-anchored table --------------------------------------------------
 nc_grid_template <- load_nc_grid_template(nc_template_file)
+nc_cell_polygon_template <- load_nc_cell_polygon_template(nc_template_file, nc_grid_template)
 
 nc_grid_metrics <- nc_grid_template |>
   left_join(grid_results, by = c("lon_index", "lat_index"))
@@ -293,7 +422,16 @@ build_metric_layer <- function(ratio_col) {
     stop(sprintf("No finite values to plot for %s after LSE masking.", ratio_col))
   }
 
-  cell_polygons <- build_cell_polygons(finite_data)
+  cell_polygons <- if (is.null(nc_cell_polygon_template)) {
+    build_cell_polygons(finite_data)
+  } else {
+    nc_cell_polygon_template |>
+      inner_join(
+        finite_data |>
+          select(lon_index, lat_index, ratio_value),
+        by = c("lon_index", "lat_index")
+      )
+  }
 
   list(
     finite_data = finite_data,
