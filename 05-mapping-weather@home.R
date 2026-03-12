@@ -24,7 +24,7 @@ blues <- blue_palette(14)
 
 # Input/output paths -------------------------------------------------------
 weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
-nc_template_file <- file.path(weatherathome_dir, "current_decade", "NCIP5.nc")
+nc_template_file <- file.path(weatherathome_dir, "current_decade", "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm.nc")
 lse_mask_file <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/Land-Sea Mask for Weather@home Data.xlsx"
 lse_mask_sheet <- "capro"
 lse_mask_transpose <- TRUE
