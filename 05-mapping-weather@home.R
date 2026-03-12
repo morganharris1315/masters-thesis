@@ -216,26 +216,36 @@ read_lse_mask <- function(mask_file, nlon, nlat) {
   numeric_raw <- suppressWarnings(as.data.frame(lapply(raw, as.numeric)))
 
   to_matrix <- function(df) as.matrix(df)
-  candidates <- list(
+  base_candidates <- list(
     to_matrix(numeric_raw),
     to_matrix(numeric_raw[, -1, drop = FALSE]),
     to_matrix(numeric_raw[-1, , drop = FALSE]),
     to_matrix(numeric_raw[-1, -1, drop = FALSE])
   )
 
-  dims_ok <- vapply(candidates, function(m) {
+  orient_matrix <- function(m) {
+    if (!is.matrix(m)) return(NULL)
+    if (isTRUE(lse_mask_transpose)) t(m) else m
+  }
+
+  oriented_candidates <- lapply(base_candidates, orient_matrix)
+
+  dims_ok <- vapply(oriented_candidates, function(m) {
     is.matrix(m) && nrow(m) == nlon && ncol(m) == nlat
   }, logical(1))
 
   if (!any(dims_ok)) {
-    stop(sprintf("Could not coerce LSE mask to %d x %d matrix. Check the file layout.", nlon, nlat))
+    stop(
+      sprintf(
+        "Could not coerce LSE mask to %d x %d matrix after transpose=%s. Check the file layout.",
+        nlon,
+        nlat,
+        if (isTRUE(lse_mask_transpose)) "TRUE" else "FALSE"
+      )
+    )
   }
 
-  mask_matrix <- candidates[[which(dims_ok)[1]]]
-
-  if (isTRUE(lse_mask_transpose)) {
-    mask_matrix <- t(mask_matrix)
-  }
+  mask_matrix <- oriented_candidates[[which(dims_ok)[1]]]
 
   data.frame(
     lon_index = rep(seq_len(nlon), times = nlat),
