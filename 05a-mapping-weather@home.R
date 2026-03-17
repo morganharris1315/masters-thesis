@@ -353,8 +353,8 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
   ratio_max <- upper_cap
   ratio_span <- ratio_max - ratio_min
   triangle_height <- max(ratio_span * 0.08, 0.2)
-  bar_xmin <- 0.14
-  bar_xmax <- 0.82
+  bar_xmin <- 0.31
+  bar_xmax <- 0.57
 
   tri_df <- data.frame(
     x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
@@ -559,12 +559,12 @@ ratio_breaks <- unique(c(1, ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6],
 # Manually defined probability-ratio colours (bottom cap, 1-2, 2-3, 3-4, 4-5, 5-6, top cap)
 ratio_palette <- c(
   "#D0D4DA", # <1 (grey)
-  "#DCEBFF", # 1-2
-  "#BCD9FF", # 2-3
-  "#94C1F5", # 3-4
-  "#6EA6E8", # 4-5
-  "#3A86CF", # 5-6
-  "#1E5A9A"  # >6
+  "#EAF3FF", # 1-2
+  "#BFD9FF", # 2-3
+  "#7FB3FF", # 3-4
+  "#3F8BE6", # 4-5
+  "#0B4FAF", # 5-6
+  "#08306B"  # >6
 )
 
 # Build requested plots -----------------------------------------------------
