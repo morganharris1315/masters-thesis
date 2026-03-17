@@ -2,377 +2,113 @@
 # 05-mapping-weather@home.R
 # -------------------------------------------------------------------------
 # Feb 2026
-# Build weather@home probability-ratio maps using NCIP5 grid + LSE land mask.
-# Outputs:
-# - main combined map (>=4, top 10% Rx1day, and joint)
-# - >=5 exceedance map (for supplementary material)
-# - masked CSV + masked NetCDF on NCIP5 grid
+# Building weather@home mapping workflow from scratch.
+# Step 1: Load a single weather@home .nc file.
+# Step 2: Apply LSE mask (CSV) and recreate .nc with masked (NaN) tiles.
+# Step 3: Build native 44x44 touching polygons in global lon/lat.
+# Step 4: Build NZ-intersection probability-ratio maps matching 05 output style:
+#         - combined map (>=4, top 10% Rx1day, and joint)
+#         - >=5 exceedance map
 # -------------------------------------------------------------------------
 
+# Loading packages ---------------------------------------------------------
+library(RNetCDF)
+library(ncdf4)
 library(ggplot2)
-library(viridis)
 library(maps)
 library(dplyr)
 library(patchwork)
+library(sf)
 library(grid)
-library(colorspace)
-library(RNetCDF)
-
-# Colouring  --------------------------------------------------------------
-#blue_palette <- choose_palette()
-blues <- blue_palette(14)
 
 # Input/output paths -------------------------------------------------------
-weatherathome_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
-nc_template_file <- file.path(weatherathome_dir, "current_decade", "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm.nc")
-lse_mask_file <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/Land-Sea Mask for Weather@home Data.xlsx"
-lse_mask_sheet <- "capro"
-lse_mask_transpose <- TRUE
+model_data_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
+nc_file <- file.path(
+  model_data_dir,
+  "current_decade",
+  "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm.nc"
+)
+lse_mask_file <- file.path(model_data_dir, "Land-Sea Mask for Weather@home Data.csv")
+ratio_grid_file <- file.path(model_data_dir, "weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv")
 
-# Reading processed data ---------------------------------------------------
-grid_results <- read.csv(
-  file.path(weatherathome_dir, "weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv")
+# If NZ appears rotated/wrong, toggle transpose to TRUE/FALSE and rerun.
+mask_transpose <- TRUE
+
+masked_nc_file <- file.path(
+  model_data_dir,
+  "current_decade",
+  "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm-masked.nc"
 )
 
-ratio_columns <- c(
-  "probability_ratio_ge4_future_over_current",
-  "probability_ratio_ge5_future_over_current",
-  "probability_ratio_rx1day_top10_future_over_current",
-  "probability_ratio_joint_top10_ge4_future_over_current"
+# Ratio map outputs --------------------------------------------------------
+combined_ratio_output_png <- file.path(
+  model_data_dir,
+  "05a-weather@home_probability_ratio_ge4_top10_joint_nz_intersection_combined_map.png"
 )
 
-load_nc_grid_template <- function(nc_file) {
-  nc <- open.nc(nc_file)
-  on.exit(close.nc(nc), add = TRUE)
+ge5_ratio_output_png <- file.path(
+  model_data_dir,
+  "05a-weather@home_probability_ratio_ge5_nz_intersection_map.png"
+)
 
-  longitude0 <- var.get.nc(nc, "longitude0")
-  latitude0 <- var.get.nc(nc, "latitude0")
-  global_longitude0 <- var.get.nc(nc, "global_longitude0")
-  global_latitude0 <- var.get.nc(nc, "global_latitude0")
-
-  grid_template <- expand.grid(
-    lon_index = seq_along(longitude0),
-    lat_index = seq_along(latitude0)
+# Utility: coerce CSV mask file to nlon x nlat matrix ---------------------
+load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) {
+  raw <- utils::read.csv(
+    file = mask_file,
+    header = FALSE,
+    check.names = FALSE,
+    stringsAsFactors = FALSE,
+    na.strings = c("NaN", "NA", "")
   )
-
-  data.frame(
-    lon_index = grid_template$lon_index,
-    lat_index = grid_template$lat_index,
-    longitude0 = longitude0[grid_template$lon_index],
-    latitude0 = latitude0[grid_template$lat_index],
-    global_longitude0 = global_longitude0[cbind(grid_template$lon_index, grid_template$lat_index)],
-    global_latitude0 = global_latitude0[cbind(grid_template$lon_index, grid_template$lat_index)]
-  )
-}
-
-load_nc_cell_polygon_template <- function(nc_file, grid_template) {
-  nc <- open.nc(nc_file)
-  on.exit(close.nc(nc), add = TRUE)
-
-  nlon <- length(unique(grid_template$lon_index))
-  nlat <- length(unique(grid_template$lat_index))
-
-  read_var_if_exists <- function(var_name) {
-    tryCatch(var.get.nc(nc, var_name), error = function(e) NULL)
-  }
-
-  build_from_1d_bounds <- function(lon_bounds, lat_bounds) {
-    if (length(dim(lon_bounds)) != 2 || length(dim(lat_bounds)) != 2) {
-      return(NULL)
-    }
-
-    if (nrow(lon_bounds) != nlon || nrow(lat_bounds) != nlat || ncol(lon_bounds) < 2 || ncol(lat_bounds) < 2) {
-      return(NULL)
-    }
-
-    polygon_parts <- vector("list", nlon * nlat)
-    part_i <- 0L
-
-    for (i in seq_len(nlon)) {
-      for (j in seq_len(nlat)) {
-        lon_lo <- lon_bounds[i, 1]
-        lon_hi <- lon_bounds[i, 2]
-        lat_lo <- lat_bounds[j, 1]
-        lat_hi <- lat_bounds[j, 2]
-
-        if (!all(is.finite(c(lon_lo, lon_hi, lat_lo, lat_hi)))) next
-
-        corners <- rbind(
-          c(lon_lo, lat_lo),
-          c(lon_hi, lat_lo),
-          c(lon_hi, lat_hi),
-          c(lon_lo, lat_hi),
-          c(lon_lo, lat_lo)
-        )
-
-        part_i <- part_i + 1L
-        polygon_parts[[part_i]] <- data.frame(
-          lon_index = i,
-          lat_index = j,
-          cell_id = paste(i, j, sep = "_"),
-          vertex_id = seq_len(5),
-          lon = corners[, 1],
-          lat = corners[, 2]
-        )
-      }
-    }
-
-    if (part_i == 0L) return(NULL)
-    do.call(rbind, polygon_parts[seq_len(part_i)])
-  }
-
-  build_from_2d_bounds <- function(lon_bounds, lat_bounds) {
-    d_lon <- dim(lon_bounds)
-    d_lat <- dim(lat_bounds)
-
-    if (length(d_lon) != 3 || length(d_lat) != 3 || d_lon[3] < 3 || d_lat[3] < 3) {
-      return(NULL)
-    }
-
-    if (!all(d_lon[1:2] == c(nlon, nlat)) || !all(d_lat[1:2] == c(nlon, nlat))) {
-      return(NULL)
-    }
-
-    n_vertices <- min(d_lon[3], d_lat[3])
-    polygon_parts <- vector("list", nlon * nlat)
-    part_i <- 0L
-
-    for (i in seq_len(nlon)) {
-      for (j in seq_len(nlat)) {
-        lon_seq <- as.numeric(lon_bounds[i, j, seq_len(n_vertices)])
-        lat_seq <- as.numeric(lat_bounds[i, j, seq_len(n_vertices)])
-
-        if (!all(is.finite(lon_seq)) || !all(is.finite(lat_seq))) next
-
-        if (lon_seq[1] != lon_seq[length(lon_seq)] || lat_seq[1] != lat_seq[length(lat_seq)]) {
-          lon_seq <- c(lon_seq, lon_seq[1])
-          lat_seq <- c(lat_seq, lat_seq[1])
-        }
-
-        part_i <- part_i + 1L
-        polygon_parts[[part_i]] <- data.frame(
-          lon_index = i,
-          lat_index = j,
-          cell_id = paste(i, j, sep = "_"),
-          vertex_id = seq_along(lon_seq),
-          lon = lon_seq,
-          lat = lat_seq
-        )
-      }
-    }
-
-    if (part_i == 0L) return(NULL)
-    do.call(rbind, polygon_parts[seq_len(part_i)])
-  }
-
-  bounds_candidates <- list(
-    c("global_longitude0_bounds", "global_latitude0_bounds"),
-    c("global_longitude0_bnds", "global_latitude0_bnds"),
-    c("longitude0_bounds", "latitude0_bounds"),
-    c("longitude0_bnds", "latitude0_bnds")
-  )
-
-  for (pair in bounds_candidates) {
-    lon_bounds <- read_var_if_exists(pair[1])
-    lat_bounds <- read_var_if_exists(pair[2])
-
-    if (is.null(lon_bounds) || is.null(lat_bounds)) next
-
-    polygons <- build_from_2d_bounds(lon_bounds, lat_bounds)
-    if (is.null(polygons)) {
-      polygons <- build_from_1d_bounds(lon_bounds, lat_bounds)
-    }
-
-    if (!is.null(polygons)) {
-      message(sprintf("Using NC cell bounds from variables '%s' and '%s'.", pair[1], pair[2]))
-      return(polygons)
-    }
-  }
-
-  message("No NC cell-bound variables found with supported shapes; using neighbour-based polygon reconstruction.")
-  NULL
-}
-
-read_lse_mask <- function(mask_file, nlon, nlat) {
-  ext <- tolower(tools::file_ext(mask_file))
-
-  if (ext == "csv") {
-    raw <- read.csv(mask_file, check.names = FALSE, stringsAsFactors = FALSE)
-  } else if (ext %in% c("xlsx", "xls")) {
-    if (!requireNamespace("readxl", quietly = TRUE)) {
-      stop("readxl package is required to read Excel LSE mask files.")
-    }
-
-    available_sheets <- readxl::excel_sheets(mask_file)
-    sheet_match <- available_sheets[tolower(available_sheets) == tolower(lse_mask_sheet)]
-    sheet_to_read <- if (length(sheet_match) > 0) sheet_match[1] else available_sheets[1]
-
-    raw <- readxl::read_excel(mask_file, sheet = sheet_to_read, col_names = TRUE)
-    raw <- as.data.frame(raw, stringsAsFactors = FALSE)
-  } else {
-    stop("Unsupported LSE mask format. Use .csv, .xlsx or .xls")
-  }
 
   numeric_raw <- suppressWarnings(as.data.frame(lapply(raw, as.numeric)))
 
-  to_matrix <- function(df) as.matrix(df)
+  as_m <- function(x) as.matrix(x)
   base_candidates <- list(
-    to_matrix(numeric_raw),
-    to_matrix(numeric_raw[, -1, drop = FALSE]),
-    to_matrix(numeric_raw[-1, , drop = FALSE]),
-    to_matrix(numeric_raw[-1, -1, drop = FALSE])
+    as_m(numeric_raw),
+    as_m(numeric_raw[-1, , drop = FALSE]),
+    as_m(numeric_raw[, -1, drop = FALSE]),
+    as_m(numeric_raw[-1, -1, drop = FALSE])
   )
 
-  orient_matrix <- function(m) {
-    if (!is.matrix(m)) return(NULL)
-    if (isTRUE(lse_mask_transpose)) t(m) else m
-  }
-
-  oriented_candidates <- lapply(base_candidates, orient_matrix)
-
-  dims_ok <- vapply(oriented_candidates, function(m) {
+  dims_ok <- vapply(base_candidates, function(m) {
     is.matrix(m) && nrow(m) == nlon && ncol(m) == nlat
   }, logical(1))
 
   if (!any(dims_ok)) {
-    stop(
-      sprintf(
-        "Could not coerce LSE mask to %d x %d matrix after transpose=%s. Check the file layout.",
-        nlon,
-        nlat,
-        if (isTRUE(lse_mask_transpose)) "TRUE" else "FALSE"
-      )
-    )
+    stop(sprintf("Could not coerce LSE mask to %d x %d matrix.", nlon, nlat))
   }
 
-  mask_matrix <- oriented_candidates[[which(dims_ok)[1]]]
+  mask <- base_candidates[[which(dims_ok)[1]]]
+  if (isTRUE(transpose_mask)) {
+    mask <- t(mask)
+  }
 
-  data.frame(
-    lon_index = rep(seq_len(nlon), times = nlat),
-    lat_index = rep(seq_len(nlat), each = nlon),
-    lse_mask_value = as.vector(mask_matrix)
+  if (nrow(mask) != nlon || ncol(mask) != nlat) {
+    stop("Mask dimensions do not match rainfall grid after transpose setting.")
+  }
+
+  message(sprintf(
+    "Loaded LSE mask as %d x %d matrix (transpose=%s).",
+    nrow(mask),
+    ncol(mask),
+    ifelse(isTRUE(transpose_mask), "TRUE", "FALSE")
+  ))
+
+  mask
+}
+
+# Utility: derive touching cell polygons from curvilinear center grid ------
+build_cell_polygons <- function(lon_mat, lat_mat, value_mat, value_name = "value") {
+  centres <- expand.grid(
+    lon_index = seq_len(nrow(lon_mat)),
+    lat_index = seq_len(ncol(lon_mat))
   )
-}
 
-apply_lse_mask_to_metrics <- function(grid_df, ratio_cols) {
-  masked <- grid_df
-  mask_is_land <- !is.na(masked$lse_mask_value)
-
-  for (col_name in ratio_cols) {
-    masked[[col_name]][!mask_is_land] <- NA_real_
-  }
-
-  masked$lse_is_land <- mask_is_land
-  masked
-}
-
-# Build NC-anchored table --------------------------------------------------
-nc_grid_template <- load_nc_grid_template(nc_template_file)
-nc_cell_polygon_template <- load_nc_cell_polygon_template(nc_template_file, nc_grid_template)
-
-nc_grid_metrics <- nc_grid_template |>
-  left_join(grid_results, by = c("lon_index", "lat_index"))
-
-harmonise_joined_coordinate_columns <- function(df, col_names) {
-  for (col_name in col_names) {
-    joined_names <- intersect(c(col_name, paste0(col_name, ".x"), paste0(col_name, ".y")), names(df))
-
-    if (length(joined_names) == 0L) next
-
-    # Prefer the unsuffixed column first, then .x, then .y, filling any gaps.
-    merged <- Reduce(function(a, b) dplyr::coalesce(a, b), lapply(joined_names, function(nm) df[[nm]]))
-    df[[col_name]] <- merged
-
-    drop_names <- setdiff(joined_names, col_name)
-    if (length(drop_names) > 0L) {
-      df <- dplyr::select(df, -all_of(drop_names))
-    }
-  }
-
-  df
-}
-
-nc_grid_metrics <- harmonise_joined_coordinate_columns(
-  nc_grid_metrics,
-  c("longitude0", "latitude0", "global_longitude0", "global_latitude0")
-)
-
-missing_metrics <- rowSums(is.na(nc_grid_metrics[, ratio_columns]))
-if (any(missing_metrics == length(ratio_columns))) {
-  stop("Some NC grid cells did not match CSV probability-ratio rows. Check lon_index/lat_index alignment.")
-}
-
-lse_mask_df <- read_lse_mask(
-  mask_file = lse_mask_file,
-  nlon = length(unique(nc_grid_template$lon_index)),
-  nlat = length(unique(nc_grid_template$lat_index))
-)
-
-nc_grid_metrics <- nc_grid_metrics |>
-  left_join(lse_mask_df, by = c("lon_index", "lat_index"))
-
-if (all(is.na(nc_grid_metrics$lse_mask_value))) {
-  stop("LSE mask contains only NA values after alignment.")
-}
-
-nc_grid_metrics_masked <- apply_lse_mask_to_metrics(nc_grid_metrics, ratio_columns)
-
-extract_masked_ratio_grid <- function(grid_df, ratio_col) {
-  grid_df |>
-    select(
-      lon_index, lat_index,
-      longitude0, latitude0,
-      global_longitude0, global_latitude0,
-      lse_mask_value, lse_is_land,
-      all_of(ratio_col)
-    )
-}
-
-# Shared helpers -----------------------------------------------------------
-get_fixed_width_bin_spec <- function(x, bin_width = 0.5, min_value = 0, max_value = NULL) {
-  r <- range(x, na.rm = TRUE)
-  min_break <- min_value
-  max_break <- if (is.null(max_value)) ceiling(r[2] / bin_width) * bin_width else max_value
-
-  if (min_break == max_break) {
-    max_break <- min_break + bin_width
-  }
-
-  brks <- seq(min_break, max_break, by = bin_width)
-
-  list(
-    breaks = brks,
-    labels = format(head(brks, -1), trim = TRUE, scientific = FALSE, nsmall = 1)
-  )
-}
-
-build_discrete_ratio_bins <- function(x, bin_spec) {
-  cut(
-    x,
-    breaks = bin_spec$breaks,
-    include.lowest = TRUE,
-    right = TRUE,
-    labels = bin_spec$labels,
-    ordered_result = TRUE
-  )
-}
-
-build_cell_polygons <- function(df) {
-  has_ratio_bin <- "ratio_bin" %in% names(df)
-  centres <- df |>
-    select(lon_index, lat_index, lon, lat, ratio_value) |>
-    distinct()
-
-  if (has_ratio_bin) {
-    ratio_bins <- df |>
-      select(lon_index, lat_index, ratio_bin) |>
-      distinct()
-
-    centres <- centres |>
-      left_join(ratio_bins, by = c("lon_index", "lat_index"))
-  } else {
-    centres$ratio_bin <- NA_character_
-  }
+  centres$lon <- as.vector(lon_mat)
+  centres$lat <- as.vector(lat_mat)
+  centres$value <- as.vector(value_mat)
+  centres <- centres[is.finite(centres$lon) & is.finite(centres$lat), ]
 
   key <- paste(centres$lon_index, centres$lat_index, sep = "_")
   key_lookup <- setNames(seq_len(nrow(centres)), key)
@@ -429,193 +165,442 @@ build_cell_polygons <- function(df) {
 
     part_i <- part_i + 1L
     polygon_parts[[part_i]] <- data.frame(
-      cell_id = paste(i, j, sep = "_"),
-      vertex_id = seq_len(5),
+      id = paste(i, j, sep = "_"),
+      lon_index = i,
+      lat_index = j,
       lon = corners[, 1],
       lat = corners[, 2],
-      ratio_value = centres$ratio_value[r],
-      ratio_bin = centres$ratio_bin[r]
+      vertex_id = seq_len(nrow(corners)),
+      value = ifelse(is.nan(centres$value[r]), NA_real_, centres$value[r])
     )
   }
 
   if (part_i == 0L) return(data.frame())
-  do.call(rbind, polygon_parts[seq_len(part_i)])
+  polygons <- do.call(rbind, polygon_parts[seq_len(part_i)])
+  names(polygons)[names(polygons) == "value"] <- value_name
+  polygons
 }
 
-build_metric_layer <- function(ratio_col) {
-  required_cols <- c("lon_index", "lat_index", "global_longitude0", "global_latitude0")
-  missing_required <- setdiff(required_cols, names(nc_grid_metrics_masked))
+# Utility: place tabular index/value data into nlon x nlat matrix ----------
+matrix_from_indexed_values <- function(df, value_col, nlon, nlat) {
+  out <- matrix(NA_real_, nrow = nlon, ncol = nlat)
 
-  if (length(missing_required) > 0) {
-    stop(
-      sprintf(
-        "Cannot build metric layer: missing required column(s): %s",
-        paste(missing_required, collapse = ", ")
-      )
-    )
+  needed <- c("lon_index", "lat_index", value_col)
+  missing <- setdiff(needed, names(df))
+  if (length(missing) > 0) {
+    stop(sprintf("Missing required columns in ratio grid CSV: %s", paste(missing, collapse = ", ")))
   }
 
-  if (!(ratio_col %in% names(nc_grid_metrics_masked))) {
-    available_ratio_cols <- names(nc_grid_metrics_masked)[grepl("probability_ratio", names(nc_grid_metrics_masked), fixed = TRUE)]
+  idx_ok <- is.finite(df$lon_index) & is.finite(df$lat_index)
+  idx_ok <- idx_ok & df$lon_index >= 1 & df$lon_index <= nlon
+  idx_ok <- idx_ok & df$lat_index >= 1 & df$lat_index <= nlat
 
-    stop(
-      sprintf(
-        "Requested ratio column '%s' is not present. Available ratio columns: %s",
-        ratio_col,
-        if (length(available_ratio_cols) == 0) "<none>" else paste(available_ratio_cols, collapse = ", ")
-      )
-    )
+  if (!any(idx_ok)) {
+    stop(sprintf("No valid lon_index/lat_index rows found for %s.", value_col))
   }
 
-  base_data <- data.frame(
-    lon_index = nc_grid_metrics_masked$lon_index,
-    lat_index = nc_grid_metrics_masked$lat_index,
-    lon = nc_grid_metrics_masked$global_longitude0,
-    lat = nc_grid_metrics_masked$global_latitude0,
-    ratio_value = nc_grid_metrics_masked[[ratio_col]]
-  )
-
-  finite_data <- base_data[is.finite(base_data$ratio_value), ]
-  if (nrow(finite_data) == 0) {
-    stop(sprintf("No finite values to plot for %s after LSE masking.", ratio_col))
-  }
-
-  cell_polygons <- if (is.null(nc_cell_polygon_template)) {
-    build_cell_polygons(finite_data)
-  } else {
-    nc_cell_polygon_template |>
-      inner_join(
-        finite_data |>
-          select(lon_index, lat_index, ratio_value),
-        by = c("lon_index", "lat_index")
-      )
-  }
-
-  list(
-    finite_data = finite_data,
-    cell_polygons = cell_polygons,
-    keep_cell_ids = unique(cell_polygons$cell_id)
-  )
+  mat_idx <- cbind(as.integer(df$lon_index[idx_ok]), as.integer(df$lat_index[idx_ok]))
+  out[mat_idx] <- as.numeric(df[[value_col]][idx_ok])
+  out
 }
 
-make_nz_ratio_plot <- function(
-    layer_obj,
-    title_text,
-    ratio_breaks,
-    blues,
-    show_legend = TRUE,
-    legend_height_cm = 18,
-    legend_width_cm = 0.65) {
-  cell_polygons_nz <- layer_obj$cell_polygons[layer_obj$cell_polygons$cell_id %in% layer_obj$keep_cell_ids, ]
+# Utilities from 05 map workflow for NZ-intersection filtering -------------
+sanitize_geometry <- function(x) {
+  if (nrow(x) == 0) return(x)
+  is_bad <- !st_is_valid(x)
+  if (any(is_bad)) {
+    x[is_bad, ] <- st_make_valid(x[is_bad, ])
+  }
+  x
+}
 
-  if (nrow(cell_polygons_nz) == 0) {
-    stop(sprintf("No cells found for '%s'.", title_text))
+cell_polygons_to_sf <- function(cell_polygons_df) {
+  if (nrow(cell_polygons_df) == 0) {
+    return(st_sf(id = character(0), geometry = st_sfc(crs = 4326)))
   }
 
-  ratio_limits <- range(ratio_breaks)
-  ratio_labels <- format(ratio_breaks, trim = TRUE, scientific = FALSE, nsmall = 1)
+  split_polys <- split(cell_polygons_df, cell_polygons_df$id)
+
+  sf_list <- lapply(names(split_polys), function(id) {
+    piece <- split_polys[[id]]
+    coords <- as.matrix(piece[order(piece$vertex_id), c("lon", "lat")])
+    coords <- coords[stats::complete.cases(coords), , drop = FALSE]
+    if (nrow(coords) < 4) return(NULL)
+    if (!all(coords[1, ] == coords[nrow(coords), ])) {
+      coords <- rbind(coords, coords[1, ])
+    }
+
+    st_sf(id = id, geometry = st_sfc(st_polygon(list(coords)), crs = 4326))
+  })
+
+  sf_list <- Filter(Negate(is.null), sf_list)
+  if (length(sf_list) == 0) {
+    return(st_sf(id = character(0), geometry = st_sfc(crs = 4326)))
+  }
+
+  do.call(rbind, sf_list)
+}
+
+get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
+  if (nrow(cell_polygons_df) == 0) return(character(0))
+
+  old_s2 <- sf_use_s2()
+  on.exit(sf_use_s2(old_s2), add = TRUE)
+  sf_use_s2(FALSE)
+
+  nz_map <- maps::map("nz", fill = TRUE, plot = FALSE)
+  nz_sf <- st_as_sf(nz_map) |> st_set_crs(4326) |> sanitize_geometry()
+  nz_union <- st_union(nz_sf)
+  nz_union <- st_sf(geometry = nz_union) |> sanitize_geometry()
+
+  cells_sf <- cell_polygons_to_sf(cell_polygons_df) |> sanitize_geometry()
+  if (nrow(cells_sf) == 0 || nrow(nz_union) == 0) return(character(0))
+
+  intersects <- st_intersects(cells_sf, nz_union, sparse = FALSE)[, 1]
+  cells_sf$id[intersects]
+}
+
+get_fixed_width_bin_spec <- function(x, bin_width = 1, min_value = 1, max_value = 6.5) {
+  r <- range(x, na.rm = TRUE)
+  min_break <- min_value
+  max_break <- if (is.null(max_value)) ceiling(r[2] / bin_width) * bin_width else max_value
+
+  if (min_break == max_break) {
+    max_break <- min_break + bin_width
+  }
+
+  brks <- seq(min_break, max_break, by = bin_width)
+  list(breaks = brks)
+}
+
+# Plot helper for probability-ratio maps -----------------------------------
+make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, ratio_palette) {
+  poly_nz <- poly_df[poly_df$id %in% keep_ids, ]
+  poly_nz <- poly_nz[is.finite(poly_nz$ratio_value), ]
+
+  if (nrow(poly_nz) == 0) {
+    stop(sprintf("No NZ-intersecting cells found for '%s'.", title_text))
+  }
+
+  core_breaks <- ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6]
+  if (length(core_breaks) < 2) {
+    stop("`ratio_breaks` must include at least two values between 1 and 6.")
+  }
+
+  plot_breaks <- c(-Inf, core_breaks, Inf)
+  bin_levels <- paste0("bin_", seq_len(length(plot_breaks) - 1))
+
+  poly_nz$ratio_bin <- cut(
+    poly_nz$ratio_value,
+    breaks = plot_breaks,
+    include.lowest = TRUE,
+    right = FALSE,
+    labels = bin_levels
+  )
+  poly_nz$ratio_bin <- factor(poly_nz$ratio_bin, levels = bin_levels)
+
+  palette_for_bins <- setNames(ratio_palette, bin_levels)
   nz_outline <- map_data("nz")
 
-  legend_position <- if (isTRUE(show_legend)) "right" else "none"
-  legend_height <- unit(legend_height_cm, "cm")
-  legend_width <- unit(legend_width_cm, "cm")
-
-  ggplot(cell_polygons_nz, aes(x = lon, y = lat, fill = ratio_value)) +
-    geom_polygon(aes(group = cell_id), colour = NA, linewidth = 0) +
+  ggplot(poly_nz, aes(x = lon, y = lat, fill = ratio_bin)) +
+    geom_polygon(aes(group = id), colour = NA, linewidth = 0) +
     geom_path(
       data = nz_outline,
       aes(x = long, y = lat, group = group),
       inherit.aes = FALSE,
-      colour = "white",
+      colour = "black",
       linewidth = 0.45,
       alpha = 0.9
     ) +
     coord_fixed() +
-    scale_fill_stepsn(
-      colours = blues,
-      breaks = ratio_breaks,
-      labels = ratio_labels,
-      limits = ratio_limits,
-      oob = scales::squish,
-      show.limits = TRUE,
-      name = "Probability Ratio",
-      guide = guide_coloursteps(
-        reverse = FALSE,
-        even.steps = TRUE,
-        show.limits = TRUE,
-        barheight = legend_height,
-        barwidth = legend_width,
-        title.position = "top",
-        title.hjust = 0.5
-      )
+    scale_fill_manual(
+      values = palette_for_bins,
+      drop = FALSE,
+      guide = "none"
     ) +
     labs(title = title_text, x = NULL, y = NULL) +
     theme_minimal(base_size = 13) +
     theme(
       plot.title = element_text(face = "bold", size = 14),
       axis.title = element_blank(),
-      legend.title = element_text(size = 12),
-      legend.text = element_text(size = 9),
-      legend.key.height = unit(1.05, "cm"),
-      legend.key.width = legend_width,
-      legend.margin = margin(4, 8, 4, 2),
-      legend.position = legend_position
+      legend.position = "none"
     )
 }
 
-# Build layers --------------------------------------------------------------
-layers_ge4 <- build_metric_layer("probability_ratio_ge4_future_over_current")
-layers_ge5 <- build_metric_layer("probability_ratio_ge5_future_over_current")
-layers_top10 <- build_metric_layer("probability_ratio_rx1day_top10_future_over_current")
-layers_joint <- build_metric_layer("probability_ratio_joint_top10_ge4_future_over_current")
+make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_title = "Probability Ratio") {
+  if (length(ratio_breaks) < 2) {
+    stop("`ratio_breaks` must contain at least two values.")
+  }
 
-# Shared bins using LSE-masked cells only ----------------------------------
-intersection_values <- c(
-  layers_ge4$finite_data$ratio_value,
-  layers_ge5$finite_data$ratio_value,
-  layers_top10$finite_data$ratio_value,
-  layers_joint$finite_data$ratio_value
+  core_breaks <- ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6]
+  if (length(core_breaks) < 2) {
+    stop("`ratio_breaks` must include at least two values between 1 and 6.")
+  }
+
+  lower_cap <- min(core_breaks) - 1
+  upper_cap <- max(core_breaks) + 1
+
+  interval_min <- c(lower_cap, head(core_breaks, -1), max(core_breaks))
+  interval_max <- c(min(core_breaks), tail(core_breaks, -1), upper_cap)
+
+  bar_df <- data.frame(
+    ymin = interval_min,
+    ymax = interval_max,
+    fill_col = ratio_palette
+  )
+
+  ratio_min <- lower_cap
+  ratio_max <- upper_cap
+  ratio_span <- ratio_max - ratio_min
+  triangle_height <- max(ratio_span * 0.08, 0.2)
+  bar_xmin <- 0.31
+  bar_xmax <- 0.57
+
+  tri_df <- data.frame(
+    x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
+    y = c(ratio_min, ratio_min - triangle_height, ratio_min, ratio_max, ratio_max + triangle_height, ratio_max),
+    group = c("bottom", "bottom", "bottom", "top", "top", "top"),
+    fill_col = c(ratio_palette[1], ratio_palette[1], ratio_palette[1], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)])
+  )
+
+  tick_df <- data.frame(
+    y = ratio_breaks,
+    label = scales::label_number(accuracy = 0.1)(ratio_breaks)
+  )
+
+  ggplot() +
+    geom_rect(
+      data = bar_df,
+      aes(xmin = bar_xmin, xmax = bar_xmax, ymin = ymin, ymax = ymax, fill = fill_col),
+      colour = NA
+    ) +
+    geom_polygon(
+      data = tri_df,
+      aes(x = x, y = y, group = group, fill = fill_col),
+      colour = NA
+    ) +
+    geom_path(
+      data = data.frame(
+        x = c(bar_xmin, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmax),
+        y = c(ratio_min, ratio_max, ratio_max + triangle_height, ratio_max, ratio_min)
+      ),
+      aes(x = x, y = y),
+      inherit.aes = FALSE,
+      linewidth = 0.35,
+      colour = "black"
+    ) +
+    geom_path(
+      data = data.frame(
+        x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
+        y = c(ratio_min, ratio_min - triangle_height, ratio_min)
+      ),
+      aes(x = x, y = y),
+      inherit.aes = FALSE,
+      linewidth = 0.35,
+      colour = "black"
+    ) +
+    geom_segment(
+      data = tick_df,
+      aes(x = bar_xmax, xend = bar_xmax + 0.11, y = y, yend = y),
+      inherit.aes = FALSE,
+      linewidth = 0.3,
+      colour = "black"
+    ) +
+    geom_text(
+      data = tick_df,
+      aes(x = bar_xmax + 0.17, y = y, label = label),
+      hjust = 0,
+      size = 3.8
+    ) +
+    annotate(
+      "text",
+      x = bar_xmin,
+      y = ratio_max + triangle_height + (0.05 * ratio_span),
+      label = legend_title,
+      hjust = 0,
+      vjust = 0,
+      fontface = "bold",
+      size = 5.5
+    ) +
+    scale_fill_identity() +
+    coord_cartesian(
+      xlim = c(0, 1.95),
+      ylim = c(ratio_min - triangle_height - (0.08 * ratio_span), ratio_max + triangle_height + (0.16 * ratio_span)),
+      clip = "off"
+    ) +
+    theme_void() +
+    theme(
+      plot.margin = margin(14, 16, 10, 8)
+    )
+}
+
+# Reading in a single .nc file --------------------------------------------
+nc <- open.nc(nc_file)
+on.exit(close.nc(nc), add = TRUE)
+
+lon <- var.get.nc(nc, "global_longitude0")
+lat <- var.get.nc(nc, "global_latitude0")
+rain <- var.get.nc(nc, "item5216_daily_mean")[, , 1]
+
+if (length(dim(lon)) == 3) lon <- lon[, , 1]
+if (length(dim(lat)) == 3) lat <- lat[, , 1]
+
+nlon <- dim(rain)[1]
+nlat <- dim(rain)[2]
+
+# Read and apply LSE mask (NaN where mask is NaN) -------------------------
+mask_matrix <- load_lse_mask_matrix(
+  mask_file = lse_mask_file,
+  nlon = nlon,
+  nlat = nlat,
+  transpose_mask = mask_transpose
 )
 
+mask_is_land <- !is.na(mask_matrix)
+rain[!mask_is_land] <- NaN
+
+non_missing_after_mask <- sum(is.finite(rain))
+if (non_missing_after_mask == 0) {
+  stop("Masking removed all rainfall cells. Toggle mask_transpose and rerun.")
+}
+
+message(sprintf(
+  "Mask applied successfully. Finite rainfall cells after mask: %d of %d. Mask TRUE cells: %d.",
+  non_missing_after_mask,
+  length(rain),
+  sum(mask_is_land, na.rm = TRUE)
+))
+
+# Recreate NetCDF with masked rainfall variable ---------------------------
+file.copy(nc_file, masked_nc_file, overwrite = TRUE)
+
+nc_masked <- ncdf4::nc_open(masked_nc_file, write = TRUE)
+precip_all <- ncdf4::ncvar_get(nc_masked, "item5216_daily_mean")
+
+if (length(dim(precip_all)) == 3) {
+  for (t in seq_len(dim(precip_all)[3])) {
+    layer <- precip_all[, , t]
+    layer[!mask_is_land] <- NaN
+    precip_all[, , t] <- layer
+  }
+} else if (length(dim(precip_all)) == 4) {
+  for (z in seq_len(dim(precip_all)[3])) {
+    for (t in seq_len(dim(precip_all)[4])) {
+      layer <- precip_all[, , z, t]
+      layer[!mask_is_land] <- NaN
+      precip_all[, , z, t] <- layer
+    }
+  }
+} else {
+  ncdf4::nc_close(nc_masked)
+  stop("Unexpected dimensions for item5216_daily_mean. Expected 3D or 4D variable.")
+}
+
+ncdf4::ncvar_put(nc_masked, "item5216_daily_mean", precip_all)
+ncdf4::nc_close(nc_masked)
+
+# Read probability-ratio grid CSV -----------------------------------------
+ratio_grid <- utils::read.csv(ratio_grid_file, stringsAsFactors = FALSE)
+ratio_vars <- c(
+  "probability_ratio_ge4_future_over_current",
+  "probability_ratio_ge5_future_over_current",
+  "probability_ratio_rx1day_top10_future_over_current",
+  "probability_ratio_joint_top10_ge4_future_over_current"
+)
+
+missing_ratio_vars <- setdiff(c("lon_index", "lat_index", ratio_vars), names(ratio_grid))
+if (length(missing_ratio_vars) > 0) {
+  stop(sprintf("Missing required columns in ratio grid file: %s", paste(missing_ratio_vars, collapse = ", ")))
+}
+
+# Build ratio polygon layers and NZ cell intersections ---------------------
+ratio_layers <- list()
+for (ratio_var in ratio_vars) {
+  ratio_mat <- matrix_from_indexed_values(
+    df = ratio_grid,
+    value_col = ratio_var,
+    nlon = nlon,
+    nlat = nlat
+  )
+
+  ratio_mat[!mask_is_land] <- NA_real_
+
+  ratio_poly <- build_cell_polygons(
+    lon_mat = lon,
+    lat_mat = lat,
+    value_mat = ratio_mat,
+    value_name = "ratio_value"
+  )
+
+  keep_ids <- get_nz_intersecting_cell_ids(ratio_poly)
+
+  ratio_layers[[ratio_var]] <- list(
+    poly = ratio_poly,
+    keep_ids = keep_ids
+  )
+}
+
+# Shared breaks across NZ-intersecting cells -------------------------------
+intersection_values <- c()
+for (ratio_var in ratio_vars) {
+  layer <- ratio_layers[[ratio_var]]
+  keep_rows <- layer$poly$id %in% layer$keep_ids
+  intersection_values <- c(intersection_values, layer$poly$ratio_value[keep_rows])
+}
 intersection_values <- intersection_values[is.finite(intersection_values)]
+
 if (length(intersection_values) == 0) {
-  stop("No finite probability-ratio values found after LSE masking.")
+  stop("No finite probability-ratio values found for NZ-intersecting cells.")
 }
 
-ratio_bin_spec <- get_fixed_width_bin_spec(intersection_values, bin_width = 0.5, min_value = 0)
-ratio_breaks <- ratio_bin_spec$breaks
+ratio_breaks <- get_fixed_width_bin_spec(intersection_values, bin_width = 1, min_value = 1, max_value = 6.5)$breaks
+ratio_breaks <- unique(c(1, ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6], 6))
 
-add_ratio_bins <- function(layer_obj) {
-  layer_obj$finite_data$ratio_bin <- build_discrete_ratio_bins(layer_obj$finite_data$ratio_value, ratio_bin_spec)
-  layer_obj$cell_polygons$ratio_bin <- build_discrete_ratio_bins(layer_obj$cell_polygons$ratio_value, ratio_bin_spec)
-  layer_obj
-}
-
-layers_ge4 <- add_ratio_bins(layers_ge4)
-layers_ge5 <- add_ratio_bins(layers_ge5)
-layers_top10 <- add_ratio_bins(layers_top10)
-layers_joint <- add_ratio_bins(layers_joint)
+# Manually defined probability-ratio colours (bottom cap, 1-2, 2-3, 3-4, 4-5, 5-6, top cap)
+ratio_palette <- c(
+  "#D0D4DA", # <1 (grey)
+  "#EAF3FF", # 1-2
+  "#BFD9FF", # 2-3
+  "#7FB3FF", # 3-4
+  "#3F8BE6", # 4-5
+  "#0B4FAF", # 5-6
+  "#08306B"  # >6
+)
 
 # Build requested plots -----------------------------------------------------
-p_ge4 <- make_nz_ratio_plot(
-  layers_ge4, "(b) Years with ≥4 exceedances",
-  ratio_breaks, blues
+p_top10 <- make_nz_ratio_plot(
+  ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$poly,
+  ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$keep_ids,
+  "(a) Years with extreme Rx1day",
+  ratio_breaks,
+  ratio_palette
 )
 
-p_top10 <- make_nz_ratio_plot(
-  layers_top10, "(a) Years with extreme Rx1day",
-  ratio_breaks, blues, show_legend = FALSE
+p_ge4 <- make_nz_ratio_plot(
+  ratio_layers[["probability_ratio_ge4_future_over_current"]]$poly,
+  ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids,
+  "(b) Years with ≥4 exceedances",
+  ratio_breaks,
+  ratio_palette
 )
 
 p_joint <- make_nz_ratio_plot(
-  layers_joint, "(c) Years with extreme Rx1day AND ≥4 exceedances",
-  ratio_breaks, blues, show_legend = FALSE
+  ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$poly,
+  ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids,
+  "(c) Years with extreme Rx1day AND ≥4 exceedances",
+  ratio_breaks,
+  ratio_palette
 ) +
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(
+    plot.title = element_text(hjust = 0.5)
+  )
 
 p_ge5 <- make_nz_ratio_plot(
-  layers_ge5, "Years with ≥5 exceedances",
-  ratio_breaks, blues, legend_height_cm = 13
+  ratio_layers[["probability_ratio_ge5_future_over_current"]]$poly,
+  ratio_layers[["probability_ratio_ge5_future_over_current"]]$keep_ids,
+  "Years with ≥5 exceedances",
+  ratio_breaks,
+  ratio_palette
 )
 
 combined_design <- c(
@@ -625,137 +610,56 @@ combined_design <- c(
   area(t = 1, l = 3, b = 2, r = 3)
 )
 
-p_combined <- (p_top10 + p_ge4 + p_joint + guide_area()) +
+p_ratio_legend <- make_triangle_colorbar_plot(ratio_breaks, ratio_palette)
+
+p_combined <- (p_top10 + p_ge4 + p_joint + p_ratio_legend) +
   plot_layout(
     design = combined_design,
-    guides = "collect",
-    widths = c(1, 1, 0.18),
+    widths = c(1, 1, 0.44),
     heights = c(1, 1)
-  ) +
-  plot_annotation(
-    theme = theme(
-      legend.position = "right",
-      legend.justification = "center",
-      plot.margin = margin(5, 5, 5, 5)
-    )
   )
 
-p_combined
-p_ge5
+p_ge5_with_legend <- p_ge5 + p_ratio_legend +
+  plot_layout(widths = c(1, 0.24))
+
+print(p_combined)
+print(p_ge5_with_legend)
 
 # Save outputs --------------------------------------------------------------
-output_map_data <- nc_grid_metrics_masked |>
-  select(
-    lon_index, lat_index,
-    longitude0, latitude0,
-    global_longitude0, global_latitude0,
-    lse_mask_value, lse_is_land,
-    all_of(ratio_columns)
-  )
-
-write.csv(
-  output_map_data,
-  file.path(weatherathome_dir, "weather@home_probability_ratio_map_data_lse_masked.csv"),
-  row.names = FALSE
-)
-
-write.csv(
-  extract_masked_ratio_grid(output_map_data, "probability_ratio_ge4_future_over_current"),
-  file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_lse_masked.csv"),
-  row.names = FALSE
-)
-
-write.csv(
-  extract_masked_ratio_grid(output_map_data, "probability_ratio_ge5_future_over_current"),
-  file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_lse_masked.csv"),
-  row.names = FALSE
-)
-
-write.csv(
-  extract_masked_ratio_grid(output_map_data, "probability_ratio_rx1day_top10_future_over_current"),
-  file.path(weatherathome_dir, "weather@home_probability_ratio_rx1day_top10_lse_masked.csv"),
-  row.names = FALSE
-)
-
-write.csv(
-  extract_masked_ratio_grid(output_map_data, "probability_ratio_joint_top10_ge4_future_over_current"),
-  file.path(weatherathome_dir, "weather@home_probability_ratio_joint_top10_ge4_lse_masked.csv"),
-  row.names = FALSE
-)
-
-write_probability_ratio_netcdf <- function(template_nc_file, grid_df, output_nc_file, ratio_cols) {
-  template_nc <- open.nc(template_nc_file)
-  on.exit(close.nc(template_nc), add = TRUE)
-
-  longitude0 <- var.get.nc(template_nc, "longitude0")
-  latitude0 <- var.get.nc(template_nc, "latitude0")
-  global_longitude0 <- var.get.nc(template_nc, "global_longitude0")
-  global_latitude0 <- var.get.nc(template_nc, "global_latitude0")
-
-  nlon <- length(longitude0)
-  nlat <- length(latitude0)
-
-  build_grid_matrix <- function(col_name) {
-    mat <- matrix(NA_real_, nrow = nlon, ncol = nlat)
-    mat[cbind(grid_df$lon_index, grid_df$lat_index)] <- grid_df[[col_name]]
-    mat
-  }
-
-  nc_out <- create.nc(output_nc_file)
-  on.exit(close.nc(nc_out), add = TRUE)
-
-  dim.def.nc(nc_out, "longitude0", nlon)
-  dim.def.nc(nc_out, "latitude0", nlat)
-
-  var.def.nc(nc_out, "longitude0", "NC_DOUBLE", "longitude0")
-  var.def.nc(nc_out, "latitude0", "NC_DOUBLE", "latitude0")
-  var.def.nc(nc_out, "global_longitude0", "NC_DOUBLE", c("longitude0", "latitude0"))
-  var.def.nc(nc_out, "global_latitude0", "NC_DOUBLE", c("longitude0", "latitude0"))
-  var.def.nc(nc_out, "lse_mask_value", "NC_DOUBLE", c("longitude0", "latitude0"))
-
-  for (col_name in ratio_cols) {
-    var.def.nc(nc_out, col_name, "NC_DOUBLE", c("longitude0", "latitude0"))
-  }
-
-  att.put.nc(nc_out, "NC_GLOBAL", "title", "NC_CHAR", "Weather@home probability-ratio grids on NCIP5 template grid with LSE masking")
-  att.put.nc(nc_out, "NC_GLOBAL", "source_template", "NC_CHAR", basename(template_nc_file))
-  att.put.nc(nc_out, "NC_GLOBAL", "mask_file", "NC_CHAR", basename(lse_mask_file))
-  att.put.nc(nc_out, "NC_GLOBAL", "mask_sheet", "NC_CHAR", lse_mask_sheet)
-  att.put.nc(nc_out, "NC_GLOBAL", "mask_transposed", "NC_CHAR", if (isTRUE(lse_mask_transpose)) "TRUE" else "FALSE")
-
-  var.put.nc(nc_out, "longitude0", longitude0)
-  var.put.nc(nc_out, "latitude0", latitude0)
-  var.put.nc(nc_out, "global_longitude0", global_longitude0)
-  var.put.nc(nc_out, "global_latitude0", global_latitude0)
-  var.put.nc(nc_out, "lse_mask_value", build_grid_matrix("lse_mask_value"))
-
-  for (col_name in ratio_cols) {
-    var.put.nc(nc_out, col_name, build_grid_matrix(col_name))
-  }
-
-  sync.nc(nc_out)
-}
-
-write_probability_ratio_netcdf(
-  template_nc_file = nc_template_file,
-  grid_df = output_map_data,
-  output_nc_file = file.path(weatherathome_dir, "weather@home_probability_ratio_grid_from_NCIP5_lse_masked.nc"),
-  ratio_cols = ratio_columns
+ggsave(
+  filename = combined_ratio_output_png,
+  plot = p_combined,
+  width = 16,
+  height = 11,
+  dpi = 300
 )
 
 ggsave(
-  filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge4_top10_joint_lse_masked_combined_map.png"),
-  plot = p_combined, width = 12, height = 10, dpi = 300
-)
-
-ggsave(
-  filename = file.path(weatherathome_dir, "weather@home_probability_ratio_ge5_lse_masked_map.png"),
-  plot = p_ge5, width = 8, height = 7, dpi = 300
+  filename = ge5_ratio_output_png,
+  plot = p_ge5_with_legend,
+  width = 12,
+  height = 9,
+  dpi = 300
 )
 
 # Quick checks --------------------------------------------------------------
-cat("LSE land cell count:", sum(output_map_data$lse_is_land, na.rm = TRUE), "\n")
-cat("Finite LSE-masked cells (>=4):", sum(is.finite(output_map_data$probability_ratio_ge4_future_over_current)), "\n")
-cat("Finite LSE-masked cells (>=5):", sum(is.finite(output_map_data$probability_ratio_ge5_future_over_current)), "\n")
-cat("Finite LSE-masked cells (top 10%):", sum(is.finite(output_map_data$probability_ratio_rx1day_top10_future_over_current)), "\n")
-cat("Finite LSE-masked cells (joint):", sum(is.finite(output_map_data$probability_ratio_joint_top10_ge4_future_over_current)), "\n")
+cat(
+  "NZ-intersecting cell count (>=4):",
+  length(ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids),
+  "\n"
+)
+cat(
+  "NZ-intersecting cell count (>=5):",
+  length(ratio_layers[["probability_ratio_ge5_future_over_current"]]$keep_ids),
+  "\n"
+)
+cat(
+  "NZ-intersecting cell count (top 10%):",
+  length(ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$keep_ids),
+  "\n"
+)
+cat(
+  "NZ-intersecting cell count (joint):",
+  length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),
+  "\n"
+)
