@@ -2,13 +2,7 @@
 # 05-mapping-weather@home.R
 # -------------------------------------------------------------------------
 # Feb 2026
-# Building weather@home mapping workflow from scratch.
-# Step 1: Load a single weather@home .nc file.
-# Step 2: Apply LSE mask (CSV) and recreate .nc with masked (NaN) tiles.
-# Step 3: Build native 44x44 touching polygons in global lon/lat.
-# Step 4: Build NZ-intersection probability-ratio maps matching 05 output style:
-#         - combined map (>=4, top 10% Rx1day, and joint)
-#         - >=5 exceedance map
+# Mapping weather@home data and saving NZ probability-ratio maps.
 # -------------------------------------------------------------------------
 
 # Loading packages ---------------------------------------------------------
@@ -21,7 +15,7 @@ library(patchwork)
 library(sf)
 library(grid)
 
-# Input/output paths -------------------------------------------------------
+# Setting input and output paths -------------------------------------------
 model_data_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
 nc_file <- file.path(
   model_data_dir,
@@ -31,7 +25,7 @@ nc_file <- file.path(
 lse_mask_file <- file.path(model_data_dir, "Land-Sea Mask for Weather@home Data.csv")
 ratio_grid_file <- file.path(model_data_dir, "weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv")
 
-# If NZ appears rotated/wrong, toggle transpose to TRUE/FALSE and rerun.
+# Flipping this if NZ looks wrong.
 mask_transpose <- TRUE
 
 masked_nc_file <- file.path(
@@ -40,18 +34,18 @@ masked_nc_file <- file.path(
   "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm-masked.nc"
 )
 
-# Ratio map outputs --------------------------------------------------------
+# Setting ratio map output names -------------------------------------------
 combined_ratio_output_png <- file.path(
   model_data_dir,
-  "05a-weather@home_probability_ratio_ge4_top10_joint_nz_intersection_combined_map.png"
+  "weather@home_probability_ratio_ge4_top10_joint_nz_intersection_combined_map.png"
 )
 
 ge5_ratio_output_png <- file.path(
   model_data_dir,
-  "05a-weather@home_probability_ratio_ge5_nz_intersection_map.png"
+  "weather@home_probability_ratio_ge5_nz_intersection_map.png"
 )
 
-# Utility: coerce CSV mask file to nlon x nlat matrix ---------------------
+# Loading the mask into an nlon x nlat matrix ------------------------------
 load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) {
   raw <- utils::read.csv(
     file = mask_file,
@@ -98,7 +92,7 @@ load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) 
   mask
 }
 
-# Utility: derive touching cell polygons from curvilinear center grid ------
+# Building touching cell polygons from the grid ----------------------------
 build_cell_polygons <- function(lon_mat, lat_mat, value_mat, value_name = "value") {
   centres <- expand.grid(
     lon_index = seq_len(nrow(lon_mat)),
@@ -181,7 +175,7 @@ build_cell_polygons <- function(lon_mat, lat_mat, value_mat, value_name = "value
   polygons
 }
 
-# Utility: place tabular index/value data into nlon x nlat matrix ----------
+# Placing indexed values into an nlon x nlat matrix ------------------------
 matrix_from_indexed_values <- function(df, value_col, nlon, nlat) {
   out <- matrix(NA_real_, nrow = nlon, ncol = nlat)
 
@@ -204,7 +198,7 @@ matrix_from_indexed_values <- function(df, value_col, nlon, nlat) {
   out
 }
 
-# Utilities from 05 map workflow for NZ-intersection filtering -------------
+# Keeping NZ-intersection helpers -------------------------------------------
 sanitize_geometry <- function(x) {
   if (nrow(x) == 0) return(x)
   is_bad <- !st_is_valid(x)
@@ -273,7 +267,7 @@ get_fixed_width_bin_spec <- function(x, bin_width = 1, min_value = 1, max_value 
   list(breaks = brks)
 }
 
-# Plot helper for probability-ratio maps -----------------------------------
+# Making NZ probability-ratio plots ----------------------------------------
 make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, ratio_palette) {
   poly_nz <- poly_df[poly_df$id %in% keep_ids, ]
   poly_nz <- poly_nz[is.finite(poly_nz$ratio_value), ]
@@ -434,7 +428,7 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     )
 }
 
-# Reading in a single .nc file --------------------------------------------
+# Reading one .nc file -----------------------------------------------------
 nc <- open.nc(nc_file)
 on.exit(close.nc(nc), add = TRUE)
 
@@ -448,7 +442,7 @@ if (length(dim(lat)) == 3) lat <- lat[, , 1]
 nlon <- dim(rain)[1]
 nlat <- dim(rain)[2]
 
-# Read and apply LSE mask (NaN where mask is NaN) -------------------------
+# Applying the LSE mask ----------------------------------------------------
 mask_matrix <- load_lse_mask_matrix(
   mask_file = lse_mask_file,
   nlon = nlon,
@@ -471,7 +465,7 @@ message(sprintf(
   sum(mask_is_land, na.rm = TRUE)
 ))
 
-# Recreate NetCDF with masked rainfall variable ---------------------------
+# Saving a masked NetCDF copy ----------------------------------------------
 file.copy(nc_file, masked_nc_file, overwrite = TRUE)
 
 nc_masked <- ncdf4::nc_open(masked_nc_file, write = TRUE)
@@ -499,7 +493,7 @@ if (length(dim(precip_all)) == 3) {
 ncdf4::ncvar_put(nc_masked, "item5216_daily_mean", precip_all)
 ncdf4::nc_close(nc_masked)
 
-# Read probability-ratio grid CSV -----------------------------------------
+# Reading the probability-ratio grid ---------------------------------------
 ratio_grid <- utils::read.csv(ratio_grid_file, stringsAsFactors = FALSE)
 ratio_vars <- c(
   "probability_ratio_ge4_future_over_current",
@@ -513,7 +507,7 @@ if (length(missing_ratio_vars) > 0) {
   stop(sprintf("Missing required columns in ratio grid file: %s", paste(missing_ratio_vars, collapse = ", ")))
 }
 
-# Build ratio polygon layers and NZ cell intersections ---------------------
+# Building ratio layers and NZ intersections -------------------------------
 ratio_layers <- list()
 for (ratio_var in ratio_vars) {
   ratio_mat <- matrix_from_indexed_values(
@@ -540,7 +534,7 @@ for (ratio_var in ratio_vars) {
   )
 }
 
-# Shared breaks across NZ-intersecting cells -------------------------------
+# Setting shared breaks across NZ cells ------------------------------------
 intersection_values <- c()
 for (ratio_var in ratio_vars) {
   layer <- ratio_layers[[ratio_var]]
@@ -556,9 +550,9 @@ if (length(intersection_values) == 0) {
 ratio_breaks <- get_fixed_width_bin_spec(intersection_values, bin_width = 1, min_value = 1, max_value = 6.5)$breaks
 ratio_breaks <- unique(c(1, ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6], 6))
 
-# Manually defined probability-ratio colours (bottom cap, 1-2, 2-3, 3-4, 4-5, 5-6, top cap)
+# Setting probability-ratio colours
 ratio_palette <- c(
-  "#D0D4DA", # <1 (grey)
+  "#D0D4DA", # <1
   "#EAF3FF", # 1-2
   "#BFD9FF", # 2-3
   "#7FB3FF", # 3-4
@@ -567,7 +561,7 @@ ratio_palette <- c(
   "#08306B"  # >6
 )
 
-# Build requested plots -----------------------------------------------------
+# Building the plots --------------------------------------------------------
 p_top10 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$keep_ids,
@@ -625,7 +619,7 @@ p_ge5_with_legend <- p_ge5 + p_ratio_legend +
 print(p_combined)
 print(p_ge5_with_legend)
 
-# Save outputs --------------------------------------------------------------
+# Saving outputs ------------------------------------------------------------
 ggsave(
   filename = combined_ratio_output_png,
   plot = p_combined,
@@ -642,7 +636,7 @@ ggsave(
   dpi = 300
 )
 
-# Quick checks --------------------------------------------------------------
+# Running quick checks ------------------------------------------------------
 cat(
   "NZ-intersecting cell count (>=4):",
   length(ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids),
