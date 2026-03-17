@@ -276,10 +276,11 @@ station_coords <- coromandel_obs %>%
 event_definitions <- tribble(
   ~event_id, ~event_title, ~start_date, ~end_date,
   1L, "2022-07-25", as.Date("2022-07-25"), as.Date("2022-07-25"),
-  2L, "2022-12-14", as.Date("2022-12-14"), as.Date("2022-12-14"),
-  3L, "2023-01-09 to 2023-01-11", as.Date("2023-01-09"), as.Date("2023-01-11"),
-  4L, "2023-01-27 to 2023-01-28", as.Date("2023-01-27"), as.Date("2023-01-28"),
-  5L, "2023-02-12 to 2023-02-14", as.Date("2023-02-12"), as.Date("2023-02-14")
+  2L, "2022-11-11", as.Date("2022-11-11"), as.Date("2022-11-11"),
+  3L, "2022-12-14", as.Date("2022-12-14"), as.Date("2022-12-14"),
+  4L, "2023-01-09 to 2023-01-11", as.Date("2023-01-09"), as.Date("2023-01-11"),
+  5L, "2023-01-27 to 2023-01-28", as.Date("2023-01-27"), as.Date("2023-01-28"),
+  6L, "2023-02-12 to 2023-02-14", as.Date("2023-02-12"), as.Date("2023-02-14")
 )
 
 build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim = c(-37.6, -36.4)) {
@@ -373,10 +374,9 @@ legend_panel <- ggplot() +
     plot.title = element_text(size = 11)
   )
 
-# Keep 3x2 layout with a legend in the sixth panel.
-event_maps[[6]] <- legend_panel
-
-p_coromandel_event_panel <- patchwork::wrap_plots(event_maps, ncol = 2, nrow = 3) +
+# Keep all six slots for events and place the legend above the panel by the title.
+p_coromandel_event_panel <- legend_panel / patchwork::wrap_plots(event_maps, ncol = 2, nrow = 3) +
+  patchwork::plot_layout(heights = c(0.18, 1)) +
   patchwork::plot_annotation(
     title = "Coromandel 2023",
     theme = theme(plot.title = element_text(hjust = 0.5))
