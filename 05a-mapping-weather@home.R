@@ -20,7 +20,6 @@ library(dplyr)
 library(patchwork)
 library(sf)
 library(grid)
-library(legendry)
 
 # Input/output paths -------------------------------------------------------
 model_data_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
@@ -275,7 +274,7 @@ get_fixed_width_bin_spec <- function(x, bin_width = 1, min_value = 1, max_value 
 }
 
 # Plot helper for probability-ratio maps -----------------------------------
-make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, ratio_palette, show_legend = TRUE) {
+make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, ratio_palette) {
   poly_nz <- poly_df[poly_df$id %in% keep_ids, ]
   poly_nz <- poly_nz[is.finite(poly_nz$ratio_value), ]
 
@@ -285,12 +284,6 @@ make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, rati
 
   ratio_limits <- range(ratio_breaks)
   nz_outline <- map_data("nz")
-  legend_position <- if (isTRUE(show_legend)) "right" else "none"
-
-  colbar_guide <- legendry::guide_colbar(
-    barheight = unit(15, "cm"),
-    barwidth = unit(1.1, "cm")
-  )
 
   ggplot(poly_nz, aes(x = lon, y = lat, fill = ratio_value)) +
     geom_polygon(aes(group = id), colour = NA, linewidth = 0) +
@@ -310,20 +303,108 @@ make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, rati
       limits = ratio_limits,
       oob = scales::squish,
       name = "Probability Ratio",
-      guide = colbar_guide
+      guide = "none"
     ) +
     labs(title = title_text, x = NULL, y = NULL) +
     theme_minimal(base_size = 13) +
     theme(
       plot.title = element_text(face = "bold", size = 14),
       axis.title = element_blank(),
-      legend.title = element_text(size = 20, face = "bold"),
-      legend.text = element_text(size = 14),
-      legend.key.height = unit(1.6, "cm"),
-      legend.key.width = unit(1.1, "cm"),
-      legend.box.margin = margin(6, 6, 6, 6),
-      legend.margin = margin(4, 4, 4, 4),
-      legend.position = legend_position
+      legend.position = "none"
+    )
+}
+
+make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_title = "Probability Ratio") {
+  if (length(ratio_breaks) < 2) {
+    stop("`ratio_breaks` must contain at least two values.")
+  }
+
+  bar_df <- data.frame(
+    ymin = head(ratio_breaks, -1),
+    ymax = tail(ratio_breaks, -1),
+    fill_col = ratio_palette
+  )
+
+  ratio_min <- min(ratio_breaks)
+  ratio_max <- max(ratio_breaks)
+  ratio_span <- ratio_max - ratio_min
+  triangle_height <- max(ratio_span * 0.08, 0.2)
+
+  tri_df <- data.frame(
+    x = c(0, 0.5, 1, 0, 0.5, 1),
+    y = c(ratio_min, ratio_min - triangle_height, ratio_min, ratio_max, ratio_max + triangle_height, ratio_max),
+    group = c("bottom", "bottom", "bottom", "top", "top", "top"),
+    fill_col = c(ratio_palette[1], ratio_palette[1], ratio_palette[1], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)])
+  )
+
+  tick_df <- data.frame(
+    y = ratio_breaks,
+    label = scales::label_number(accuracy = 0.1)(ratio_breaks)
+  )
+
+  ggplot() +
+    geom_rect(
+      data = bar_df,
+      aes(xmin = 0, xmax = 1, ymin = ymin, ymax = ymax, fill = fill_col),
+      colour = NA
+    ) +
+    geom_polygon(
+      data = tri_df,
+      aes(x = x, y = y, group = group, fill = fill_col),
+      colour = NA
+    ) +
+    geom_path(
+      data = data.frame(
+        x = c(0, 0, 0.5, 1, 1),
+        y = c(ratio_min, ratio_max, ratio_max + triangle_height, ratio_max, ratio_min)
+      ),
+      aes(x = x, y = y),
+      inherit.aes = FALSE,
+      linewidth = 0.35,
+      colour = "black"
+    ) +
+    geom_path(
+      data = data.frame(
+        x = c(0, 0.5, 1),
+        y = c(ratio_min, ratio_min - triangle_height, ratio_min)
+      ),
+      aes(x = x, y = y),
+      inherit.aes = FALSE,
+      linewidth = 0.35,
+      colour = "black"
+    ) +
+    geom_segment(
+      data = tick_df,
+      aes(x = 1, xend = 1.12, y = y, yend = y),
+      inherit.aes = FALSE,
+      linewidth = 0.3,
+      colour = "black"
+    ) +
+    geom_text(
+      data = tick_df,
+      aes(x = 1.18, y = y, label = label),
+      hjust = 0,
+      size = 3.8
+    ) +
+    annotate(
+      "text",
+      x = 0,
+      y = ratio_max + triangle_height + (0.05 * ratio_span),
+      label = legend_title,
+      hjust = 0,
+      vjust = 0,
+      fontface = "bold",
+      size = 5.5
+    ) +
+    scale_fill_identity() +
+    coord_cartesian(
+      xlim = c(-0.05, 2.3),
+      ylim = c(ratio_min - triangle_height - (0.08 * ratio_span), ratio_max + triangle_height + (0.16 * ratio_span)),
+      clip = "off"
+    ) +
+    theme_void() +
+    theme(
+      plot.margin = margin(14, 16, 10, 8)
     )
 }
 
@@ -463,8 +544,7 @@ p_ge4 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids,
   "(b) Years with ≥4 exceedances",
   ratio_breaks,
-  ratio_palette,
-  show_legend = FALSE
+  ratio_palette
 )
 
 p_joint <- make_nz_ratio_plot(
@@ -472,8 +552,7 @@ p_joint <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids,
   "(c) Years with extreme Rx1day AND ≥4 exceedances",
   ratio_breaks,
-  ratio_palette,
-  show_legend = FALSE
+  ratio_palette
 ) +
   theme(
     plot.title = element_text(hjust = 0.5)
@@ -494,23 +573,20 @@ combined_design <- c(
   area(t = 1, l = 3, b = 2, r = 3)
 )
 
-p_combined <- (p_top10 + p_ge4 + p_joint + guide_area()) +
+p_ratio_legend <- make_triangle_colorbar_plot(ratio_breaks, ratio_palette)
+
+p_combined <- (p_top10 + p_ge4 + p_joint + p_ratio_legend) +
   plot_layout(
     design = combined_design,
-    guides = "collect",
-    widths = c(1, 1, 0.33),
+    widths = c(1, 1, 0.44),
     heights = c(1, 1)
-  ) +
-  plot_annotation(
-    theme = theme(
-      legend.position = "right",
-      legend.justification = "center",
-      plot.margin = margin(10, 38, 10, 10)
-    )
   )
 
+p_ge5_with_legend <- p_ge5 + p_ratio_legend +
+  plot_layout(widths = c(1, 0.24))
+
 print(p_combined)
-print(p_ge5)
+print(p_ge5_with_legend)
 
 # Save outputs --------------------------------------------------------------
 ggsave(
@@ -523,7 +599,7 @@ ggsave(
 
 ggsave(
   filename = ge5_ratio_output_png,
-  plot = p_ge5,
+  plot = p_ge5_with_legend,
   width = 12,
   height = 9,
   dpi = 300
