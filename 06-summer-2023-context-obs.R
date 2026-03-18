@@ -126,7 +126,7 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
     scale_x_date(date_breaks = "1 month", date_labels = "%b") +
     scale_y_continuous(limits = c(0, y_max)) +
     labs(
-      title = glue("{station_name} — Hydrological Year 2023"),
+      title = glue("{station_name} — 2023"),
       x = "Date",
       y = "Daily Rainfall (mm)"
     ) +
