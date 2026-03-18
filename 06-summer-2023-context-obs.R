@@ -323,7 +323,7 @@ event_definitions <- tribble(
 ) %>%
   mutate(event_title = map2_chr(start_date, end_date, format_event_title))
 
-build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim = c(-37.5, -36.5)) {
+build_event_map <- function(event_row, base_map_df, xlim = c(175.4, 176.0), ylim = c(-37.6, -36.4)) {
   legend_labels <- c(
     "Daily Rainfall (mm)",
     "Above 33rd Rx1day Percentile Threshold"
@@ -397,11 +397,11 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim
     ) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     scale_x_continuous(
-      breaks = seq(xlim[1], xlim[2], by = 0.1),
+      breaks = seq(xlim[1], xlim[2], by = 0.4),
       minor_breaks = NULL
     ) +
     scale_y_continuous(
-      breaks = seq(-37.5, -36.5, by = 0.5),
+      breaks = seq(ylim[1], ylim[2], by = 0.4),
       minor_breaks = NULL
     ) +
     labs(
