@@ -252,6 +252,90 @@ plot_hist_exceedances <- function(hist_df_prop, max_exceedance, fill_colour = bo
   p
 }
 
+build_hist_panel_df <- function(regions_mod, thr_list, max_exceedance) {
+  panel_region_order <- c("Milford Sound", "Napier", "Northland", "Waikato")
+  
+  bind_rows(lapply(regions_mod, function(reg) {
+    build_hist_df(
+      reg,
+      thr_list,
+      get(paste0(reg, "_CD")),
+      get(paste0(reg, "_FP"))
+    ) %>%
+      mutate(
+        Region = region_labels[[reg]],
+        Period = factor(Period, levels = c("Current Day", "Future Projection"))
+      ) %>%
+      complete(
+        Period,
+        days = 0:max_exceedance,
+        fill = list(n = 0, prop_years = 0, cum_prop_years = NA_real_)
+      )
+  })) %>%
+    mutate(
+      Region = factor(Region, levels = panel_region_order),
+      Period = factor(Period, levels = c("Current Day", "Future Projection"))
+    ) %>%
+    arrange(Region, Period, days)
+}
+
+plot_hist_exceedance_panel <- function(hist_panel_df, max_exceedance, fill_colour = box_colour) {
+  cumulative_label_df <- hist_panel_df %>%
+    mutate(
+      cumulative_label = case_when(
+        is.na(cum_prop_years) ~ NA_character_,
+        cum_prop_years > 0 & (cum_prop_years * 100) < 1 ~ "<1%",
+        TRUE ~ paste0(round(cum_prop_years * 100, 0), "%")
+      )
+    )
+  
+  y_upper_limit <- hist_panel_df %>%
+    summarise(max_prop = max(prop_years, na.rm = TRUE)) %>%
+    pull(max_prop) * 1.12
+  
+  ggplot(hist_panel_df, aes(x = days, y = prop_years)) +
+    geom_col(width = 0.9, fill = fill_colour) +
+    geom_text(
+      data = cumulative_label_df,
+      aes(label = cumulative_label),
+      vjust = -0.35,
+      size = 2.2,
+      colour = "black",
+      na.rm = TRUE
+    ) +
+    facet_grid(Region ~ Period, switch = "y") +
+    scale_x_continuous(
+      breaks = 0:max_exceedance,
+      limits = c(-0.5, max_exceedance + 0.5),
+      expand = expansion(mult = c(0, 0))
+    ) +
+    scale_y_continuous(
+      limits = c(0, y_upper_limit),
+      expand = expansion(mult = c(0, 0.02))
+    ) +
+    labs(
+      title = "Histograms of Exceedance Days",
+      x = "Number of exceedance days per year",
+      y = "Proportion of years"
+    ) +
+    coord_cartesian(clip = "off") +
+    theme_thesis +
+    theme_model_axes +
+    theme(
+      strip.placement = "outside",
+      strip.text.x = element_text(face = "bold"),
+      strip.text.y = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
+      strip.text.y.left = element_text(angle = 90, hjust = 0.5, vjust = 0.5),
+      panel.grid.major = element_line(colour = "grey82", linewidth = 0.3),
+      panel.grid.minor = element_blank(),
+      panel.spacing = unit(1.1, "lines"),
+      panel.border = element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
+      axis.line = element_blank(),
+      axis.ticks = element_line(colour = "black", linewidth = 0.3),
+      plot.margin = margin(10, 12, 10, 10)
+    )
+}
+
 # Histogram for top 10% annual RX1day years ---------------------------------
 build_top_rx1day_hist_df <- function(region_name, period, thr_list, df, rx1day_90th_cd, max_exceedance_bin = 10) {
   threshold <- thr_list[[paste0(region_name, "_CD")]]$threshold
@@ -797,6 +881,10 @@ save_plot(quadrant_heatmap_plot, "all_regions_rx1day_exceedance_quadrant_heatmap
 timeseries_panel_df <- build_timeseries_panel_df(regions_mod, thr_list)
 timeseries_panel_plot <- plot_rx1day_timeseries_panel(timeseries_panel_df)
 save_plot(timeseries_panel_plot, "all_regions_rx1day_timeseries_panel.png", width = fig_width_full, height = fig_height_tall)
+
+hist_panel_df <- build_hist_panel_df(regions_mod, thr_list, global_hist_max_exceedance)
+hist_panel_plot <- plot_hist_exceedance_panel(hist_panel_df, global_hist_max_exceedance)
+save_plot(hist_panel_plot, "all_regions_exceedance_histogram_panel.png", width = fig_width_full, height = fig_height_tall)
 
 
 # Threshold summary table -------------------------------------------------
