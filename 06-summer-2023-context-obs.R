@@ -284,6 +284,11 @@ event_definitions <- tribble(
 )
 
 build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim = c(-37.6, -36.4)) {
+  legend_labels <- c(
+    "Daily Rainfall (mm)",
+    "Above 33rd Rx1day Percentile Threshold"
+  )
+
   event_data <- coromandel_obs %>%
     filter(
       observation_date >= event_row$start_date,
@@ -319,20 +324,26 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim
     ) +
     geom_point(
       data = event_data,
-      aes(x = longitude, y = latitude),
+      aes(
+        x = longitude,
+        y = latitude,
+        fill = legend_labels[1],
+        colour = legend_labels[1]
+      ),
       shape = 21,
-      fill = "grey45",
-      colour = "grey20",
       size = 2.7,
       stroke = 0.4,
       alpha = 0.95
     ) +
     geom_point(
       data = event_data %>% filter(is_above_threshold),
-      aes(x = longitude, y = latitude),
+      aes(
+        x = longitude,
+        y = latitude,
+        fill = legend_labels[2],
+        colour = legend_labels[2]
+      ),
       shape = 21,
-      fill = NA,
-      colour = "#93acff",
       size = 3.4,
       stroke = 1.1
     ) +
@@ -350,9 +361,39 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim
       x = NULL,
       y = NULL
   ) +
+    scale_colour_manual(
+      values = c(
+        "Daily Rainfall (mm)" = "grey20",
+        "Above 33rd Rx1day Percentile Threshold" = "#93acff"
+      ),
+      breaks = legend_labels,
+      name = NULL
+    ) +
+    scale_fill_manual(
+      values = c(
+        "Daily Rainfall (mm)" = "grey45",
+        "Above 33rd Rx1day Percentile Threshold" = "white"
+      ),
+      breaks = legend_labels,
+      name = NULL
+    ) +
+    guides(
+      fill = "none",
+      colour = guide_legend(
+        override.aes = list(
+          shape = 21,
+          size = c(2.7, 3.4),
+          stroke = c(0.4, 1.1),
+          fill = c("grey45", "white"),
+          colour = c("grey20", "#93acff"),
+          alpha = 1
+        )
+      )
+    ) +
     theme_thesis +
     theme(
-      axis.title = element_blank()
+      axis.title = element_blank(),
+      legend.position = "top"
     )
 }
 
@@ -361,14 +402,14 @@ event_maps <- map(
   ~ build_event_map(.x, nz_map_df)
 )
 
-# Keep the legend tight under the title using a subtitle-style line.
 p_coromandel_event_panel <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2) +
+  patchwork::plot_layout(guides = "collect") +
   patchwork::plot_annotation(
     title = "Coromandel Key Events - 2023",
-    subtitle = "● Daily Rainfall (mm)      ○ Above 33rd Rx1day Percentile Threshold",
     theme = theme(
       plot.title = element_text(hjust = 0.5),
-      plot.subtitle = element_text(size = 10, hjust = 0.5, colour = "grey25")
+      legend.position = "top",
+      legend.justification = "center"
     )
   )
 
@@ -377,7 +418,7 @@ print(p_coromandel_event_panel)
 ggsave(
   filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2.png"),
   plot = p_coromandel_event_panel,
-  width = 11,
+  width = 9,
   height = 10,
   dpi = 300
 )
