@@ -47,6 +47,29 @@ collapse_dates <- function(x) {
   paste(sort(unique(format(as.Date(x), "%Y-%m-%d"))), collapse = "; ")
 }
 
+format_event_title <- function(start_date, end_date = start_date) {
+  start_date <- as.Date(start_date)
+  end_date <- as.Date(end_date)
+
+  if (is.na(start_date) || is.na(end_date)) {
+    return(NA_character_)
+  }
+
+  if (start_date == end_date) {
+    return(format(start_date, "%-d %b %Y"))
+  }
+
+  if (year(start_date) == year(end_date) && month(start_date) == month(end_date)) {
+    return(glue("{day(start_date)} to {day(end_date)} {format(end_date, '%b %Y')}"))
+  }
+
+  if (year(start_date) == year(end_date)) {
+    return(glue("{format(start_date, '%-d %b')} to {format(end_date, '%-d %b %Y')}"))
+  }
+
+  glue("{format(start_date, '%-d %b %Y')} to {format(end_date, '%-d %b %Y')}")
+}
+
 # Create HY2023 + Summer 2023 example plots -------------------------------
 create_example_year_plots <- function(df_station, station_name, threshold, output_dir, rx1day_hy2023_val = NA_real_) {
   hy_df <- df_station %>%
@@ -274,14 +297,15 @@ station_coords <- coromandel_obs %>%
   )
 
 event_definitions <- tribble(
-  ~event_id, ~event_title, ~start_date, ~end_date,
-  1L, "2022-07-25", as.Date("2022-07-25"), as.Date("2022-07-25"),
-  2L, "2022-11-11", as.Date("2022-11-11"), as.Date("2022-11-11"),
-  3L, "2022-12-14", as.Date("2022-12-14"), as.Date("2022-12-14"),
-  4L, "2023-01-09 to 2023-01-11", as.Date("2023-01-09"), as.Date("2023-01-11"),
-  5L, "2023-01-27 to 2023-01-28", as.Date("2023-01-27"), as.Date("2023-01-28"),
-  6L, "2023-02-12 to 2023-02-14", as.Date("2023-02-12"), as.Date("2023-02-14")
-)
+  ~event_id, ~start_date, ~end_date,
+  1L, as.Date("2022-07-25"), as.Date("2022-07-25"),
+  2L, as.Date("2022-11-11"), as.Date("2022-11-11"),
+  3L, as.Date("2022-12-14"), as.Date("2022-12-14"),
+  4L, as.Date("2023-01-09"), as.Date("2023-01-11"),
+  5L, as.Date("2023-01-27"), as.Date("2023-01-28"),
+  6L, as.Date("2023-02-12"), as.Date("2023-02-14")
+) %>%
+  mutate(event_title = map2_chr(start_date, end_date, format_event_title))
 
 build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim = c(-37.6, -36.4)) {
   legend_labels <- c(
