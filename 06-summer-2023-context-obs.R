@@ -24,7 +24,7 @@ compute_RX1day_obs <- function(df_station, missing_day_threshold = 30) {
 calculate_rx1day_thresholds_obs <- function(df_station_obs) {
   RX1day_df <- compute_RX1day_obs(df_station_obs)
   rx <- RX1day_df$RX1day
-
+  
   # Keep single-threshold definition aligned with
   # 03a-blockmaxima-function-obs-singlethreshold.R:
   # threshold where 2/3 of annual RX1day values are above it.
@@ -34,7 +34,7 @@ calculate_rx1day_thresholds_obs <- function(df_station_obs) {
     na.rm = TRUE,
     type = 7
   )
-
+  
   list(
     thresholds = c(single = as.numeric(single_threshold))
   )
@@ -66,23 +66,23 @@ format_day_month_year <- function(x) {
 format_event_title <- function(start_date, end_date = start_date) {
   start_date <- as.Date(start_date)
   end_date <- as.Date(end_date)
-
+  
   if (is.na(start_date) || is.na(end_date)) {
     return(NA_character_)
   }
-
+  
   if (start_date == end_date) {
     return(format_day_month_year(start_date))
   }
-
+  
   if (year(start_date) == year(end_date) && month(start_date) == month(end_date)) {
     return(glue("{day(start_date)} to {day(end_date)} {format(end_date, '%b %Y')}"))
   }
-
+  
   if (year(start_date) == year(end_date)) {
     return(glue("{format_day_month(start_date)} to {format_day_month_year(end_date)}"))
   }
-
+  
   glue("{format_day_month_year(start_date)} to {format_day_month_year(end_date)}")
 }
 
@@ -90,13 +90,13 @@ build_axis_breaks <- function(limits, n_breaks = 3) {
   if (length(limits) != 2 || any(!is.finite(limits))) {
     stop("limits must be a numeric vector of length 2 with finite values")
   }
-
+  
   limits <- sort(limits)
-
+  
   if (n_breaks <= 2 || diff(limits) == 0) {
     return(limits)
   }
-
+  
   unique(round(seq(limits[1], limits[2], length.out = n_breaks), 1))
 }
 
@@ -105,21 +105,21 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
   hy_df <- df_station %>%
     filter(hydro_year == 2023) %>%
     arrange(observation_date)
-
+  
   if (nrow(hy_df) == 0 || is.na(rx1day_hy2023_val)) {
     return(list(
       plot_generated = FALSE,
       plot_path = NA_character_
     ))
   }
-
+  
   station_safe <- path_sanitize(station_name)
   plot_path <- file.path(output_dir, glue("{station_safe}_summer2023_context.png"))
-
+  
   y_max <- max(hy_df$rainfall_mm, na.rm = TRUE)
   if (!is.finite(y_max)) y_max <- 10
   y_max <- y_max + 10
-
+  
   p_hy <- ggplot(hy_df, aes(x = observation_date, y = rainfall_mm)) +
     geom_col(fill = "#0072B2", width= 1.5, na.rm = TRUE) +
     {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#93acff", size = 1)} +
@@ -131,7 +131,7 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
       y = "Daily Rainfall (mm)"
     ) +
     theme_thesis
-
+  
   ggsave(
     filename = plot_path,
     plot = p_hy,
@@ -139,7 +139,7 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
     height = fig_height_standard,
     dpi = 300
   )
-
+  
   list(
     plot_generated = TRUE,
     plot_path = plot_path
@@ -151,44 +151,44 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
 build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
   region_df <- df_obs %>%
     filter(region == region_name)
-
+  
   stations <- sort(unique(region_df$station))
-
+  
   summary_tbl <- map_dfr(stations, function(stn) {
     df_station <- region_df %>%
       filter(station == stn) %>%
       arrange(observation_date)
-
+    
     thr <- calculate_rx1day_thresholds_obs(df_station)
     threshold_single <- thr$thresholds["single"]
-
+    
     hy2023 <- df_station %>% filter(hydro_year == 2023)
     summer2023 <- hy2023 %>%
       filter(
         observation_date >= as.Date("2022-12-01"),
         observation_date <= as.Date("2023-02-28")
       )
-
+    
     hy2023_total <- sum(hy2023$rainfall_mm, na.rm = TRUE)
     summer2023_total <- sum(summer2023$rainfall_mm, na.rm = TRUE)
-
+    
     hy_exceed <- hy2023 %>% filter(rainfall_mm > threshold_single)
     summer_exceed <- summer2023 %>% filter(rainfall_mm > threshold_single)
-
+    
     rx1day_all <- compute_RX1day_obs(df_station) %>% filter(!is.na(RX1day))
     rx1day_2023 <- hy2023 %>%
       filter(!is.na(rainfall_mm)) %>%
       slice_max(order_by = rainfall_mm, n = 1, with_ties = FALSE)
-
+    
     rx1day_2023_val <- if (nrow(rx1day_2023) == 0) NA_real_ else rx1day_2023$rainfall_mm[[1]]
     rx1day_2023_date <- if (nrow(rx1day_2023) == 0) as.Date(NA) else rx1day_2023$observation_date[[1]]
-
+    
     rx1day_percentile <- if (is.na(rx1day_2023_val) || nrow(rx1day_all) == 0) {
       NA_real_
     } else {
       round(mean(rx1day_all$RX1day <= rx1day_2023_val) * 100, 1)
     }
-
+    
     plot_result <- create_example_year_plots(
       df_station = df_station,
       station_name = stn,
@@ -196,7 +196,7 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
       output_dir = output_dir,
       rx1day_hy2023_val = rx1day_2023_val
     )
-
+    
     tibble(
       region = region_name,
       station = stn,
@@ -213,12 +213,12 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
       rx1day_hy2023_percentile = rx1day_percentile,
     )
   })
-
+  
   write_csv(
     summary_tbl,
     file.path(output_dir, glue("{region_name}_summer_2023_station_summary.csv"))
   )
-
+  
   summary_tbl
 }
 
@@ -279,12 +279,12 @@ p_coromandel_map <- ggplot() +
   labs(
     title = "Coromandel Stations"
   ) +
-theme_thesis
-    
-    print(p_coromandel_map)
-    
-    ggsave(file.path("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/obs_data/coromandel/coromandel_base_map.png"),
-    plot = p_coromandel_map, width = 8, height = 7, dpi = 300)
+  theme_thesis
+
+print(p_coromandel_map)
+
+ggsave(file.path("C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/obs_data/coromandel/coromandel_base_map.png"),
+       plot = p_coromandel_map, width = 8, height = 7, dpi = 300)
 
 coromandel_lat_log_data %>%
   summarise(
@@ -337,12 +337,12 @@ event_definitions <- tribble(
 ) %>%
   mutate(event_title = map2_chr(start_date, end_date, format_event_title))
 
-build_event_map <- function(event_row, base_map_df, xlim = c(175.4, 176.0), ylim = c(-37.6, -36.4)) {
+build_event_map <- function(event_row, base_map_df, xlim = c(175.25, 176.0), ylim = c(-37.6, -36.4)) {
   legend_labels <- c(
     "Daily Rainfall (mm)",
     "Above 33rd Rx1day Percentile Threshold"
   )
-
+  
   event_data <- coromandel_obs %>%
     filter(
       observation_date >= event_row$start_date,
@@ -411,8 +411,8 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.4, 176.0), ylim
     ) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     scale_x_continuous(
-      breaks = build_axis_breaks(xlim, n_breaks = 3),
-      labels = scales::label_number(accuracy = 0.1),
+      breaks = build_axis_breaks(xlim, n_breaks = 4),
+      labels = scales::label_number(accuracy = 0.01),
       minor_breaks = NULL
     ) +
     scale_y_continuous(
@@ -423,7 +423,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.4, 176.0), ylim
       title = event_row$event_title,
       x = NULL,
       y = NULL
-  ) +
+    ) +
     scale_colour_manual(
       values = c(
         "Daily Rainfall (mm)" = "grey20",
