@@ -86,6 +86,20 @@ format_event_title <- function(start_date, end_date = start_date) {
   glue("{format_day_month_year(start_date)} to {format_day_month_year(end_date)}")
 }
 
+build_axis_breaks <- function(limits, n_breaks = 3) {
+  if (length(limits) != 2 || any(!is.finite(limits))) {
+    stop("limits must be a numeric vector of length 2 with finite values")
+  }
+
+  limits <- sort(limits)
+
+  if (n_breaks <= 2 || diff(limits) == 0) {
+    return(limits)
+  }
+
+  unique(round(seq(limits[1], limits[2], length.out = n_breaks), 1))
+}
+
 # Create HY2023 + Summer 2023 example plots -------------------------------
 create_example_year_plots <- function(df_station, station_name, threshold, output_dir, rx1day_hy2023_val = NA_real_) {
   hy_df <- df_station %>%
@@ -397,7 +411,8 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.4, 176.0), ylim
     ) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     scale_x_continuous(
-      breaks = seq(xlim[1], xlim[2], by = 0.4),
+      breaks = build_axis_breaks(xlim, n_breaks = 3),
+      labels = scales::label_number(accuracy = 0.1),
       minor_breaks = NULL
     ) +
     scale_y_continuous(
