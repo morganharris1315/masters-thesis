@@ -402,8 +402,10 @@ event_maps <- map(
   ~ build_event_map(.x, nz_map_df)
 )
 
-p_coromandel_event_panel <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2) +
-  patchwork::plot_layout(guides = "collect") +
+event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
+
+p_coromandel_event_panel <- patchwork::guide_area() / event_map_grid +
+  patchwork::plot_layout(heights = c(0.08, 1), guides = "collect") +
   patchwork::plot_annotation(
     title = "Coromandel Key Events - 2023",
     theme = theme(
