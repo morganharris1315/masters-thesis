@@ -397,7 +397,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim
     ) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     scale_x_continuous(
-      breaks = c(175.4, 175.6, 175.8),
+      breaks = seq(xlim[1], xlim[2], by = 0.1),
       minor_breaks = NULL
     ) +
     scale_y_continuous(
@@ -420,7 +420,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim
     scale_fill_manual(
       values = c(
         "Daily Rainfall (mm)" = "grey45",
-        "Above 33rd Rx1day Percentile Threshold" = "white"
+        "Above 33rd Rx1day Percentile Threshold" = "grey45"
       ),
       breaks = legend_labels,
       name = NULL
@@ -432,7 +432,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim
           shape = 21,
           size = c(2.7, 3.4),
           stroke = c(0.4, 1.1),
-          fill = c("grey45", "white"),
+          fill = c("grey45", "grey45"),
           colour = c("grey20", "#93acff"),
           alpha = 1
         )
