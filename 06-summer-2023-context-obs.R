@@ -275,7 +275,7 @@ p_coromandel_map <- ggplot() +
     size = 2,
     alpha = 0.9
   ) +
-  coord_quickmap(xlim = c(175.3, 176.0), ylim = c(-37.5, -36.5), expand = FALSE) +
+  coord_quickmap(xlim = c(175.3, 176.1), ylim = c(-37.5, -36.5), expand = FALSE) +
   labs(
     title = "Coromandel Stations"
   ) +
@@ -337,7 +337,7 @@ event_definitions <- tribble(
 ) %>%
   mutate(event_title = map2_chr(start_date, end_date, format_event_title))
 
-build_event_map <- function(event_row, base_map_df, xlim = c(175.25, 176.0), ylim = c(-37.6, -36.4)) {
+build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim = c(-37.6, -36.4)) {
   legend_labels <- c(
     "Daily Rainfall (mm)",
     "Above 33rd Rx1day Percentile Threshold"
@@ -411,8 +411,8 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.25, 176.0), yli
     ) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     scale_x_continuous(
-      breaks = build_axis_breaks(xlim, n_breaks = 4),
-      labels = scales::label_number(accuracy = 0.01),
+      breaks = seq(xlim[1], xlim[2], by = 0.4),
+      labels = scales::label_number(accuracy = 0.1),
       minor_breaks = NULL
     ) +
     scale_y_continuous(
