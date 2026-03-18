@@ -47,6 +47,22 @@ collapse_dates <- function(x) {
   paste(sort(unique(format(as.Date(x), "%Y-%m-%d"))), collapse = "; ")
 }
 
+format_day_month <- function(x) {
+  x <- as.Date(x)
+  if (is.na(x)) {
+    return(NA_character_)
+  }
+  glue("{day(x)} {format(x, '%b')}")
+}
+
+format_day_month_year <- function(x) {
+  x <- as.Date(x)
+  if (is.na(x)) {
+    return(NA_character_)
+  }
+  glue("{day(x)} {format(x, '%b %Y')}")
+}
+
 format_event_title <- function(start_date, end_date = start_date) {
   start_date <- as.Date(start_date)
   end_date <- as.Date(end_date)
@@ -56,7 +72,7 @@ format_event_title <- function(start_date, end_date = start_date) {
   }
 
   if (start_date == end_date) {
-    return(format(start_date, "%-d %b %Y"))
+    return(format_day_month_year(start_date))
   }
 
   if (year(start_date) == year(end_date) && month(start_date) == month(end_date)) {
@@ -64,10 +80,10 @@ format_event_title <- function(start_date, end_date = start_date) {
   }
 
   if (year(start_date) == year(end_date)) {
-    return(glue("{format(start_date, '%-d %b')} to {format(end_date, '%-d %b %Y')}"))
+    return(glue("{format_day_month(start_date)} to {format_day_month_year(end_date)}"))
   }
 
-  glue("{format(start_date, '%-d %b %Y')} to {format(end_date, '%-d %b %Y')}")
+  glue("{format_day_month_year(start_date)} to {format_day_month_year(end_date)}")
 }
 
 # Create HY2023 + Summer 2023 example plots -------------------------------
