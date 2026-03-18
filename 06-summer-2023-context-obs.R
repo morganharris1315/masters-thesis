@@ -361,26 +361,15 @@ event_maps <- map(
   ~ build_event_map(.x, nz_map_df)
 )
 
-legend_panel <- ggplot() +
-  annotate("point", x = 0.22, y = 0.70, shape = 21, size = 4.2, fill = "grey45", colour = "grey20", stroke = 0.4) +
-  annotate("text", x = 0.27, y = 0.70, hjust = 0, label = "Daily Rainfall (mm)", size = 3.4) +
-  annotate("point", x = 0.22, y = 0.38, shape = 21, size = 5, fill = NA, colour = "#93acff", stroke = 1.2) +
-  annotate("text", x = 0.27, y = 0.38, hjust = 0, label = "Above 33rd Rx1day Percentile Threshold", size = 3.4) +
-  xlim(0, 1) +
-  ylim(0.18, 0.9) +
-  theme_void() +
-  labs(title = "Legend") +
-  theme(
-    plot.title = element_text(size = 11, hjust = 0),
-    plot.margin = margin(0, 0, 2, 0)
-  )
-
-# Keep all six slots for events and place the legend above the panel by the title.
-p_coromandel_event_panel <- legend_panel / patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2) +
-  patchwork::plot_layout(heights = c(0.14, 1)) +
+# Keep the legend tight under the title using a subtitle-style line.
+p_coromandel_event_panel <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2) +
   patchwork::plot_annotation(
-    title = "Coromandel 2023",
-    theme = theme(plot.title = element_text(hjust = 0.5))
+    title = "Coromandel Key Events - 2023",
+    subtitle = "● Daily Rainfall (mm)      ○ Above 33rd Rx1day Percentile Threshold",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5),
+      plot.subtitle = element_text(size = 10, hjust = 0.5, colour = "grey25")
+    )
   )
 
 print(p_coromandel_event_panel)
@@ -388,7 +377,7 @@ print(p_coromandel_event_panel)
 ggsave(
   filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2.png"),
   plot = p_coromandel_event_panel,
-  width = 14,
+  width = 11,
   height = 10,
   dpi = 300
 )
