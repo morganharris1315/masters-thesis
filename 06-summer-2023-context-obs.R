@@ -390,13 +390,21 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.0), ylim
     geom_text(
       data = event_data,
       aes(x = longitude, y = latitude, label = round(event_rainfall_mm, 0)),
-      nudge_y = 0.06,
+      nudge_y = 0.045,
       size = 2.5,
       colour = "grey10",
       check_overlap = TRUE
     ) +
-  coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
-  labs(
+    coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
+    scale_x_continuous(
+      breaks = c(175.4, 175.6, 175.8),
+      minor_breaks = NULL
+    ) +
+    scale_y_continuous(
+      breaks = c(-37.6, -37.2, -36.8, -36.4),
+      minor_breaks = NULL
+    ) +
+    labs(
       title = event_row$event_title,
       x = NULL,
       y = NULL
@@ -445,13 +453,15 @@ event_maps <- map(
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 
 p_coromandel_event_panel <- patchwork::guide_area() / event_map_grid +
-  patchwork::plot_layout(heights = c(0.08, 1), guides = "collect") +
+  patchwork::plot_layout(heights = c(0.05, 1), guides = "collect") +
   patchwork::plot_annotation(
     title = "Coromandel Key Events - 2023",
     theme = theme(
-      plot.title = element_text(hjust = 0.5),
+      plot.title = element_text(hjust = 0.5, margin = margin(b = 3)),
       legend.position = "top",
-      legend.justification = "center"
+      legend.justification = "center",
+      legend.margin = margin(t = -6, b = 0),
+      legend.box.margin = margin(t = -6, b = 0)
     )
   )
 
