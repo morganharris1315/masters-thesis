@@ -46,6 +46,7 @@ period_labels <- c(CD = "Current Day", FP = "Future Projection")
 box_colour <- "#93acff"
 box_colour_light <- "#eff2ff"
 box_colour_dark <- "#6f8dff"
+histogram_x_max <- 10
 
 # Calculate thresholds -----------------------------------------------------
 calculate_rx1day_threshold <- function(df) {
@@ -267,6 +268,7 @@ build_hist_panel_df <- function(regions_mod, thr_list, max_exceedance) {
         Period = factor(Period, levels = c("Current Day", "Future Projection"))
       ) %>%
       complete(
+        Region,
         Period,
         days = 0:max_exceedance,
         fill = list(n = 0, prop_years = 0, cum_prop_years = NA_real_)
@@ -807,12 +809,7 @@ save_plot <- function(plot, filename, width = fig_width_full, height = fig_heigh
 }
 
 # Build all outputs --------------------------------------------------------
-global_hist_max_exceedance <- max(unlist(lapply(regions_mod, function(reg) {
-  thr_cd <- thr_list[[paste0(reg, "_CD")]]$threshold
-  exc_cd <- count_exceedances_per_year(get(paste0(reg, "_CD")), thr_cd)
-  exc_fp <- count_exceedances_per_year(get(paste0(reg, "_FP")), thr_cd)
-  max(c(exc_cd, exc_fp), na.rm = TRUE)
-})), na.rm = TRUE)
+global_hist_max_exceedance <- histogram_x_max
 
 for (reg in regions_mod) {
   y_max <- max(get(paste0(reg, "_CD"))$RX1day, get(paste0(reg, "_FP"))$RX1day, na.rm = TRUE)
