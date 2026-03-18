@@ -256,6 +256,8 @@ make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, rati
   
   palette_for_bins <- setNames(ratio_palette, bin_levels)
   nz_outline <- map_data("nz")
+  lat_limits <- c(-37.5, -36.5)
+  lat_breaks <- seq(lat_limits[1], lat_limits[2], by = 0.5)
   
   ggplot(poly_nz, aes(x = lon, y = lat, fill = ratio_bin)) +
     geom_polygon(aes(group = id), colour = NA, linewidth = 0) +
@@ -266,7 +268,8 @@ make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, rati
       colour = "black",
       linewidth = 0.45,
       alpha = 0.9) +
-    coord_fixed() +
+    coord_fixed(ylim = lat_limits) +
+    scale_y_continuous(breaks = lat_breaks) +
     scale_fill_manual(
       values = palette_for_bins,
       drop = FALSE,
