@@ -472,14 +472,15 @@ intersection_values <- intersection_values[is.finite(intersection_values)]
 if (length(intersection_values) == 0) {
   stop("No finite probability-ratio values found for NZ-intersecting cells.")}
 
-ratio_breaks <- get_fixed_width_bin_spec(intersection_values, bin_width = 1, min_value = 1, max_value = 6.5)$breaks
-ratio_breaks <- unique(c(1, ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6], 6))
+ratio_breaks <- c(1, 1.5, 2, 2.5, 3, 4, 5, 6)
 
 # Setting probability-ratio colours
 ratio_palette <- c(
   "#D0D4DA", # <1
-  "#EAF3FF", # 1-2
-  "#BFD9FF", # 2-3
+  "#F3F8FF", # 1-1.5
+  "#EAF3FF", # 1.5-2
+  "#D7E8FF", # 2-2.5
+  "#BFD9FF", # 2.5-3
   "#7FB3FF", # 3-4
   "#3F8BE6", # 4-5
   "#0B4FAF", # 5-6
