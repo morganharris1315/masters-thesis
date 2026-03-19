@@ -286,8 +286,10 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
   if (length(core_breaks) < 2) {
     stop("`ratio_breaks` must include at least two values between 1 and 6.")}
   
-  lower_cap <- min(core_breaks) - 1
-  upper_cap <- max(core_breaks) + 1
+  lower_step <- diff(core_breaks[1:2])
+  upper_step <- diff(tail(core_breaks, 2))
+  lower_cap <- min(core_breaks) - lower_step
+  upper_cap <- max(core_breaks) + upper_step
   
   interval_min <- c(lower_cap, head(core_breaks, -1), max(core_breaks))
   interval_max <- c(min(core_breaks), tail(core_breaks, -1), upper_cap)
@@ -300,13 +302,14 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
   ratio_min <- lower_cap
   ratio_max <- upper_cap
   ratio_span <- ratio_max - ratio_min
-  triangle_height <- max(ratio_span * 0.08, 0.2)
+  bottom_triangle_height <- lower_step
+  top_triangle_height <- upper_step
   bar_xmin <- 0.31
   bar_xmax <- 0.57
   
   tri_df <- data.frame(
     x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
-    y = c(ratio_min, ratio_min - triangle_height, ratio_min, ratio_max, ratio_max + triangle_height, ratio_max),
+    y = c(ratio_min, ratio_min - bottom_triangle_height, ratio_min, ratio_max, ratio_max + top_triangle_height, ratio_max),
     group = c("bottom", "bottom", "bottom", "top", "top", "top"),
     fill_col = c(ratio_palette[1], ratio_palette[1], ratio_palette[1], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)]))
   
@@ -326,7 +329,7 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     geom_path(
       data = data.frame(
         x = c(bar_xmin, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmax),
-        y = c(ratio_min, ratio_max, ratio_max + triangle_height, ratio_max, ratio_min)),
+        y = c(ratio_min, ratio_max, ratio_max + top_triangle_height, ratio_max, ratio_min)),
       aes(x = x, y = y),
       inherit.aes = FALSE,
       linewidth = 0.35,
@@ -334,7 +337,7 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     geom_path(
       data = data.frame(
         x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
-        y = c(ratio_min, ratio_min - triangle_height, ratio_min)),
+        y = c(ratio_min, ratio_min - bottom_triangle_height, ratio_min)),
       aes(x = x, y = y),
       inherit.aes = FALSE,
       linewidth = 0.35,
@@ -353,7 +356,7 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     annotate(
       "text",
       x = bar_xmin,
-      y = ratio_max + triangle_height + (0.05 * ratio_span),
+      y = ratio_max + top_triangle_height + (0.05 * ratio_span),
       label = legend_title,
       hjust = 0,
       vjust = 0,
@@ -362,7 +365,7 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     scale_fill_identity() +
     coord_cartesian(
       xlim = c(0, 1.95),
-      ylim = c(ratio_min - triangle_height - (0.08 * ratio_span), ratio_max + triangle_height + (0.16 * ratio_span)),
+      ylim = c(ratio_min - bottom_triangle_height - (0.08 * ratio_span), ratio_max + top_triangle_height + (0.16 * ratio_span)),
       clip = "off") +
     theme_void() +
     theme(
