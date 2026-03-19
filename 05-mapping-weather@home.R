@@ -300,8 +300,15 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
   ratio_min <- lower_cap
   ratio_max <- upper_cap
   ratio_span <- ratio_max - ratio_min
+  triangle_height <- max(ratio_span * 0.08, 0.2)
   bar_xmin <- 0.31
   bar_xmax <- 0.57
+  
+  tri_df <- data.frame(
+    x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
+    y = c(ratio_min, ratio_min - triangle_height, ratio_min, ratio_max, ratio_max + triangle_height, ratio_max),
+    group = c("bottom", "bottom", "bottom", "top", "top", "top"),
+    fill_col = c(ratio_palette[1], ratio_palette[1], ratio_palette[1], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)]))
   
   tick_df <- data.frame(
     y = ratio_breaks,
@@ -312,12 +319,26 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
       data = bar_df,
       aes(xmin = bar_xmin, xmax = bar_xmax, ymin = ymin, ymax = ymax, fill = fill_col),
       colour = NA) +
-    geom_rect(
-      aes(xmin = bar_xmin, xmax = bar_xmax, ymin = ratio_min, ymax = ratio_max),
+    geom_polygon(
+      data = tri_df,
+      aes(x = x, y = y, group = group, fill = fill_col),
+      colour = NA) +
+    geom_path(
+      data = data.frame(
+        x = c(bar_xmin, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmax),
+        y = c(ratio_min, ratio_max, ratio_max + triangle_height, ratio_max, ratio_min)),
+      aes(x = x, y = y),
       inherit.aes = FALSE,
-      fill = NA,
-      colour = "black",
-      linewidth = 0.35) +
+      linewidth = 0.35,
+      colour = "black") +
+    geom_path(
+      data = data.frame(
+        x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
+        y = c(ratio_min, ratio_min - triangle_height, ratio_min)),
+      aes(x = x, y = y),
+      inherit.aes = FALSE,
+      linewidth = 0.35,
+      colour = "black") +
     geom_segment(
       data = tick_df,
       aes(x = bar_xmax, xend = bar_xmax + 0.11, y = y, yend = y),
@@ -332,7 +353,7 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     annotate(
       "text",
       x = bar_xmin,
-      y = ratio_max + (0.08 * ratio_span),
+      y = ratio_max + triangle_height + (0.05 * ratio_span),
       label = legend_title,
       hjust = 0,
       vjust = 0,
@@ -341,7 +362,7 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     scale_fill_identity() +
     coord_cartesian(
       xlim = c(0, 1.95),
-      ylim = c(ratio_min - (0.08 * ratio_span), ratio_max + (0.20 * ratio_span)),
+      ylim = c(ratio_min - triangle_height - (0.08 * ratio_span), ratio_max + triangle_height + (0.16 * ratio_span)),
       clip = "off") +
     theme_void() +
     theme(
@@ -451,15 +472,14 @@ intersection_values <- intersection_values[is.finite(intersection_values)]
 if (length(intersection_values) == 0) {
   stop("No finite probability-ratio values found for NZ-intersecting cells.")}
 
-ratio_breaks <- c(1, 1.5, 2, 2.5, 3, 4, 5, 6)
+ratio_breaks <- get_fixed_width_bin_spec(intersection_values, bin_width = 1, min_value = 1, max_value = 6.5)$breaks
+ratio_breaks <- unique(c(1, ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6], 6))
 
 # Setting probability-ratio colours
 ratio_palette <- c(
   "#D0D4DA", # <1
-  "#EAF3FF", # 1-1.5
-  "#D6E9FF", # 1.5-2
-  "#BFD9FF", # 2-2.5
-  "#A5CCFF", # 2.5-3
+  "#EAF3FF", # 1-2
+  "#BFD9FF", # 2-3
   "#7FB3FF", # 3-4
   "#3F8BE6", # 4-5
   "#0B4FAF", # 5-6
