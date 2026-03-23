@@ -36,6 +36,8 @@ theme_thesis <- theme_minimal(base_size = 9) +
     strip.text   = element_text(size = 8, face = "bold"),
     legend.title = element_text(size = 8),
     legend.text  = element_text(size = 7),
+    panel.grid.major = element_line(colour = "grey85", linewidth = 0.3),
+    panel.grid.minor = element_line(colour = "grey92", linewidth = 0.2),
     panel.spacing = unit(0.5, "lines")
   )
 
