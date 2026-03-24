@@ -337,6 +337,14 @@ event_definitions <- tribble(
 ) %>%
   mutate(event_title = map2_chr(start_date, end_date, format_event_title))
 
+chiltern_site <- tibble(
+  station = "Chiltern",
+  latitude = -36.81804,
+  longitude = 175.53654,
+  label_longitude = 175.41,
+  label_latitude = -36.69
+)
+
 build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim = c(-37.6, -36.4)) {
   legend_labels <- c(
     "Daily Rainfall (mm)",
@@ -400,6 +408,28 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim
       shape = 21,
       size = 3.4,
       stroke = 1.1
+    ) +
+    geom_curve(
+      data = chiltern_site,
+      aes(
+        x = label_longitude,
+        y = label_latitude,
+        xend = longitude,
+        yend = latitude
+      ),
+      curvature = -0.2,
+      linewidth = 0.35,
+      colour = "grey20",
+      arrow = grid::arrow(length = grid::unit(0.08, "inches"))
+    ) +
+    geom_text(
+      data = chiltern_site,
+      aes(x = label_longitude, y = label_latitude, label = station),
+      hjust = 1,
+      vjust = -0.3,
+      size = 2.6,
+      colour = "grey10",
+      fontface = "bold"
     ) +
     geom_text(
       data = event_data,
@@ -467,8 +497,8 @@ event_maps <- map(
 
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 
-p_coromandel_event_panel <- patchwork::guide_area() / event_map_grid +
-  patchwork::plot_layout(heights = c(0.05, 1), guides = "collect") +
+p_coromandel_event_panel <- event_map_grid | patchwork::guide_area() +
+  patchwork::plot_layout(widths = c(1, 0.16), guides = "collect") +
   patchwork::plot_annotation(
     theme = theme(
       plot.title = element_text(hjust = 0.5, margin = margin(b = 3))
