@@ -340,9 +340,7 @@ event_definitions <- tribble(
 chiltern_site <- tibble(
   station = "Chiltern",
   latitude = -36.81804,
-  longitude = 175.53654,
-  label_longitude = 175.41,
-  label_latitude = -36.69
+  longitude = 175.53654
 )
 
 build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim = c(-37.6, -36.4)) {
@@ -409,24 +407,12 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim
       size = 3.4,
       stroke = 1.1
     ) +
-    geom_curve(
-      data = chiltern_site,
-      aes(
-        x = label_longitude,
-        y = label_latitude,
-        xend = longitude,
-        yend = latitude
-      ),
-      curvature = -0.2,
-      linewidth = 0.35,
-      colour = "grey20",
-      arrow = grid::arrow(length = grid::unit(0.08, "inches"))
-    ) +
     geom_text(
       data = chiltern_site,
-      aes(x = label_longitude, y = label_latitude, label = station),
+      aes(x = longitude, y = latitude, label = station),
+      nudge_x = -0.035,
       hjust = 1,
-      vjust = -0.3,
+      vjust = 0.5,
       size = 2.6,
       colour = "grey10",
       fontface = "bold"
