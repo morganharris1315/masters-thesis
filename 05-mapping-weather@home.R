@@ -18,7 +18,7 @@ library(grid)
 # Setting input and output paths -------------------------------------------
 model_data_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
 nc_file <- file.path(model_data_dir,"current_decade",
-  "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm.nc")
+                     "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm.nc")
 lse_mask_file <- file.path(model_data_dir, "Land-Sea Mask for Weather@home Data.csv")
 ratio_grid_file <- file.path(model_data_dir, "weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv")
 
@@ -27,14 +27,14 @@ ratio_grid_file <- file.path(model_data_dir, "weather@home_exceedance_ge4_ge5_to
 mask_transpose <- TRUE
 
 masked_nc_file <- file.path(model_data_dir, "current_decade",
-  "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm-masked.nc")
+                            "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm-masked.nc")
 
 # Setting ratio map output names -------------------------------------------
 combined_ratio_output_png <- file.path(model_data_dir,
-  "weather@home_probability_ratio_ge4_top10_joint_combined_map.png")
+                                       "weather@home_probability_ratio_ge4_top10_joint_combined_map.png")
 
 ge5_ratio_output_png <- file.path(model_data_dir,
-  "weather@home_probability_ratio_ge5_map.png")
+                                  "weather@home_probability_ratio_ge5_map.png")
 
 # Loading the mask into an nlon x nlat matrix ------------------------------
 load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) {
@@ -56,7 +56,7 @@ load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) 
   
   dims_ok <- vapply(base_candidates, function(m) {
     is.matrix(m) && nrow(m) == nlon && ncol(m) == nlat
-    }, logical(1))
+  }, logical(1))
   
   if (!any(dims_ok)) {
     stop(sprintf("Could not coerce LSE mask to %d x %d matrix.", nlon, nlat))}
@@ -406,13 +406,13 @@ if (length(dim(precip_all)) == 3) {
     layer <- precip_all[, , t]
     layer[!mask_is_land] <- NaN
     precip_all[, , t] <- layer}
-  } else if (length(dim(precip_all)) == 4) {
+} else if (length(dim(precip_all)) == 4) {
   for (z in seq_len(dim(precip_all)[3])) {
     for (t in seq_len(dim(precip_all)[4])) {
       layer <- precip_all[, , z, t]
       layer[!mask_is_land] <- NaN
       precip_all[, , z, t] <- layer}}
-    } else {
+} else {
   ncdf4::nc_close(nc_masked)
   stop("Unexpected dimensions for item5216_daily_mean. Expected 3D or 4D variable.")}
 
@@ -478,7 +478,7 @@ ratio_palette <- c(
   "#0B4FAF", # 3-4
   "#08306B", # 4-5
   "#041F4A"  # >5
-   )
+)
 
 # Building the plots --------------------------------------------------------
 p_top10 <- make_nz_ratio_plot(
@@ -528,20 +528,20 @@ p_ratio_legend <- make_triangle_colorbar_plot(ratio_breaks, ratio_palette)
 
 p_combined <- (p_top10 + p_ge4 + p_joint + p_ratio_legend) +
   plot_layout(design = combined_design,
-    widths = c(1, 1, 0.44), heights = c(1, 1))
+              widths = c(1, 1, 0.44), heights = c(1, 1))
 
 p_ge5_with_legend <- p_ge5 + p_ge5_joint + p_ratio_legend +
-  plot_layout(widths = c(1, 1, 0.24))
+  plot_layout(widths = c(1, 1, 0.5))
 
 print(p_combined)
 print(p_ge5_with_legend)
 
 # Saving outputs ------------------------------------------------------------
 ggsave(filename = combined_ratio_output_png, plot = p_combined,
-  width = 16, height = 11, dpi = 300)
+       width = 16, height = 11, dpi = 300)
 
 ggsave(filename = ge5_ratio_output_png, plot = p_ge5_with_legend,
-  width = 12, height = 9, dpi = 300)
+       width = 16, height = 11, dpi = 300)
 
 # Running quick checks ------------------------------------------------------
 cat("NZ-intersecting cell count (>=4):", length(ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids),"\n")
@@ -558,3 +558,4 @@ cat("NZ-intersecting cell count (top 10%):", length(ratio_layers[["probability_r
 
 cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),"\n")
 # 185 cells
+
