@@ -121,12 +121,12 @@ create_example_year_plots <- function(df_station, station_name, threshold, outpu
   y_max <- y_max + 10
   
   p_hy <- ggplot(hy_df, aes(x = observation_date, y = rainfall_mm)) +
-    geom_col(fill = "#0072B2", width= 1.5, na.rm = TRUE) +
+    geom_col(fill = "#93acff", width= 1.5, na.rm = TRUE) +
     {if (is.finite(threshold)) geom_hline(yintercept = threshold, linetype = "dashed", colour = "#93acff", size = 1)} +
     scale_x_date(date_breaks = "1 month", date_labels = "%b") +
     scale_y_continuous(limits = c(0, y_max)) +
     labs(
-      title = glue("{station_name} — 2023"),
+      title = glue("{station_name} - 2023"),
       x = "Date",
       y = "Daily Rainfall (mm)"
     ) +
@@ -427,7 +427,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim
     scale_colour_manual(
       values = c(
         "Daily Rainfall (mm)" = "grey20",
-        "Above 33rd Rx1day Percentile Threshold" = "#93acff"
+        "Above 33rd Rx1day Percentile Threshold" = "red"
       ),
       breaks = legend_labels,
       name = NULL
@@ -448,7 +448,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim
           size = c(2.7, 3.4),
           stroke = c(0.4, 1.1),
           fill = c("grey45", "grey45"),
-          colour = c("grey20", "#93acff"),
+          colour = c("grey20", "red"),
           alpha = 1
         )
       )
@@ -456,7 +456,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim
     theme_thesis +
     theme(
       axis.title = element_blank(),
-      legend.position = "top"
+      legend.position = "right"
     )
 }
 
@@ -470,13 +470,8 @@ event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 p_coromandel_event_panel <- patchwork::guide_area() / event_map_grid +
   patchwork::plot_layout(heights = c(0.05, 1), guides = "collect") +
   patchwork::plot_annotation(
-    title = "Coromandel Key Events - 2023",
     theme = theme(
-      plot.title = element_text(hjust = 0.5, margin = margin(b = 3)),
-      legend.position = "top",
-      legend.justification = "center",
-      legend.margin = margin(t = -6, b = 0),
-      legend.box.margin = margin(t = -6, b = 0)
+      plot.title = element_text(hjust = 0.5, margin = margin(b = 3))
     )
   )
 
@@ -489,3 +484,4 @@ ggsave(
   height = 10,
   dpi = 300
 )
+
