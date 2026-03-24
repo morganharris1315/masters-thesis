@@ -276,6 +276,11 @@ p_coromandel_map <- ggplot() +
     alpha = 0.9
   ) +
   coord_quickmap(xlim = c(175.2, 176.2), ylim = c(-37.5, -36.5), expand = FALSE) +
+  scale_x_continuous(
+    breaks = c(175.2, 175.7, 176.2),
+    labels = scales::label_number(accuracy = 0.1),
+    minor_breaks = NULL
+  ) +
   labs(
     title = "Coromandel Stations"
   ) +
@@ -427,7 +432,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
     ) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     scale_x_continuous(
-      breaks = seq(xlim[1], xlim[2], by = 0.4),
+      breaks = c(xlim[1], mean(xlim), xlim[2]),
       labels = scales::label_number(accuracy = 0.1),
       minor_breaks = NULL
     ) +
@@ -494,4 +499,3 @@ ggsave(
   filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2.png"),
   plot = p_coromandel_event_panel,
   dpi = 300)
-
