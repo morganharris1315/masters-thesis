@@ -282,13 +282,12 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
   if (length(ratio_breaks) < 2) {
     stop("`ratio_breaks` must contain at least two values.")}
   
-  core_breaks <- ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6]
+  core_breaks <- sort(unique(ratio_breaks))
   if (length(core_breaks) < 2) {
-    stop("`ratio_breaks` must include at least two values between 1 and 6.")}
+    stop("`ratio_breaks` must include at least two finite values.")}
   
-  lower_step <- diff(core_breaks[1:2])
+  lower_cap <- 0
   upper_step <- diff(tail(core_breaks, 2))
-  lower_cap <- min(core_breaks) - lower_step
   upper_cap <- max(core_breaks) + upper_step
   
   interval_min <- c(lower_cap, head(core_breaks, -1), max(core_breaks))
@@ -302,20 +301,19 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
   ratio_min <- lower_cap
   ratio_max <- upper_cap
   ratio_span <- ratio_max - ratio_min
-  bottom_triangle_height <- lower_step
   top_triangle_height <- upper_step
   bar_xmin <- 0.31
   bar_xmax <- 0.57
   
   tri_df <- data.frame(
-    x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
-    y = c(ratio_min, ratio_min - bottom_triangle_height, ratio_min, ratio_max, ratio_max + top_triangle_height, ratio_max),
-    group = c("bottom", "bottom", "bottom", "top", "top", "top"),
-    fill_col = c(ratio_palette[1], ratio_palette[1], ratio_palette[1], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)], ratio_palette[length(ratio_palette)]))
+    x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
+    y = c(ratio_max, ratio_max + top_triangle_height, ratio_max),
+    group = "top",
+    fill_col = ratio_palette[length(ratio_palette)])
   
   tick_df <- data.frame(
-    y = ratio_breaks,
-    label = scales::label_number(accuracy = 0.1)(ratio_breaks))
+    y = c(0, ratio_breaks),
+    label = scales::label_number(accuracy = 0.1)(c(0, ratio_breaks)))
   
   ggplot() +
     geom_rect(
@@ -330,14 +328,6 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
       data = data.frame(
         x = c(bar_xmin, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmax),
         y = c(ratio_min, ratio_max, ratio_max + top_triangle_height, ratio_max, ratio_min)),
-      aes(x = x, y = y),
-      inherit.aes = FALSE,
-      linewidth = 0.35,
-      colour = "black") +
-    geom_path(
-      data = data.frame(
-        x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
-        y = c(ratio_min, ratio_min - bottom_triangle_height, ratio_min)),
       aes(x = x, y = y),
       inherit.aes = FALSE,
       linewidth = 0.35,
@@ -365,7 +355,7 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     scale_fill_identity() +
     coord_cartesian(
       xlim = c(0, 1.95),
-      ylim = c(ratio_min - bottom_triangle_height - (0.08 * ratio_span), ratio_max + top_triangle_height + (0.16 * ratio_span)),
+      ylim = c(ratio_min - (0.04 * ratio_span), ratio_max + top_triangle_height + (0.16 * ratio_span)),
       clip = "off") +
     theme_void() +
     theme(
@@ -434,6 +424,7 @@ ratio_grid <- utils::read.csv(ratio_grid_file, stringsAsFactors = FALSE)
 ratio_vars <- c(
   "probability_ratio_ge4_future_over_current",
   "probability_ratio_ge5_future_over_current",
+  "probability_ratio_joint_top10_ge5_future_over_current",
   "probability_ratio_rx1day_top10_future_over_current",
   "probability_ratio_joint_top10_ge4_future_over_current")
 
@@ -475,19 +466,18 @@ intersection_values <- intersection_values[is.finite(intersection_values)]
 if (length(intersection_values) == 0) {
   stop("No finite probability-ratio values found for NZ-intersecting cells.")}
 
-ratio_breaks <- c(1, 1.5, 2, 2.5, 3, 4, 5, 6)
+ratio_breaks <- c(1, 1.5, 2, 2.5, 3, 4, 5)
 
 # Setting probability-ratio colours
 ratio_palette <- c(
-  "#D0D4DA", # <1
-  "#F3F8FF", # 1-1.5
-  "#EAF3FF", # 1.5-2
-  "#D7E8FF", # 2-2.5
-  "#BFD9FF", # 2.5-3
-  "#7FB3FF", # 3-4
-  "#3F8BE6", # 4-5
-  "#0B4FAF", # 5-6
-  "#08306B"  # >6
+  "#D0D4DA", # 0-1
+  "#D7E8FF", # 1-1.5
+  "#BFD9FF", # 1.5-2
+  "#7FB3FF", # 2-2.5
+  "#3F8BE6", # 2.5-3
+  "#0B4FAF", # 3-4
+  "#08306B", # 4-5
+  "#041F4A"  # >5
    )
 
 # Building the plots --------------------------------------------------------
@@ -517,7 +507,14 @@ p_joint <- make_nz_ratio_plot(
 p_ge5 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_ge5_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_ge5_future_over_current"]]$keep_ids,
-  "Years with ≥5 exceedances",
+  "(a) Years with ≥5 exceedances",
+  ratio_breaks,
+  ratio_palette)
+
+p_ge5_joint <- make_nz_ratio_plot(
+  ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$poly,
+  ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$keep_ids,
+  "(b) Years with ≥5 exceedances AND above 90th percentile Rx1day",
   ratio_breaks,
   ratio_palette)
 
@@ -533,8 +530,8 @@ p_combined <- (p_top10 + p_ge4 + p_joint + p_ratio_legend) +
   plot_layout(design = combined_design,
     widths = c(1, 1, 0.44), heights = c(1, 1))
 
-p_ge5_with_legend <- p_ge5 + p_ratio_legend +
-  plot_layout(widths = c(1, 0.24))
+p_ge5_with_legend <- p_ge5 + p_ge5_joint + p_ratio_legend +
+  plot_layout(widths = c(1, 1, 0.24))
 
 print(p_combined)
 print(p_ge5_with_legend)
@@ -553,9 +550,11 @@ cat("NZ-intersecting cell count (>=4):", length(ratio_layers[["probability_ratio
 cat("NZ-intersecting cell count (>=5):", length(ratio_layers[["probability_ratio_ge5_future_over_current"]]$keep_ids),"\n")
 # 185 cells
 
+cat("NZ-intersecting cell count (>=5 + top 10%):", length(ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$keep_ids),"\n")
+# 185 cells
+
 cat("NZ-intersecting cell count (top 10%):", length(ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$keep_ids),"\n")
 # 185 cells
 
 cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),"\n")
 # 185 cells
-
