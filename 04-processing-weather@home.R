@@ -277,6 +277,32 @@ dim(current_prop_joint_top10_ge4)
 dim(future_prop_joint_top10_ge4)
 # both should be 44 X 44
 
+# Probability-ratio block for joint event: top 10% RX1day and >=5 exceedances
+# Uses the same top 10% threshold and joint-event logic, but with min_days = 5.
+
+current_prop_joint_top10_ge5 <- calc_joint_top10_ge4_proportion(
+  rx_array = current_rx_array,
+  exceedance_array = current_exceedance_array,
+  threshold_matrix = rx1day_threshold_90_current,
+  min_days = 5
+)
+
+future_prop_joint_top10_ge5 <- calc_joint_top10_ge4_proportion(
+  rx_array = future_rx_array,
+  exceedance_array = future_exceedance_array,
+  threshold_matrix = rx1day_threshold_90_current,
+  min_days = 5
+)
+
+probability_ratio_joint_top10_ge5 <- calc_probability_ratio(
+  current_prop_joint_top10_ge5,
+  future_prop_joint_top10_ge5
+)
+
+dim(current_prop_joint_top10_ge5)
+dim(future_prop_joint_top10_ge5)
+# both should be 44 X 44
+
 # Build a per-grid-cell output table with lon/lat and all required metrics --
 # Includes:
 # - rotated-model longitude0 and latitude0
@@ -317,7 +343,10 @@ grid_results <- data.frame(
   probability_ratio_rx1day_top10_future_over_current = probability_ratio_rx1day_top10[cbind(grid_template$lon_index, grid_template$lat_index)],
   prop_years_joint_top10_ge4_current = current_prop_joint_top10_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
   prop_years_joint_top10_ge4_future = future_prop_joint_top10_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
-  probability_ratio_joint_top10_ge4_future_over_current = probability_ratio_joint_top10_ge4[cbind(grid_template$lon_index, grid_template$lat_index)]
+  probability_ratio_joint_top10_ge4_future_over_current = probability_ratio_joint_top10_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
+  prop_years_joint_top10_ge5_current = current_prop_joint_top10_ge5[cbind(grid_template$lon_index, grid_template$lat_index)],
+  prop_years_joint_top10_ge5_future = future_prop_joint_top10_ge5[cbind(grid_template$lon_index, grid_template$lat_index)],
+  probability_ratio_joint_top10_ge5_future_over_current = probability_ratio_joint_top10_ge5[cbind(grid_template$lon_index, grid_template$lat_index)]
 )
 
 head(grid_results)
@@ -348,3 +377,7 @@ min(probability_ratio_rx1day_top10, na.rm = TRUE) # Min top10 RX1day
 max(probability_ratio_joint_top10_ge4, na.rm = TRUE) # Max joint top10 + ge4
 mean(probability_ratio_joint_top10_ge4[is.finite(probability_ratio_joint_top10_ge4)], na.rm = TRUE) # Mean joint top10 + ge4
 min(probability_ratio_joint_top10_ge4, na.rm = TRUE) # Min joint top10 + ge4
+
+max(probability_ratio_joint_top10_ge5, na.rm = TRUE) # Max joint top10 + ge5
+mean(probability_ratio_joint_top10_ge5[is.finite(probability_ratio_joint_top10_ge5)], na.rm = TRUE) # Mean joint top10 + ge5
+min(probability_ratio_joint_top10_ge5, na.rm = TRUE) # Min joint top10 + ge5
