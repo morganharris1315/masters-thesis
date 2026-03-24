@@ -1,137 +1,124 @@
+# -------------------------------------------------------------------------
 # 07-combined-figures.R
-#
-# Purpose:
-# Given a known value in the land-sea mask (e.g., 294.9545), identify the
-# corresponding grid-cell row/column and extract that same cell from a second
-# gridded CSV file. If latitude/longitude labels are present in row/column names,
-# those coordinates are also returned.
+# -------------------------------------------------------------------------
+# Mar 2026
+# Find the coordinates (row/column and optional lat/lon labels) for a
+# specific weather@home grid cell using the land-sea mask value, then pull
+# the matching value from the joint probability-ratio grid.
+# -------------------------------------------------------------------------
 
-options(stringsAsFactors = FALSE)
+# Setting input paths and target value ------------------------------------
+land_mask_file <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/Land-Sea Mask for Weather@home Data.csv"
+ratio_grid_file <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv"
 
-# ----------------------------- User inputs -----------------------------------
-land_mask_path <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/Land-Sea Mask for Weather@home Data.csv"
-ratio_grid_path <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv"
-
-# The value you already know appears in the land mask
 target_value <- 294.9545
-
-# Tolerance for floating-point comparisons
 value_tolerance <- 1e-6
-# -----------------------------------------------------------------------------
 
-read_grid_csv <- function(path) {
-  # Read with names preserved (important when lon/lat are column headers)
-  raw <- read.csv(path, check.names = FALSE)
-
-  # Heuristic: if first column looks like a row-label/index column (often lat),
-  # move it to row names before numeric conversion.
+# Helper functions ---------------------------------------------------------
+read_grid_csv <- function(file_path) {
+  raw <- utils::read.csv(
+    file = file_path,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+  
   first_col <- raw[[1]]
-  first_col_name <- names(raw)[1]
-
   use_first_col_as_rownames <- FALSE
-
-  # If the first column is non-numeric, it's very likely a label column.
+  
   if (!is.numeric(first_col)) {
     suppressWarnings(first_col_num <- as.numeric(first_col))
-    if (any(!is.na(first_col_num))) {
-      # Mixed numeric/character: still likely labels
-      use_first_col_as_rownames <- TRUE
-    } else {
+    if (any(!is.na(first_col_num)) || all(is.na(first_col_num))) {
       use_first_col_as_rownames <- TRUE
     }
   } else {
-    # If numeric but not a simple 1..n sequence, it could be latitude labels.
-    seq_like <- all(!is.na(first_col)) && identical(first_col, seq_len(nrow(raw)))
-    if (!seq_like) use_first_col_as_rownames <- TRUE
+    is_simple_index <- all(!is.na(first_col)) && identical(first_col, seq_len(nrow(raw)))
+    if (!is_simple_index) {
+      use_first_col_as_rownames <- TRUE
+    }
   }
-
+  
   if (use_first_col_as_rownames) {
     rownames(raw) <- as.character(first_col)
     raw <- raw[, -1, drop = FALSE]
   }
-
-  # Convert all remaining values to numeric.
-  num <- suppressWarnings(as.data.frame(lapply(raw, as.numeric), check.names = FALSE))
-  mat <- as.matrix(num)
-
-  # Preserve row/column names where available.
-  rownames(mat) <- if (!is.null(rownames(raw))) rownames(raw) else rownames(mat)
-  colnames(mat) <- colnames(raw)
-
-  list(
-    matrix = mat,
-    original_first_col_name = first_col_name,
-    used_first_col_as_rownames = use_first_col_as_rownames
-  )
+  
+  numeric_raw <- suppressWarnings(as.data.frame(lapply(raw, as.numeric), check.names = FALSE))
+  grid_matrix <- as.matrix(numeric_raw)
+  
+  if (!is.null(rownames(raw))) {
+    rownames(grid_matrix) <- rownames(raw)
+  }
+  colnames(grid_matrix) <- colnames(raw)
+  
+  grid_matrix
 }
 
-parse_numeric_labels <- function(x) {
-  if (is.null(x)) return(rep(NA_real_, 0))
-  suppressWarnings(as.numeric(x))
+parse_numeric_labels <- function(labels) {
+  if (is.null(labels)) {
+    return(numeric(0))
+  }
+  suppressWarnings(as.numeric(labels))
 }
 
-find_grid_cells_by_value <- function(mat, value, tol = 1e-6) {
-  idx <- which(abs(mat - value) <= tol, arr.ind = TRUE)
-  if (nrow(idx) == 0) return(idx)
-  idx
+find_matching_cells <- function(grid_matrix, value, tolerance = 1e-6) {
+  which(abs(grid_matrix - value) <= tolerance, arr.ind = TRUE)
 }
 
-# Read both grids
-land <- read_grid_csv(land_mask_path)
-ratio <- read_grid_csv(ratio_grid_path)
-land_mat <- land$matrix
-ratio_mat <- ratio$matrix
+# Loading grid files -------------------------------------------------------
+land_mask_matrix <- read_grid_csv(land_mask_file)
+ratio_grid_matrix <- read_grid_csv(ratio_grid_file)
 
-# Basic shape check
-if (!all(dim(land_mat) == dim(ratio_mat))) {
+# Checking dimensions ------------------------------------------------------
+if (!all(dim(land_mask_matrix) == dim(ratio_grid_matrix))) {
   stop(
     "Grid dimensions do not match.\n",
-    "Land mask dimensions: ", paste(dim(land_mat), collapse = " x "), "\n",
-    "Ratio grid dimensions: ", paste(dim(ratio_mat), collapse = " x "), "\n",
-    "You may need to align/transpose one dataset before matching cells."
+    "Land mask dimensions: ", paste(dim(land_mask_matrix), collapse = " x "), "\n",
+    "Ratio grid dimensions: ", paste(dim(ratio_grid_matrix), collapse = " x "), "\n",
+    "Check whether one file needs transposing or different row/column handling."
   )
 }
 
-# Find all matching cells in land mask
-hits <- find_grid_cells_by_value(land_mat, target_value, tol = value_tolerance)
+# Finding matching grid cell(s) -------------------------------------------
+match_indices <- find_matching_cells(land_mask_matrix, target_value, value_tolerance)
 
-if (nrow(hits) == 0) {
+if (nrow(match_indices) == 0) {
   stop(
-    "No cells found in land mask with value ", target_value,
-    " within tolerance ", value_tolerance, "."
+    "No grid cell found in the land mask for value ",
+    target_value,
+    " within tolerance ",
+    value_tolerance,
+    "."
   )
 }
 
-# Pull coordinates (if encoded in names)
-lat_labels <- rownames(land_mat)
-lon_labels <- colnames(land_mat)
+# Building output table ----------------------------------------------------
+lat_labels <- rownames(land_mask_matrix)
+lon_labels <- colnames(land_mask_matrix)
+
 lat_values <- parse_numeric_labels(lat_labels)
 lon_values <- parse_numeric_labels(lon_labels)
 
-# Build results table
-results <- data.frame(
-  hit_number = seq_len(nrow(hits)),
-  row_index = hits[, "row"],
-  col_index = hits[, "col"],
-  land_mask_value = land_mat[hits],
-  ratio_grid_value = ratio_mat[hits],
-  latitude = if (length(lat_values) > 0) lat_values[hits[, "row"]] else NA_real_,
-  longitude = if (length(lon_values) > 0) lon_values[hits[, "col"]] else NA_real_
+matched_cells <- data.frame(
+  hit_number = seq_len(nrow(match_indices)),
+  row_index = match_indices[, "row"],
+  col_index = match_indices[, "col"],
+  land_mask_value = land_mask_matrix[match_indices],
+  ratio_grid_value = ratio_grid_matrix[match_indices],
+  latitude = if (length(lat_values) > 0) lat_values[match_indices[, "row"]] else NA_real_,
+  longitude = if (length(lon_values) > 0) lon_values[match_indices[, "col"]] else NA_real_
 )
 
-cat("\nMatched cell(s) for value", target_value, "in land mask:\n")
-print(results)
+print(matched_cells)
 
-# Optional: write output for downstream use
-output_path <- "matched_grid_cells_for_294_9545.csv"
-write.csv(results, output_path, row.names = FALSE)
-cat("\nSaved match table to:", output_path, "\n")
+# Saving output ------------------------------------------------------------
+output_file <- "matched_grid_cells_for_294_9545.csv"
+utils::write.csv(matched_cells, output_file, row.names = FALSE)
 
-# Helpful note for interpretation
-if (all(is.na(results$latitude)) || all(is.na(results$longitude))) {
-  cat(
-    "\nNote: Latitude/longitude were not detected from row/column labels.\n",
-    "You still have exact matrix coordinates via row_index and col_index.\n",
-    sep = ""
+message("Saved matched grid cells to: ", output_file)
+
+if (all(is.na(matched_cells$latitude)) || all(is.na(matched_cells$longitude))) {
+  message(
+    "Latitude/longitude labels were not detected from row/column names. ",
+    "Use row_index and col_index from the output file as the exact cell coordinates."
   )
 }
