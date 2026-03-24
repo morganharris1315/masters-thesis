@@ -524,7 +524,7 @@ p_ge5 <- make_nz_ratio_plot(
 p_ge5_joint <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$keep_ids,
-  "(b) Years with ≥5 exceedances AND above 90th percentile Rx1day",
+  "(b) Years with extreme Rx1day AND ≥5 exceedances",
   ratio_breaks,
   ratio_palette) +
   theme(
@@ -540,10 +540,10 @@ p_ratio_legend <- make_triangle_colorbar_plot(ratio_breaks, ratio_palette)
 
 p_combined <- (p_top10 + p_ge4 + p_joint + p_ratio_legend) +
   plot_layout(design = combined_design,
-              widths = c(1, 1, 0.44), heights = c(1, 1))
+              widths = c(1, 1, 0.40), heights = c(1, 1))
 
 p_ge5_with_legend <- p_ge5 + p_ge5_joint + p_ratio_legend +
-  plot_layout(widths = c(1, 1, 0.5))
+  plot_layout(widths = c(1, 1, 0.40), heights = c(11,11,0.8))
 
 print(p_combined)
 print(p_ge5_with_legend)
@@ -570,3 +570,4 @@ cat("NZ-intersecting cell count (top 10%):", length(ratio_layers[["probability_r
 
 cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),"\n")
 # 185 cells
+
