@@ -517,14 +517,18 @@ p_ge5 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_ge5_future_over_current"]]$keep_ids,
   "(a) Years with ≥5 exceedances",
   ratio_breaks,
-  ratio_palette)
+  ratio_palette) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, margin = margin(b = -18)))
 
 p_ge5_joint <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$keep_ids,
   "(b) Years with ≥5 exceedances AND above 90th percentile Rx1day",
   ratio_breaks,
-  ratio_palette)
+  ratio_palette) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, margin = margin(b = -18)))
 
 combined_design <- c(
   area(t = 1, l = 1, b = 1, r = 1),
