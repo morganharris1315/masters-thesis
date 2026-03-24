@@ -333,6 +333,11 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
       linewidth = 0.35,
       colour = "black") +
     geom_segment(
+      aes(x = bar_xmin, xend = bar_xmax, y = ratio_min, yend = ratio_min),
+      inherit.aes = FALSE,
+      linewidth = 0.35,
+      colour = "black") +
+    geom_segment(
       data = tick_df,
       aes(x = bar_xmax, xend = bar_xmax + 0.11, y = y, yend = y),
       inherit.aes = FALSE,
