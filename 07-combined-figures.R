@@ -23,22 +23,27 @@ read_grid_csv <- function(file_path) {
   )
   
   first_col <- raw[[1]]
-  use_first_col_as_rownames <- FALSE
+  first_col_char <- trimws(as.character(first_col))
+  suppressWarnings(first_col_num <- as.numeric(first_col_char))
   
-  if (!is.numeric(first_col)) {
-    suppressWarnings(first_col_num <- as.numeric(first_col))
-    if (any(!is.na(first_col_num)) || all(is.na(first_col_num))) {
-      use_first_col_as_rownames <- TRUE
-    }
-  } else {
-    is_simple_index <- all(!is.na(first_col)) && identical(first_col, seq_len(nrow(raw)))
-    if (!is_simple_index) {
-      use_first_col_as_rownames <- TRUE
-    }
-  }
+  is_simple_index <- all(!is.na(first_col_num)) &&
+    length(first_col_num) == nrow(raw) &&
+    identical(first_col_num, seq_len(nrow(raw)))
+  
+  has_missing_or_blank <- any(
+    is.na(first_col) |
+      first_col_char == "" |
+      tolower(first_col_char) %in% c("na", "nan")
+  )
+  
+  has_unique_labels <- !anyDuplicated(first_col_char)
+  
+  use_first_col_as_rownames <- !is_simple_index && !has_missing_or_blank && has_unique_labels
   
   if (use_first_col_as_rownames) {
-    rownames(raw) <- as.character(first_col)
+    rownames(raw) <- first_col_char
+    raw <- raw[, -1, drop = FALSE]
+  } else if (is_simple_index) {
     raw <- raw[, -1, drop = FALSE]
   }
   
