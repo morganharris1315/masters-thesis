@@ -351,7 +351,7 @@ chiltern_site <- tibble(
 build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim = c(-37.6, -36.4)) {
   legend_labels <- c(
     "Daily Rainfall (mm)",
-    "Above 33rd Rx1day Percentile Threshold"
+    "Above Heavy Threshold"
   )
   
   event_data <- coromandel_obs %>%
@@ -396,7 +396,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
         colour = legend_labels[1]
       ),
       shape = 21,
-      size = 2.7,
+      size = 2,
       stroke = 0.4,
       alpha = 0.95
     ) +
@@ -409,7 +409,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
         colour = legend_labels[2]
       ),
       shape = 21,
-      size = 3.4,
+      size = 3,
       stroke = 1.1
     ) +
     geom_text(
@@ -499,3 +499,4 @@ ggsave(
   filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2.png"),
   plot = p_coromandel_event_panel,
   dpi = 300)
+
