@@ -288,15 +288,18 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
   
   lower_cap <- 0
   upper_step <- diff(tail(core_breaks, 2))
-  upper_cap <- max(core_breaks) + upper_step
+  upper_cap <- max(core_breaks)
   
-  interval_min <- c(lower_cap, head(core_breaks, -1), max(core_breaks))
-  interval_max <- c(min(core_breaks), tail(core_breaks, -1), upper_cap)
+  interval_min <- c(lower_cap, head(core_breaks, -1))
+  interval_max <- core_breaks
+  
+  if (length(ratio_palette) < (length(interval_min) + 1)) {
+    stop("`ratio_palette` must include one colour per bar segment plus one for the top arrow head.")}
   
   bar_df <- data.frame(
     ymin = interval_min,
     ymax = interval_max,
-    fill_col = ratio_palette)
+    fill_col = ratio_palette[seq_len(length(interval_min))])
   
   ratio_min <- lower_cap
   ratio_max <- upper_cap
@@ -563,4 +566,3 @@ cat("NZ-intersecting cell count (top 10%):", length(ratio_layers[["probability_r
 
 cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),"\n")
 # 185 cells
-
