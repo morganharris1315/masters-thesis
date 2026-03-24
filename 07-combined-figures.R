@@ -8,8 +8,14 @@
 # -------------------------------------------------------------------------
 
 # Setting input paths and target value ------------------------------------
+model_data_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data"
 land_mask_file <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/Land-Sea Mask for Weather@home Data.csv"
 ratio_grid_file <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/model_data/weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv"
+nc_file <- file.path(
+  model_data_dir,
+  "current_decade",
+  "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm.nc"
+)
 
 target_value <- 294.9545
 value_tolerance <- 1e-6
@@ -69,17 +75,53 @@ find_matching_cells <- function(grid_matrix, value, tolerance = 1e-6) {
   which(abs(grid_matrix - value) <= tolerance, arr.ind = TRUE)
 }
 
+load_first_nc_slice <- function(file_path, variable_name = "item5216_daily_mean") {
+  if (!requireNamespace("ncdf4", quietly = TRUE)) {
+    stop("Package 'ncdf4' is required to read the NetCDF file.")
+  }
+  
+  nc <- ncdf4::nc_open(file_path)
+  on.exit(ncdf4::nc_close(nc), add = TRUE)
+  
+  var_info <- nc$var[[variable_name]]
+  if (is.null(var_info)) {
+    stop("Variable '", variable_name, "' was not found in NetCDF file: ", file_path)
+  }
+  
+  var_ndims <- length(var_info$dim)
+  if (var_ndims < 2) {
+    stop("Expected at least 2 dimensions in NetCDF variable: ", variable_name)
+  }
+  
+  start <- rep(1, var_ndims)
+  count <- rep(1, var_ndims)
+  count[1:2] <- -1
+  
+  nc_slice <- ncdf4::ncvar_get(nc, variable_name, start = start, count = count)
+  as.matrix(nc_slice)
+}
+
 # Loading grid files -------------------------------------------------------
 land_mask_matrix <- read_grid_csv(land_mask_file)
+nc_grid_matrix <- load_first_nc_slice(nc_file)
 ratio_grid_matrix <- read_grid_csv(ratio_grid_file)
 
 # Checking dimensions ------------------------------------------------------
-if (!all(dim(land_mask_matrix) == dim(ratio_grid_matrix))) {
+if (!all(dim(land_mask_matrix) == dim(nc_grid_matrix))) {
   stop(
     "Grid dimensions do not match.\n",
     "Land mask dimensions: ", paste(dim(land_mask_matrix), collapse = " x "), "\n",
-    "Ratio grid dimensions: ", paste(dim(ratio_grid_matrix), collapse = " x "), "\n",
+    "NetCDF grid dimensions: ", paste(dim(nc_grid_matrix), collapse = " x "), "\n",
     "Check whether one file needs transposing or different row/column handling."
+  )
+}
+
+if (!all(dim(land_mask_matrix) == dim(ratio_grid_matrix))) {
+  warning(
+    "Ratio grid dimensions do not match mask/NetCDF dimensions.\n",
+    "Land mask dimensions: ", paste(dim(land_mask_matrix), collapse = " x "), "\n",
+    "Ratio grid dimensions: ", paste(dim(ratio_grid_matrix), collapse = " x "), "\n",
+    "Proceeding anyway; ratio_grid_value may not represent a direct 44 x 44 cell mapping."
   )
 }
 
