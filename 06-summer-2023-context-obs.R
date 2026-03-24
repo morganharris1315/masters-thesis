@@ -448,7 +448,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
     scale_colour_manual(
       values = c(
         "Daily Rainfall (mm)" = "grey20",
-        "Above 33rd Rx1day Percentile Threshold" = "red"
+        "Above Heavy Threshold" = "red"
       ),
       breaks = legend_labels,
       name = NULL
@@ -456,7 +456,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
     scale_fill_manual(
       values = c(
         "Daily Rainfall (mm)" = "grey45",
-        "Above 33rd Rx1day Percentile Threshold" = "grey45"
+        "Above Heavy Threshold" = "grey45"
       ),
       breaks = legend_labels,
       name = NULL
@@ -499,4 +499,3 @@ ggsave(
   filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2.png"),
   plot = p_coromandel_event_panel,
   dpi = 300)
-
