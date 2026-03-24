@@ -2,9 +2,9 @@
 # 07-combined-figures.R
 # -------------------------------------------------------------------------
 # Mar 2026
-# Find the coordinates (row/column and optional lat/lon labels) for a
-# specific weather@home grid cell using the land-sea mask value, then pull
-# the matching value from the joint probability-ratio grid.
+# Find the weather@home grid indices (lon_index/lat_index) for a specific
+# land-sea mask value. Uses the same mask transpose logic as
+# 05-mapping-weather@home.R.
 # -------------------------------------------------------------------------
 
 # Setting input paths and target value ------------------------------------
@@ -17,62 +17,12 @@ nc_file <- file.path(
   "item5216_daily_mean_a000_2006-07_2007-06-NZtrim-mm.nc"
 )
 
-target_value <- 294.9545
-value_tolerance <- 1e-6
+mask_transpose <- TRUE
+target_value <- 294.9544983
 
 # Helper functions ---------------------------------------------------------
-read_grid_csv <- function(file_path) {
-  raw <- utils::read.csv(
-    file = file_path,
-    check.names = FALSE,
-    stringsAsFactors = FALSE
-  )
-  
-  first_col <- raw[[1]]
-  first_col_char <- trimws(as.character(first_col))
-  suppressWarnings(first_col_num <- as.numeric(first_col_char))
-  
-  is_simple_index <- all(!is.na(first_col_num)) &&
-    length(first_col_num) == nrow(raw) &&
-    identical(first_col_num, seq_len(nrow(raw)))
-  
-  has_missing_or_blank <- any(
-    is.na(first_col) |
-      first_col_char == "" |
-      tolower(first_col_char) %in% c("na", "nan")
-  )
-  
-  has_unique_labels <- !anyDuplicated(first_col_char)
-  
-  use_first_col_as_rownames <- !is_simple_index && !has_missing_or_blank && has_unique_labels
-  
-  if (use_first_col_as_rownames) {
-    rownames(raw) <- first_col_char
-    raw <- raw[, -1, drop = FALSE]
-  } else if (is_simple_index) {
-    raw <- raw[, -1, drop = FALSE]
-  }
-  
-  numeric_raw <- suppressWarnings(as.data.frame(lapply(raw, as.numeric), check.names = FALSE))
-  grid_matrix <- as.matrix(numeric_raw)
-  
-  if (!is.null(rownames(raw))) {
-    rownames(grid_matrix) <- rownames(raw)
-  }
-  colnames(grid_matrix) <- colnames(raw)
-  
-  grid_matrix
-}
-
-parse_numeric_labels <- function(labels) {
-  if (is.null(labels)) {
-    return(numeric(0))
-  }
-  suppressWarnings(as.numeric(labels))
-}
-
-find_matching_cells <- function(grid_matrix, value, tolerance = 1e-6) {
-  which(abs(grid_matrix - value) <= tolerance, arr.ind = TRUE)
+find_matching_cells_exact <- function(grid_matrix, value) {
+  which(grid_matrix == value, arr.ind = TRUE)
 }
 
 load_first_nc_slice <- function(file_path, variable_name = "item5216_daily_mean") {
@@ -101,10 +51,62 @@ load_first_nc_slice <- function(file_path, variable_name = "item5216_daily_mean"
   as.matrix(nc_slice)
 }
 
+load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) {
+  raw <- utils::read.csv(
+    file = mask_file,
+    header = FALSE,
+    check.names = FALSE,
+    stringsAsFactors = FALSE,
+    na.strings = c("NaN", "NA", "")
+  )
+  
+  numeric_raw <- suppressWarnings(as.data.frame(lapply(raw, as.numeric)))
+  
+  as_m <- function(x) as.matrix(x)
+  base_candidates <- list(
+    as_m(numeric_raw),
+    as_m(numeric_raw[-1, , drop = FALSE]),
+    as_m(numeric_raw[, -1, drop = FALSE]),
+    as_m(numeric_raw[-1, -1, drop = FALSE])
+  )
+  
+  dims_ok <- vapply(base_candidates, function(m) {
+    is.matrix(m) && nrow(m) == nlon && ncol(m) == nlat
+  }, logical(1))
+  
+  if (!any(dims_ok)) {
+    stop(sprintf("Could not coerce LSE mask to %d x %d matrix.", nlon, nlat))
+  }
+  
+  mask <- base_candidates[[which(dims_ok)[1]]]
+  if (isTRUE(transpose_mask)) {
+    mask <- t(mask)
+  }
+  
+  if (nrow(mask) != nlon || ncol(mask) != nlat) {
+    stop("Mask dimensions do not match rainfall grid after transpose setting.")
+  }
+  
+  message(sprintf(
+    "Loaded LSE mask as %d x %d matrix (transpose=%s).",
+    nrow(mask),
+    ncol(mask),
+    ifelse(isTRUE(transpose_mask), "TRUE", "FALSE")
+  ))
+  mask
+}
+
 # Loading grid files -------------------------------------------------------
-land_mask_matrix <- read_grid_csv(land_mask_file)
 nc_grid_matrix <- load_first_nc_slice(nc_file)
-ratio_grid_matrix <- read_grid_csv(ratio_grid_file)
+nlon <- nrow(nc_grid_matrix)
+nlat <- ncol(nc_grid_matrix)
+land_mask_matrix <- load_lse_mask_matrix(
+  mask_file = land_mask_file,
+  nlon = nlon,
+  nlat = nlat,
+  transpose_mask = mask_transpose
+)
+ratio_grid <- utils::read.csv(ratio_grid_file, stringsAsFactors = FALSE)
 
 # Checking dimensions ------------------------------------------------------
 if (!all(dim(land_mask_matrix) == dim(nc_grid_matrix))) {
@@ -116,56 +118,37 @@ if (!all(dim(land_mask_matrix) == dim(nc_grid_matrix))) {
   )
 }
 
-if (!all(dim(land_mask_matrix) == dim(ratio_grid_matrix))) {
-  warning(
-    "Ratio grid dimensions do not match mask/NetCDF dimensions.\n",
-    "Land mask dimensions: ", paste(dim(land_mask_matrix), collapse = " x "), "\n",
-    "Ratio grid dimensions: ", paste(dim(ratio_grid_matrix), collapse = " x "), "\n",
-    "Proceeding anyway; ratio_grid_value may not represent a direct 44 x 44 cell mapping."
-  )
+if (!all(c("lon_index", "lat_index") %in% names(ratio_grid))) {
+  stop("Ratio grid must contain lon_index and lat_index columns.")
 }
 
 # Finding matching grid cell(s) -------------------------------------------
-match_indices <- find_matching_cells(land_mask_matrix, target_value, value_tolerance)
+match_indices <- find_matching_cells_exact(land_mask_matrix, target_value)
 
 if (nrow(match_indices) == 0) {
   stop(
-    "No grid cell found in the land mask for value ",
+    "No grid cell found in the land mask for exact value ",
     target_value,
-    " within tolerance ",
-    value_tolerance,
     "."
   )
 }
 
 # Building output table ----------------------------------------------------
-lat_labels <- rownames(land_mask_matrix)
-lon_labels <- colnames(land_mask_matrix)
-
-lat_values <- parse_numeric_labels(lat_labels)
-lon_values <- parse_numeric_labels(lon_labels)
-
 matched_cells <- data.frame(
   hit_number = seq_len(nrow(match_indices)),
-  row_index = match_indices[, "row"],
-  col_index = match_indices[, "col"],
-  land_mask_value = land_mask_matrix[match_indices],
-  ratio_grid_value = ratio_grid_matrix[match_indices],
-  latitude = if (length(lat_values) > 0) lat_values[match_indices[, "row"]] else NA_real_,
-  longitude = if (length(lon_values) > 0) lon_values[match_indices[, "col"]] else NA_real_
+  lon_index = match_indices[, "row"],
+  lat_index = match_indices[, "col"],
+  land_mask_value = land_mask_matrix[match_indices]
 )
 
-print(matched_cells)
-
-# Saving output ------------------------------------------------------------
-output_file <- "matched_grid_cells_for_294_9545.csv"
-utils::write.csv(matched_cells, output_file, row.names = FALSE)
-
-message("Saved matched grid cells to: ", output_file)
-
-if (all(is.na(matched_cells$latitude)) || all(is.na(matched_cells$longitude))) {
-  message(
-    "Latitude/longitude labels were not detected from row/column names. ",
-    "Use row_index and col_index from the output file as the exact cell coordinates."
+ratio_lookup <- ratio_grid[, c("lon_index", "lat_index"), drop = FALSE]
+matched_cells$ratio_row_matches <- vapply(seq_len(nrow(matched_cells)), function(i) {
+  sum(
+    ratio_lookup$lon_index == matched_cells$lon_index[i] &
+      ratio_lookup$lat_index == matched_cells$lat_index[i],
+    na.rm = TRUE
   )
-}
+}, integer(1))
+
+cat("Matching coordinates in console:\n")
+print(matched_cells)
