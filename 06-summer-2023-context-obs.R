@@ -486,7 +486,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim
     theme_thesis +
     theme(
       axis.title = element_blank(),
-      legend.position = "right"
+      legend.position = "none"
     )
 }
 
@@ -497,12 +497,12 @@ event_maps <- map(
 
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 
-p_coromandel_event_panel <- event_map_grid | patchwork::guide_area() +
-  patchwork::plot_layout(widths = c(1, 0.16), guides = "collect") +
-  patchwork::plot_annotation(
-    theme = theme(
-      plot.title = element_text(hjust = 0.5, margin = margin(b = 3))
-    )
+# Draw a single shared legend for the full panel on the right-hand side.
+p_coromandel_event_panel <- event_map_grid +
+  patchwork::plot_layout(guides = "collect") &
+  theme(
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5, margin = margin(b = 3))
   )
 
 print(p_coromandel_event_panel)
@@ -514,4 +514,3 @@ ggsave(
   height = 10,
   dpi = 300
 )
-
