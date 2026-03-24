@@ -553,7 +553,7 @@ ggsave(filename = combined_ratio_output_png, plot = p_combined,
        width = 16, height = 11, dpi = 300)
 
 ggsave(filename = ge5_ratio_output_png, plot = p_ge5_with_legend,
-       width = 16, height = 6.4, dpi = 300)
+       width = 16, height = 8.5, dpi = 300)
 
 # Running quick checks ------------------------------------------------------
 cat("NZ-intersecting cell count (>=4):", length(ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids),"\n")
@@ -570,3 +570,4 @@ cat("NZ-intersecting cell count (top 10%):", length(ratio_layers[["probability_r
 
 cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),"\n")
 # 185 cells
+
