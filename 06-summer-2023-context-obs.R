@@ -275,7 +275,7 @@ p_coromandel_map <- ggplot() +
     size = 2,
     alpha = 0.9
   ) +
-  coord_quickmap(xlim = c(175.3, 176.1), ylim = c(-37.5, -36.5), expand = FALSE) +
+  coord_quickmap(xlim = c(175.2, 176.2), ylim = c(-37.5, -36.5), expand = FALSE) +
   labs(
     title = "Coromandel Stations"
   ) +
@@ -343,7 +343,7 @@ chiltern_site <- tibble(
   longitude = 175.53654
 )
 
-build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim = c(-37.6, -36.4)) {
+build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim = c(-37.6, -36.4)) {
   legend_labels <- c(
     "Daily Rainfall (mm)",
     "Above 33rd Rx1day Percentile Threshold"
@@ -410,11 +410,11 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.3, 176.1), ylim
     geom_text(
       data = chiltern_site,
       aes(x = longitude, y = latitude, label = station),
-      nudge_x = -0.035,
+      nudge_x = -0.05,
       hjust = 1,
       vjust = 0.5,
       size = 2.6,
-      colour = "grey10",
+      colour = "black",
       fontface = "bold"
     ) +
     geom_text(
@@ -486,17 +486,12 @@ event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 # Draw a single shared legend for the full panel on the right-hand side.
 p_coromandel_event_panel <- event_map_grid +
   patchwork::plot_layout(guides = "collect") &
-  theme(
-    legend.position = "right",
-    plot.title = element_text(hjust = 0.5, margin = margin(b = 3))
-  )
+  theme(legend.position = "right")
 
 print(p_coromandel_event_panel)
 
 ggsave(
   filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2.png"),
   plot = p_coromandel_event_panel,
-  width = 9,
-  height = 10,
-  dpi = 300
-)
+  dpi = 300)
+
