@@ -322,10 +322,12 @@ make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_titl
     geom_rect(
       data = bar_df,
       aes(xmin = bar_xmin, xmax = bar_xmax, ymin = ymin, ymax = ymax, fill = fill_col),
+      inherit.aes = FALSE,
       colour = NA) +
     geom_polygon(
       data = tri_df,
       aes(x = x, y = y, group = group, fill = fill_col),
+      inherit.aes = FALSE,
       colour = NA) +
     geom_path(
       data = data.frame(
@@ -531,19 +533,21 @@ p_ge5_joint <- make_nz_ratio_plot(
     plot.title = element_text(face = "bold", size = 14, margin = margin(b = -18)))
 
 combined_design <- c(
-  area(t = 1, l = 1, b = 1, r = 1),
-  area(t = 1, l = 2, b = 1, r = 2),
-  area(t = 2, l = 1, b = 2, r = 2),
-  area(t = 1, l = 3, b = 2, r = 3))
+  patchwork::area(t = 1, l = 1, b = 1, r = 1),
+  patchwork::area(t = 1, l = 2, b = 1, r = 2),
+  patchwork::area(t = 2, l = 1, b = 2, r = 2),
+  patchwork::area(t = 1, l = 3, b = 2, r = 3))
 
 p_ratio_legend <- make_triangle_colorbar_plot(ratio_breaks, ratio_palette)
 
 p_combined <- (p_top10 + p_ge4 + p_joint + p_ratio_legend) +
-  plot_layout(design = combined_design,
-              widths = c(1, 1, 0.40), heights = c(1, 1))
+  patchwork::plot_layout(
+    design = combined_design,
+    widths = c(1, 1, 0.40),
+    heights = c(1, 1))
 
 p_ge5_with_legend <- p_ge5 + p_ge5_joint + p_ratio_legend +
-  plot_layout(widths = c(1, 1, 0.40))
+  patchwork::plot_layout(widths = c(1, 1, 0.40))
 
 print(p_combined)
 print(p_ge5_with_legend)
@@ -570,4 +574,3 @@ cat("NZ-intersecting cell count (top 10%):", length(ratio_layers[["probability_r
 
 cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),"\n")
 # 185 cells
-
