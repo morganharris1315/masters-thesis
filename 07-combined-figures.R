@@ -330,9 +330,12 @@ format_event_title <- function(start_date, end_date = start_date) {
 }
 
 all_station_thresholds <- coromandel_obs %>%
+  filter(!is.na(rainfall_mm)) %>%
+  group_by(station, hydro_year) %>%
+  summarise(rx1day = max(rainfall_mm, na.rm = TRUE), .groups = "drop") %>%
   group_by(station) %>%
   summarise(
-    threshold_single = as.numeric(quantile(rainfall_mm, probs = 1 / 3, na.rm = TRUE, type = 7)),
+    threshold_single = as.numeric(quantile(rx1day, probs = 1 / 3, na.rm = TRUE, type = 7)),
     .groups = "drop"
   )
 
