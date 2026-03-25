@@ -258,6 +258,15 @@ make_column_header <- function(label_text) {
     theme_void()
 }
 
+make_panel_tag <- function(tag_text) {
+  ggplot() +
+    annotate("text", x = 0, y = 1, label = tag_text, hjust = 0, vjust = 1, fontface = "bold", size = 3.4) +
+    xlim(0, 1) +
+    ylim(0, 1) +
+    theme_void() +
+    theme(plot.margin = margin(0, 0, 0, 0))
+}
+
 # Figure 1 -----------------------------------------------------------------
 
 coromandel_obs <- readr::read_csv(chiltern_obs_file, show_col_types = FALSE) %>%
@@ -363,6 +372,13 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
     mutate(is_above_threshold = !is.na(threshold_single) & event_rainfall_mm > threshold_single) %>%
     filter(!is.na(latitude), !is.na(longitude), !is.na(event_rainfall_mm))
   
+  event_data_base <- event_data %>%
+    mutate(legend_key = legend_labels[1])
+  
+  event_data_above <- event_data %>%
+    filter(is_above_threshold) %>%
+    mutate(legend_key = legend_labels[2])
+  
   ggplot() +
     geom_polygon(
       data = base_map_df,
@@ -372,30 +388,26 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
       linewidth = 0.2
     ) +
     geom_point(
-      data = event_data,
+      data = event_data_base,
       aes(
         x = longitude,
         y = latitude,
-        fill = legend_labels[1],
-        colour = legend_labels[1]
+        colour = legend_key
       ),
-      shape = 21,
+      shape = 16,
       size = 2,
-      stroke = 0.4,
       alpha = 0.95
     ) +
     geom_point(
-      data = event_data %>% filter(is_above_threshold),
+      data = event_data_above,
       aes(
         x = longitude,
         y = latitude,
-        fill = legend_labels[2],
-        colour = legend_labels[2]
+        colour = legend_key
       ),
-      shape = 21,
-      size = 2,
-      stroke = 0.8,
-      fill = NA
+      shape = 1,
+      size = 2.8,
+      stroke = 0.9
     ) +
     geom_text(
       data = chiltern_site,
@@ -434,23 +446,12 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
       breaks = legend_labels,
       name = NULL
     ) +
-    scale_fill_manual(
-      values = c(
-        "Daily Rainfall (mm)" = "grey45",
-        "Above Heavy Threshold" = "grey45"
-      ),
-      breaks = legend_labels,
-      name = NULL
-    ) +
     guides(
-      fill = "none",
       colour = guide_legend(
         override.aes = list(
-          shape = 21,
-          size = c(2.7, 3.4),
-          stroke = c(0.4, 1.1),
-          fill = c("grey45", "grey45"),
-          colour = c("grey20", heavy_col),
+          shape = c(16, 1),
+          size = c(2.7, 3.2),
+          stroke = c(0, 1),
           alpha = 1
         )
       )
@@ -472,14 +473,11 @@ nz_map_df<-map_data('nz')
 event_list <- split(event_definitions, event_definitions$event_id)
 event_maps <- imap(event_list, ~ build_event_map(.x, nz_map_df, show_legend = (.y == names(event_list)[1])))
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
-p1a <- event_map_grid +
+p1a_core <- event_map_grid +
   patchwork::plot_layout(guides = "collect") &
   theme(legend.position = "right")
-p1a <- p1a +
-  plot_annotation(
-    title = "(a)",
-    theme = theme(plot.title = element_text(face = "bold", size = 9, hjust = 0))
-  )
+p1a <- make_panel_tag("(a)") / p1a_core +
+  plot_layout(heights = c(0.05, 1))
 
 p1b <- ggplot(chiltern_rx_plot, aes(x = Year, y = RX1day)) +
   geom_line(colour = "black", linewidth = 0.35) +
@@ -489,7 +487,7 @@ p1b <- ggplot(chiltern_rx_plot, aes(x = Year, y = RX1day)) +
   annotate("text", x = 1950, y = 300, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = heavy_col, fontface= "bold") +
   annotate("text", x = 1950, y = 300, label = sprintf("Extreme %.1f mm", extreme_obs), hjust = 0, vjust = 2.7, size = 2.7, colour = extreme_col, fontface= "bold") +
   scale_x_continuous(breaks = seq(1950, 2030, by = 10), limits = c(1949.5, 2025.5), expand = expansion(mult = c(0, 0))) +
-  scale_y_continuous(limits = c(0, 300), expand = expansion(mult = c(0, 0))) +
+  scale_y_continuous(breaks = seq(0, 300, by = 50), limits = c(0, 300), expand = expansion(mult = c(0, 0))) +
   labs(title = "(b)", x = "Year", y = "RX1day (mm)") +
   theme_thesis +
   theme_model_axes +
@@ -517,7 +515,7 @@ p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
   geom_hline(yintercept = heavy_obs, linetype = "solid", colour = heavy_col, linewidth = 1) +
   annotate("text", x = as.Date("2022-07-01"), y = 300, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = heavy_col, fontface= "bold") +
   scale_x_date(breaks = axis_breaks, date_labels = "%b", limits = c(as.Date("2022-07-01"), as.Date("2023-06-30")), expand = expansion(mult = c(0, 0))) +
-  scale_y_continuous(limits = c(0, 300), expand = expansion(mult = c(0, 0))) +
+  scale_y_continuous(breaks = seq(0, 300, by = 50), limits = c(0, 300), expand = expansion(mult = c(0, 0))) +
   labs(title = "(c)", x = "Date", y = "Daily Rainfall (mm)") +
   theme_thesis +
   theme_model_axes +
