@@ -486,7 +486,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
     )
 }
 
-nz_map_df <- map_data("nz")
+nz_map_df <- map_data("world", region = "New Zealand")
 event_maps <- map(split(event_definitions, event_definitions$event_id), ~ build_event_map(.x, nz_map_df))
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 p_coromandel_event_panel <- event_map_grid +
