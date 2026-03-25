@@ -5,6 +5,9 @@
 # Mapping weather@home data and saving NZ probability-ratio maps.
 # -------------------------------------------------------------------------
 
+# Changes still to be made
+# Want to add a gird outline around the Coromandel gird that I am using in Figure 2.
+
 # Loading packages ---------------------------------------------------------
 library(RNetCDF)
 library(ncdf4)
@@ -494,21 +497,21 @@ ratio_palette <- c(
 p_top10 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$keep_ids,
-  "(a) Years with extreme Rx1day",
+  "(a) Years with Extreme Rx1day",
   ratio_breaks,
   ratio_palette)
 
 p_ge4 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_ge4_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids,
-  "(b) Years with ≥4 exceedances",
+  "(b) Years with ≥4 Heavy days",
   ratio_breaks,
   ratio_palette)
 
 p_joint <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids,
-  "(c) Years with extreme Rx1day AND ≥4 exceedances",
+  "(c) Years with Extreme Rx1day AND ≥4 Heavy days",
   ratio_breaks,
   ratio_palette) +
   theme(
@@ -517,7 +520,7 @@ p_joint <- make_nz_ratio_plot(
 p_ge5 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_ge5_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_ge5_future_over_current"]]$keep_ids,
-  "(a) Years with ≥5 exceedances",
+  "(a) Years with ≥5 Heavy days",
   ratio_breaks,
   ratio_palette) +
   theme(
@@ -526,7 +529,7 @@ p_ge5 <- make_nz_ratio_plot(
 p_ge5_joint <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$keep_ids,
-  "(b) Years with extreme Rx1day AND ≥5 exceedances",
+  "(b) Years with Extreme Rx1day AND ≥5 Heavy days",
   ratio_breaks,
   ratio_palette) +
   theme(
