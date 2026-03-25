@@ -521,7 +521,8 @@ p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
   theme_model_axes +
   theme(plot.title = element_text(hjust = 0))
 
-figure1_plot <- p1a / (p1b | p1c) +
+bottom_row <- p1b | p1c
+figure1_plot <- patchwork::wrap_elements(full = p1a) / patchwork::wrap_elements(full = bottom_row) +
   plot_layout(heights = c(1, 1))
 
 figure1_plot
