@@ -8,14 +8,6 @@
 # -------------------------------------------------------------------------
 
 # Packages ----------------------------------------------------------------
-if (!requireNamespace("RNetCDF", quietly = TRUE)) stop("Package 'RNetCDF' is required.")
-if (!requireNamespace("dplyr", quietly = TRUE)) stop("Package 'dplyr' is required.")
-if (!requireNamespace("tidyr", quietly = TRUE)) stop("Package 'tidyr' is required.")
-if (!requireNamespace("ggplot2", quietly = TRUE)) stop("Package 'ggplot2' is required.")
-if (!requireNamespace("patchwork", quietly = TRUE)) stop("Package 'patchwork' is required.")
-if (!requireNamespace("readr", quietly = TRUE)) stop("Package 'readr' is required.")
-if (!requireNamespace("lubridate", quietly = TRUE)) stop("Package 'lubridate' is required.")
-
 library(RNetCDF)
 library(dplyr)
 library(tidyr)
@@ -25,7 +17,8 @@ library(readr)
 library(lubridate)
 
 # Style constants ----------------------------------------------------------
-box_colour <- "#93acff"
+heavy_col <- "#93acff"
+extreme_col <- "#5f66DB"
 box_colour_light <- "#eff2ff"
 box_colour_dark <- "#6f8dff"
 
@@ -62,7 +55,7 @@ future_dir <- file.path(weatherathome_dir, "3k_warmer")
 chiltern_obs_file <- file.path(base_raw_dir, "obs_data", "cleaned_datasets", "rain_coromandel_cleaned.csv")
 
 figure1_file <- file.path(base_raw_dir, "obs_data", "Figure1_combined.png")
-figure2_file <- file.path(weatherathome_dir, "Figure2_matched_cell_2x3.png")
+figure2_file <- file.path(weatherathome_dir, "Figure2_coromandel_cell_2x3.png")
 
 # Inputs -------------------------------------------------------------------
 matched_cell <- data.frame(lon_index = 30L, lat_index = 16L)
@@ -82,17 +75,17 @@ list_nc_files <- function(directory_path) {
 extract_cell_daily_series <- function(file_path, lon_index, lat_index, var_name = "item5216_daily_mean") {
   nc <- open.nc(file_path)
   on.exit(close.nc(nc), add = TRUE)
-
+  
   pr <- var.get.nc(nc, var_name)
   pr_dim <- dim(pr)
-
+  
   if (length(pr_dim) == 4 && pr_dim[3] == 1) {
     pr <- pr[, , 1, ]
     pr_dim <- dim(pr)
   }
-
+  
   if (length(pr_dim) != 3) stop("Unexpected precipitation dimensions in file: ", basename(file_path))
-
+  
   if (lon_index < 1 || lon_index > pr_dim[1] || lat_index < 1 || lat_index > pr_dim[2]) {
     stop(
       "Requested lon/lat index is outside file grid range. ",
@@ -100,7 +93,7 @@ extract_cell_daily_series <- function(file_path, lon_index, lat_index, var_name 
       "lat_index=", lat_index, " (max ", pr_dim[2], ")."
     )
   }
-
+  
   as.numeric(pr[lon_index, lat_index, ])
 }
 
@@ -127,7 +120,7 @@ count_heavy_days <- function(nc_files, lon_index, lat_index, heavy_threshold) {
 calc_cumulative_props <- function(exceed_vec) {
   max_k <- max(exceed_vec, na.rm = TRUE)
   n_years <- sum(!is.na(exceed_vec))
-
+  
   data.frame(
     days = 0:max_k,
     cum_prop_years = sapply(0:max_k, function(k) sum(exceed_vec >= k, na.rm = TRUE) / n_years)
@@ -136,7 +129,7 @@ calc_cumulative_props <- function(exceed_vec) {
 
 build_histogram_df <- function(heavy_days_vec) {
   cumulative_df <- calc_cumulative_props(heavy_days_vec)
-
+  
   data.frame(days = heavy_days_vec) %>%
     count(days, name = "n") %>%
     complete(days = 0:max(days, na.rm = TRUE), fill = list(n = 0)) %>%
@@ -162,39 +155,39 @@ plot_rx1day_ts <- function(df_period, panel_tag, include_change = FALSE, heavy_c
   } else {
     sprintf("Heavy %.1f mm, %+0.1f%%", unique(df_period$heavy_threshold), heavy_change)
   }
-
+  
   extreme_label <- if (!include_change) {
     sprintf("Extreme %.1f mm", unique(df_period$extreme_threshold))
   } else {
     sprintf("Extreme %.1f mm, %+0.1f%%", unique(df_period$extreme_threshold), extreme_change)
   }
-
+  
   y_max <- max(df_period$RX1day, na.rm = TRUE) * 1.05
-
+  
   p <- ggplot(df_period, aes(x = Year, y = RX1day)) +
     geom_line(colour = "black", linewidth = 0.35) +
-    geom_hline(aes(yintercept = heavy_threshold), colour = box_colour, linetype = "dashed", linewidth = 0.9) +
-    geom_hline(aes(yintercept = extreme_threshold), colour = "purple4", linetype = "dashed", linewidth = 0.9) +
-    annotate("text", x = Inf, y = y_max, label = heavy_label, hjust = 1.03, vjust = 1.6, size = 2.7, colour = box_colour) +
-    annotate("text", x = Inf, y = y_max, label = extreme_label, hjust = 1.03, vjust = 3.1, size = 2.7, colour = "purple4") +
+    geom_hline(aes(yintercept = heavy_threshold), colour = heavy_col, linetype = "solid", linewidth = 0.9) +
+    geom_hline(aes(yintercept = extreme_threshold), colour = extreme_col, linetype = "solid", linewidth = 0.9) +
+    annotate("text", x = Inf, y = y_max, label = heavy_label, hjust = 1.03, vjust = 1.6, size = 2.7, colour = heavy_col) +
+    annotate("text", x = Inf, y = y_max, label = extreme_label, hjust = 1.03, vjust = 3.1, size = 2.7, colour = extreme_col) +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.04))) +
     labs(title = panel_tag, x = "Year", y = "RX1day (mm)") +
     theme_thesis +
     theme_model_axes
-
+  
   if (isTRUE(show_points)) {
     p <- p + geom_point(colour = "black", size = 0.45)
   }
-
+  
   p
 }
 
 plot_heavy_hist <- function(hist_df, panel_tag) {
   max_exceed <- max(hist_df$days, na.rm = TRUE)
-
+  
   ggplot(hist_df, aes(x = days, y = prop_years)) +
-    geom_col(width = 0.9, fill = box_colour) +
+    geom_col(width = 0.9, fill = heavy_col) +
     geom_text(aes(label = cumulative_label), vjust = -0.35, size = 2.3, na.rm = TRUE) +
     scale_x_continuous(breaks = 0:max_exceed, limits = c(-0.5, max_exceed + 0.5), expand = expansion(mult = c(0, 0))) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
@@ -214,7 +207,7 @@ plot_heavy_hist <- function(hist_df, panel_tag) {
 
 build_quadrant_df <- function(df_period, heavy_cutoff = 4L) {
   exceed_max <- max(df_period$heavy_days, na.rm = TRUE)
-
+  
   tile_df <- df_period %>%
     mutate(
       exceed_group = if_else(heavy_days < heavy_cutoff, paste0("<", heavy_cutoff, " heavy days"), paste0(">=", heavy_cutoff, " heavy days")),
@@ -236,13 +229,13 @@ build_quadrant_df <- function(df_period, heavy_cutoff = 4L) {
       xmid = (xmin + xmax) / 2,
       ymid = (ymin + ymax) / 2
     )
-
+  
   list(tile_df = tile_df, exceed_max = exceed_max)
 }
 
 plot_quadrant_heatmap <- function(df_period, panel_tag, heavy_cutoff = 4L) {
   hm <- build_quadrant_df(df_period, heavy_cutoff = heavy_cutoff)
-
+  
   ggplot(hm$tile_df) +
     geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = pct_years), colour = "white", linewidth = 0.3) +
     geom_text(aes(x = xmid, y = ymid, label = pct_label), colour = "black", size = 3.0, fontface = "bold") +
@@ -329,11 +322,11 @@ if (!is.finite(y_max_2023)) y_max_2023 <- 10
 axis_breaks <- seq(min(hy2023_df$observation_date, na.rm = TRUE), max(hy2023_df$observation_date, na.rm = TRUE), by = "1 month")
 
 p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
-  geom_col(fill = box_colour, width = 1.5, na.rm = TRUE) +
-  geom_hline(yintercept = heavy_obs, linetype = "dashed", colour = box_colour, linewidth = 1) +
-  annotate("text", x = Inf, y = y_max_2023 * 1.02, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 1.03, vjust = 1.5, size = 2.7, colour = box_colour) +
+  geom_col(fill = "black", width = 1.5, na.rm = TRUE) +
+  geom_hline(yintercept = heavy_obs, linetype = "solid", colour = heavy_col, linewidth = 1) +
+  annotate("text", x = Inf, y = y_max_2023 * 1.02, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 1.03, vjust = 1.5, size = 2.7, colour = heavy_col) +
   scale_x_date(breaks = axis_breaks, date_labels = "%b") +
-  scale_y_continuous(limits = c(0, y_max_2023 * 1.12)) +
+  scale_y_continuous(limits = c(0, 300)) +
   labs(title = "(c)", x = "Date", y = "Daily Rainfall (mm)") +
   theme_thesis +
   theme_model_axes
@@ -345,6 +338,8 @@ p1a <- p_coromandel_event_panel +
 
 figure1_plot <- p1a / (p1b | p1c) +
   plot_layout(heights = c(1, 1))
+
+figure1_plot
 
 # Figure 2 -----------------------------------------------------------------
 current_files <- list_nc_files(current_dir)
