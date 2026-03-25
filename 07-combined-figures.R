@@ -25,21 +25,6 @@ extreme_col <- "#5f66DB"
 box_colour_light <- "#eff2ff"
 box_colour_dark <- "#6f8dff"
 
-if (!exists("theme_thesis")) {
-  theme_thesis <- theme_minimal(base_size = 9) +
-    theme(
-      plot.title = element_text(size = 9, face = "bold", hjust = 0.5),
-      axis.title = element_text(size = 9),
-      axis.text = element_text(size = 7),
-      strip.text = element_text(size = 8, face = "bold"),
-      legend.title = element_text(size = 8),
-      legend.text = element_text(size = 7),
-      panel.grid.major = element_line(colour = "grey85", linewidth = 0.3),
-      panel.grid.minor = element_line(colour = "grey92", linewidth = 0.2),
-      panel.spacing = unit(0.5, "lines")
-    )
-}
-
 theme_model_axes <- theme(
   panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(),
@@ -275,10 +260,6 @@ make_column_header <- function(label_text) {
 
 # Figure 1 -----------------------------------------------------------------
 
-if (!file.exists(chiltern_obs_file)) {
-  stop("Chiltern observational dataset not found: ", chiltern_obs_file)
-}
-
 coromandel_obs <- readr::read_csv(chiltern_obs_file, show_col_types = FALSE) %>%
   mutate(
     observation_date = as.Date(observation_date),
@@ -289,10 +270,6 @@ coromandel_obs <- readr::read_csv(chiltern_obs_file, show_col_types = FALSE) %>%
 chiltern_obs <- coromandel_obs %>%
   filter(station == chiltern_site$station) %>%
   arrange(observation_date)
-
-if (nrow(chiltern_obs) == 0) {
-  stop("No rows found for station '", chiltern_site$station, "' in ", chiltern_obs_file)
-}
 
 chiltern_rx <- chiltern_obs %>%
   group_by(hydro_year) %>%
@@ -489,9 +466,11 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
 nz_map_df <- map_data("world", region = "New Zealand")
 event_maps <- map(split(event_definitions, event_definitions$event_id), ~ build_event_map(.x, nz_map_df))
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
-p_coromandel_event_panel <- event_map_grid +
+p1a <- event_map_grid +
   patchwork::plot_layout(guides = "collect") &
-  theme(legend.position = "right")
+  theme(legend.position = "right") &
+  plot_annotation(title = "(a)") &
+  theme(plot.title = element_text(face = "bold", size = 9, hjust = 0))
 
 p1b <- ggplot(chiltern_rx_plot, aes(x = Year, y = RX1day)) +
   geom_line(colour = "black", linewidth = 0.35) +
@@ -500,7 +479,7 @@ p1b <- ggplot(chiltern_rx_plot, aes(x = Year, y = RX1day)) +
   geom_hline(yintercept = extreme_obs, colour = extreme_col, linetype = "dashed", linewidth = 1) +
   annotate("text", x = 1950, y = 300, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = heavy_col) +
   annotate("text", x = 1950, y = 300, label = sprintf("Extreme %.1f mm", extreme_obs), hjust = 0, vjust = 2.7, size = 2.7, colour = extreme_col) +
-  scale_x_continuous(breaks = seq(1950, 2025, by = 5), limits = c(1949.5, 2025.5), expand = expansion(mult = c(0, 0))) +
+  scale_x_continuous(breaks = seq(1950, 2030, by = 10), limits = c(1949.5, 2025.5), expand = expansion(mult = c(0, 0))) +
   scale_y_continuous(limits = c(0, 300), expand = expansion(mult = c(0, 0))) +
   labs(title = "(b)", x = "Year", y = "RX1day (mm)") +
   theme_thesis +
@@ -522,10 +501,6 @@ hy2023_df <- chiltern_obs %>%
   filter(hydro_year == 2023) %>%
   arrange(observation_date)
 
-if (nrow(hy2023_df) == 0) {
-  stop("No data found for Chiltern hydrological year 2023.")
-}
-
 axis_breaks <- seq(as.Date("2022-07-01"), as.Date("2023-06-01"), by = "1 month")
 
 p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
@@ -538,10 +513,6 @@ p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
   theme_thesis +
   theme_model_axes +
   theme(plot.title = element_text(hjust = 0))
-
-p1a <- p_coromandel_event_panel +
-  plot_annotation(title = "(a)") &
-  theme(plot.title = element_text(face = "bold", size = 9, hjust = 0))
 
 figure1_plot <- p1a / (p1b | p1c) +
   plot_layout(heights = c(1, 1))
