@@ -5,6 +5,10 @@
 # Contextualise summer 2023 rainfall for observational stations.
 # -------------------------------------------------------------------------
 
+# Changes still to be made. 
+# I want to add LiDAR data so that I have elevation on the map
+# This should solve the issue of some of the dots going off the side of the land. 
+
 # Regions to process -------------------------------------------------------
 regions_to_process <- c("coromandel", "far_north", "top_of_south", "waikato")
 
@@ -499,3 +503,21 @@ ggsave(
   filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2.png"),
   plot = p_coromandel_event_panel,
   dpi = 300)
+
+
+# Adding Lidar Data -------------------------------------------------------
+
+# Install the packages if you haven't already
+#install.packages("lidR")
+#install.packages("terra")
+#install.packages("rayshader")
+#install.packages("terrainr")
+
+# Load the libraries
+library(lidR)
+library(terra)
+library(rayshader)
+library(viridis)
+library(terrainr)
+
+
