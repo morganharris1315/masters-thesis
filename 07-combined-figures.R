@@ -7,6 +7,11 @@
 # - Figure 2: matched weather@home grid-cell six-panel workflow
 # -------------------------------------------------------------------------
 
+# Issues still present:
+#Figure 1 
+ # The above Heavy Threshold on the coromandel event maps is not working as it should be. 
+  #When not all points are above the Heavy threshold. 
+
 # Packages ----------------------------------------------------------------
 library(RNetCDF)
 library(dplyr)
