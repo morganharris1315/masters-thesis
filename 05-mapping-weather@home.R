@@ -235,6 +235,10 @@ get_fixed_width_bin_spec <- function(x, bin_width = 1, min_value = 1, max_value 
 make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, ratio_palette) {
   poly_nz <- poly_df[poly_df$id %in% keep_ids, ]
   poly_nz <- poly_nz[is.finite(poly_nz$ratio_value), ]
+  matched_cell <- data.frame(lon_index = 30L, lat_index = 16L)
+  matched_cell_outline <- poly_nz[
+    poly_nz$lon_index == matched_cell$lon_index &
+      poly_nz$lat_index == matched_cell$lat_index, ]
   
   if (nrow(poly_nz) == 0) {
     stop(sprintf("No NZ-intersecting cells found for '%s'.", title_text))}
@@ -259,6 +263,13 @@ make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, rati
   
   ggplot(poly_nz, aes(x = lon, y = lat, fill = ratio_bin)) +
     geom_polygon(aes(group = id), colour = NA, linewidth = 0) +
+    geom_polygon(
+      data = matched_cell_outline,
+      aes(group = id),
+      inherit.aes = FALSE,
+      fill = NA,
+      colour = "Red",
+      linewidth = 0.8) +
     geom_path(
       data = nz_outline,
       aes(x = long, y = lat, group = group),
@@ -492,21 +503,21 @@ ratio_palette <- c(
 p_top10 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]$keep_ids,
-  "(a) Years with extreme Rx1day",
+  "(a) Years with Extreme Rx1day",
   ratio_breaks,
   ratio_palette)
 
 p_ge4 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_ge4_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids,
-  "(b) Years with ≥4 exceedances",
+  "(b) Years with ≥4 Heavy days",
   ratio_breaks,
   ratio_palette)
 
 p_joint <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids,
-  "(c) Years with extreme Rx1day AND ≥4 exceedances",
+  "(c) Years with Extreme Rx1day AND ≥4 Heavy days",
   ratio_breaks,
   ratio_palette) +
   theme(
@@ -515,7 +526,7 @@ p_joint <- make_nz_ratio_plot(
 p_ge5 <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_ge5_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_ge5_future_over_current"]]$keep_ids,
-  "(a) Years with ≥5 exceedances",
+  "(a) Years with ≥5 Heavy days",
   ratio_breaks,
   ratio_palette) +
   theme(
@@ -524,7 +535,7 @@ p_ge5 <- make_nz_ratio_plot(
 p_ge5_joint <- make_nz_ratio_plot(
   ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$poly,
   ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]$keep_ids,
-  "(b) Years with extreme Rx1day AND ≥5 exceedances",
+  "(b) Years with Extreme Rx1day AND ≥5 Heavy days",
   ratio_breaks,
   ratio_palette) +
   theme(
@@ -570,4 +581,3 @@ cat("NZ-intersecting cell count (top 10%):", length(ratio_layers[["probability_r
 
 cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),"\n")
 # 185 cells
-
