@@ -342,7 +342,7 @@ event_definitions <- tibble::tribble(
 ) %>%
   mutate(event_title = map2_chr(start_date, end_date, format_event_title))
 
-build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim = c(-37.6, -36.4)) {
+build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim = c(-37.6, -36.4), show_legend = FALSE) {
   legend_labels <- c("Daily Rainfall (mm)", "Above Heavy Threshold")
   
   event_data <- coromandel_obs %>%
@@ -394,7 +394,8 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
       ),
       shape = 21,
       size = 3,
-      stroke = 1.1
+      stroke = 1.1,
+      fill = NA
     ) +
     geom_text(
       data = chiltern_site,
@@ -457,26 +458,34 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
     theme_thesis +
     theme(
       axis.title = element_blank(),
-      legend.position = "none",
-      panel.grid.major = element_line(colour = "black", linewidth = 0.25),
-      panel.grid.minor = element_line(colour = "black", linewidth = 0.2)
+      legend.position = if (isTRUE(show_legend)) "right" else "none",
+      legend.justification = "center",
+      legend.margin = margin(0, 0, 0, 0),
+      panel.grid.major = element_line(colour = "grey80", linewidth = 0.2),
+      panel.grid.minor = element_blank(),
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 9),
+      plot.margin = margin(3, 3, 3, 3)
     )
 }
 
 nz_map_df <- map_data("world", region = "New Zealand")
-event_maps <- map(split(event_definitions, event_definitions$event_id), ~ build_event_map(.x, nz_map_df))
+event_list <- split(event_definitions, event_definitions$event_id)
+event_maps <- imap(event_list, ~ build_event_map(.x, nz_map_df, show_legend = (.y == names(event_list)[1])))
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 p1a <- event_map_grid +
   patchwork::plot_layout(guides = "collect") &
-  theme(legend.position = "right") &
-  plot_annotation(title = "(a)") &
-  theme(plot.title = element_text(face = "bold", size = 9, hjust = 0))
+  theme(legend.position = "right")
+p1a <- p1a +
+  plot_annotation(
+    title = "(a)",
+    theme = theme(plot.title = element_text(face = "bold", size = 9, hjust = 0))
+  )
 
 p1b <- ggplot(chiltern_rx_plot, aes(x = Year, y = RX1day)) +
   geom_line(colour = "black", linewidth = 0.35) +
   geom_point(colour = "black", size = 0.45) +
-  geom_hline(yintercept = heavy_obs, colour = heavy_col, linetype = "dashed", linewidth = 1) +
-  geom_hline(yintercept = extreme_obs, colour = extreme_col, linetype = "dashed", linewidth = 1) +
+  geom_hline(yintercept = heavy_obs, colour = heavy_col, linetype = "solid", linewidth = 1) +
+  geom_hline(yintercept = extreme_obs, colour = extreme_col, linetype = "solid", linewidth = 1) +
   annotate("text", x = 1950, y = 300, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = heavy_col) +
   annotate("text", x = 1950, y = 300, label = sprintf("Extreme %.1f mm", extreme_obs), hjust = 0, vjust = 2.7, size = 2.7, colour = extreme_col) +
   scale_x_continuous(breaks = seq(1950, 2030, by = 10), limits = c(1949.5, 2025.5), expand = expansion(mult = c(0, 0))) +
@@ -505,7 +514,7 @@ axis_breaks <- seq(as.Date("2022-07-01"), as.Date("2023-06-01"), by = "1 month")
 
 p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
   geom_col(fill = "black", width = 1.5, na.rm = TRUE) +
-  geom_hline(yintercept = heavy_obs, linetype = "dashed", colour = heavy_col, linewidth = 1) +
+  geom_hline(yintercept = heavy_obs, linetype = "solid", colour = heavy_col, linewidth = 1) +
   annotate("text", x = as.Date("2022-07-01"), y = 300, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = heavy_col) +
   scale_x_date(breaks = axis_breaks, date_labels = "%b", limits = c(as.Date("2022-07-01"), as.Date("2023-06-30")), expand = expansion(mult = c(0, 0))) +
   scale_y_continuous(limits = c(0, 300), expand = expansion(mult = c(0, 0))) +
