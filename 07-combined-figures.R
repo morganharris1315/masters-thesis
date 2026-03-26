@@ -155,8 +155,6 @@ plot_rx1day_ts <- function(df_period, panel_tag, include_change = FALSE, heavy_c
   
   p <- ggplot(df_period, aes(x = Year, y = RX1day)) +
     geom_line(colour = "black", linewidth = 0.35) +
-    geom_hline(aes(yintercept = heavy_threshold), colour = heavy_col, linetype = "solid", linewidth = 0.9) +
-    geom_hline(aes(yintercept = extreme_threshold), colour = extreme_col, linetype = "solid", linewidth = 0.9) +
     annotate("text", x = x_min, y = y_max, label = heavy_label, hjust = 0, vjust = 1.6, size = 2.7, colour = heavy_col) +
     annotate("text", x = x_min, y = y_max, label = extreme_label, hjust = 0, vjust = 3.1, size = 2.7, colour = extreme_col) +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
@@ -169,6 +167,10 @@ plot_rx1day_ts <- function(df_period, panel_tag, include_change = FALSE, heavy_c
   if (isTRUE(show_points)) {
     p <- p + geom_point(colour = "black", size = 0.45)
   }
+  
+  p <- p +
+    geom_hline(aes(yintercept = heavy_threshold), colour = heavy_col, linetype = "solid", linewidth = 0.9) +
+    geom_hline(aes(yintercept = extreme_threshold), colour = extreme_col, linetype = "solid", linewidth = 0.9)
   
   p
 }
@@ -183,7 +185,7 @@ plot_heavy_hist <- function(hist_df, panel_tag, max_exceed = NULL) {
     geom_text(aes(label = cumulative_label), vjust = -0.35, size = 2.3, na.rm = TRUE) +
     scale_x_continuous(breaks = 0:max_exceed, limits = c(-0.5, max_exceed + 0.5), expand = expansion(mult = c(0, 0))) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
-    labs(title = panel_tag, x = "Number of heavy days", y = "Proportion of years") +
+    labs(title = panel_tag, x = "Number of Heavy days", y = "Proportion of years") +
     coord_cartesian(clip = "off") +
     theme_thesis +
     theme_model_axes +
@@ -232,7 +234,13 @@ plot_quadrant_heatmap <- function(df_period, panel_tag, heavy_cutoff = 4L, x_max
     x_max <- hm$exceed_max
   }
   
-  ggplot(hm$tile_df) +
+  tile_df_plot <- hm$tile_df %>%
+    mutate(
+      xmax = if_else(exceed_group == paste0(">=", heavy_cutoff, " heavy days"), x_max + 0.5, xmax),
+      xmid = (xmin + xmax) / 2
+    )
+  
+  ggplot(tile_df_plot) +
     geom_rect(aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = pct_years), colour = "white", linewidth = 0.3) +
     geom_text(aes(x = xmid, y = ymid, label = pct_label), colour = "black", size = 3.0, fontface = "bold") +
     geom_vline(xintercept = heavy_cutoff, colour = "black", linewidth = 0.35) +
@@ -240,7 +248,7 @@ plot_quadrant_heatmap <- function(df_period, panel_tag, heavy_cutoff = 4L, x_max
     scale_x_continuous(breaks = 0:x_max, limits = c(-0.5, x_max + 0.5), expand = expansion(mult = c(0, 0))) +
     scale_y_continuous(limits = c(0, max(df_period$RX1day, na.rm = TRUE) * 1.02), expand = expansion(mult = c(0, 0))) +
     scale_fill_gradient(low = box_colour_light, high = box_colour_dark, limits = c(0, 100), guide = "none") +
-    labs(title = panel_tag, x = "Number of heavy days", y = "RX1day (mm)") +
+    labs(title = panel_tag, x = "Number of Heavy days", y = "RX1day (mm)") +
     theme_thesis +
     theme(
       panel.grid = element_blank(),
