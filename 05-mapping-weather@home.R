@@ -39,6 +39,10 @@ combined_ratio_output_png <- file.path(model_data_dir,
 ge5_ratio_output_png <- file.path(model_data_dir,
                                   "weather@home_probability_ratio_ge5_map.png")
 
+# Cell highlight settings ---------------------------------------------------
+matched_cell <- data.frame(lon_index = 30L, lat_index = 16L)
+matched_land_mask_value <- 294.9544983
+
 # Loading the mask into an nlon x nlat matrix ------------------------------
 load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) {
   raw <- utils::read.csv(
@@ -260,7 +264,7 @@ make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, rati
   palette_for_bins <- setNames(ratio_palette, bin_levels)
   nz_outline <- map_data("nz")
   
-  ggplot(poly_nz, aes(x = lon, y = lat, fill = ratio_bin)) +
+  p <- ggplot(poly_nz, aes(x = lon, y = lat, fill = ratio_bin)) +
     geom_polygon(aes(group = id), colour = NA, linewidth = 0) +
     geom_path(
       data = nz_outline,
@@ -279,7 +283,24 @@ make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, rati
     theme(
       plot.title = element_text(face = "bold", size = 14),
       axis.title = element_blank(),
-      legend.position = "none")}
+      legend.position = "none")
+  
+  selected_id <- paste(matched_cell$lon_index, matched_cell$lat_index, sep = "_")
+  selected_poly <- poly_df[poly_df$id == selected_id, ]
+  if (nrow(selected_poly) > 0) {
+    p <- p + geom_polygon(
+      data = selected_poly,
+      aes(x = lon, y = lat, group = id),
+      inherit.aes = FALSE,
+      fill = NA,
+      colour = "#f03b20",
+      linewidth = 0.7
+    )
+  } else {
+    warning(sprintf("Selected cell id '%s' was not found in polygon data.", selected_id))
+  }
+  
+  p}
 
 make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_title = "Probability Ratio") {
   if (length(ratio_breaks) < 2) {
@@ -397,6 +418,40 @@ mask_matrix <- load_lse_mask_matrix(
 
 mask_is_land <- !is.na(mask_matrix)
 rain[!mask_is_land] <- NaN
+
+selected_cell_id <- paste(matched_cell$lon_index, matched_cell$lat_index, sep = "_")
+if (matched_cell$lon_index >= 1 && matched_cell$lon_index <= nlon &&
+    matched_cell$lat_index >= 1 && matched_cell$lat_index <= nlat) {
+  selected_mask_value <- mask_matrix[matched_cell$lon_index, matched_cell$lat_index]
+  message(sprintf(
+    "Selected map cell %s has land-mask value: %.10f",
+    selected_cell_id,
+    selected_mask_value
+  ))
+  
+  matched_by_value <- which(
+    mask_matrix == matched_land_mask_value,
+    arr.ind = TRUE
+  )
+  if (nrow(matched_by_value) > 0) {
+    message(sprintf(
+      "Land-mask value %.7f found at %d cell(s): %s",
+      matched_land_mask_value,
+      nrow(matched_by_value),
+      paste(apply(matched_by_value, 1, function(idx) sprintf("(%d,%d)", idx[1], idx[2])), collapse = ", ")
+    ))
+  } else {
+    warning(sprintf(
+      "Land-mask value %.7f was not found in the loaded mask.",
+      matched_land_mask_value
+    ))
+  }
+} else {
+  warning(sprintf(
+    "Selected map cell indices are out of range: lon_index=%d (max=%d), lat_index=%d (max=%d).",
+    matched_cell$lon_index, nlon, matched_cell$lat_index, nlat
+  ))
+}
 
 non_missing_after_mask <- sum(is.finite(rain))
 if (non_missing_after_mask == 0) {
