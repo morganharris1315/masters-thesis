@@ -7,11 +7,6 @@
 # - Figure 2: matched weather@home grid-cell six-panel workflow
 # -------------------------------------------------------------------------
 
-# Issues still present:
-#Figure 1 
- # The above Heavy Threshold on the coromandel event maps is not working as it should be. 
-  #When not all points are above the Heavy threshold. 
-
 # Packages ----------------------------------------------------------------
 library(RNetCDF)
 library(dplyr)
@@ -531,7 +526,7 @@ p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
 
 bottom_row <- p1b | p1c
 figure1_plot <- patchwork::wrap_elements(full = p1a) / patchwork::wrap_elements(full = bottom_row) +
-  plot_layout(heights = c(1.35, 1))
+  plot_layout(heights = c(1.5, 1))
 
 figure1_plot
 
@@ -581,7 +576,7 @@ col_right <- make_column_header("Future Projection") / p2b / p2d / p2f + plot_la
 figure2_plot <- col_left | col_right
 
 # Save outputs -------------------------------------------------------------
-ggsave(filename = figure1_file, plot = figure1_plot, width = 11, height = 10.4, dpi = 300)
+ggsave(filename = figure1_file, plot = figure1_plot, width = 10, height = 16, dpi = 300)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 300)
 
 message("Figure 1 saved to: ", figure1_file)
