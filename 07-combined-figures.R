@@ -417,7 +417,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
         colour = legend_key
       ),
       shape = 1,
-      size = 2.8,
+      size = 2,
       stroke = 0.9
     ) +
     geom_text(
@@ -461,7 +461,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
       colour = guide_legend(
         override.aes = list(
           shape = c(16, 1),
-          size = c(2.7, 3.2),
+          size = c(2.7, 2.7),
           stroke = c(0, 1),
           alpha = 1
         )
@@ -495,8 +495,8 @@ p1b <- ggplot(chiltern_rx_plot, aes(x = Year, y = RX1day)) +
   geom_point(colour = "black", size = 0.45) +
   geom_hline(yintercept = heavy_obs, colour = heavy_col, linetype = "solid", linewidth = 1) +
   geom_hline(yintercept = extreme_obs, colour = extreme_col, linetype = "solid", linewidth = 1) +
-  annotate("text", x = 1950, y = 300, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = heavy_col, fontface= "bold") +
-  annotate("text", x = 1950, y = 300, label = sprintf("Extreme %.1f mm", extreme_obs), hjust = 0, vjust = 2.7, size = 2.7, colour = extreme_col, fontface= "bold") +
+  annotate("text", x = 1950, y = 300, label = sprintf("Extreme %.1f mm", extreme_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = extreme_col, fontface= "bold") +
+  annotate("text", x = 1950, y = 300, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 2.7, size = 2.7, colour = heavy_col, fontface= "bold") +
   scale_x_continuous(breaks = seq(1950, 2030, by = 10), limits = c(1949.5, 2025.5), expand = expansion(mult = c(0, 0))) +
   scale_y_continuous(breaks = seq(0, 300, by = 50), limits = c(0, 300), expand = expansion(mult = c(0, 0))) +
   labs(title = "(b)", x = "Year", y = "RX1day (mm)") +
@@ -534,7 +534,7 @@ p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
 
 bottom_row <- p1b | p1c
 figure1_plot <- patchwork::wrap_elements(full = p1a) / patchwork::wrap_elements(full = bottom_row) +
-  plot_layout(heights = c(1.5, 1))
+  plot_layout(heights = c(1.5, 0.85))
 
 figure1_plot
 
