@@ -564,9 +564,17 @@ fp_df <- fp_df %>%
     heavy_days = count_heavy_days(future_files, matched_cell$lon_index, matched_cell$lat_index, heavy_fp)
   )
 
+# For Figure 2 panels (c)-(f), use Current Day thresholds for both periods.
+fp_df_cd_thresholds <- fp_df %>%
+  mutate(
+    heavy_threshold = heavy_cd,
+    extreme_threshold = extreme_cd,
+    heavy_days = count_heavy_days(future_files, matched_cell$lon_index, matched_cell$lat_index, heavy_cd)
+  )
+
 hist_cd <- build_histogram_df(cd_df$heavy_days)
-hist_fp <- build_histogram_df(fp_df$heavy_days)
-heavy_days_max <- max(c(cd_df$heavy_days, fp_df$heavy_days), na.rm = TRUE)
+hist_fp <- build_histogram_df(fp_df_cd_thresholds$heavy_days)
+heavy_days_max <- max(c(cd_df$heavy_days, fp_df_cd_thresholds$heavy_days), na.rm = TRUE)
 
 heavy_change_pct <- pct_change(heavy_fp, heavy_cd)
 extreme_change_pct <- pct_change(extreme_fp, extreme_cd)
@@ -576,7 +584,7 @@ p2b <- plot_rx1day_ts(fp_df, panel_tag = "(b)", include_change = TRUE, heavy_cha
 p2c <- plot_heavy_hist(hist_cd, panel_tag = "(c)", max_exceed = heavy_days_max)
 p2d <- plot_heavy_hist(hist_fp, panel_tag = "(d)", max_exceed = heavy_days_max)
 p2e <- plot_quadrant_heatmap(cd_df, panel_tag = "(e)", heavy_cutoff = 4L, x_max = heavy_days_max)
-p2f <- plot_quadrant_heatmap(fp_df, panel_tag = "(f)", heavy_cutoff = 4L, x_max = heavy_days_max)
+p2f <- plot_quadrant_heatmap(fp_df_cd_thresholds, panel_tag = "(f)", heavy_cutoff = 4L, x_max = heavy_days_max)
 
 col_left <- make_column_header("Current Day") / p2a / p2c / p2e + plot_layout(heights = c(0.09, 1, 1, 1))
 col_right <- make_column_header("Future Projection") / p2b / p2d / p2f + plot_layout(heights = c(0.09, 1, 1, 1))
