@@ -468,7 +468,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
       panel.grid.major = element_line(colour = "grey80", linewidth = 0.2),
       panel.grid.minor = element_blank(),
       plot.title = element_text(hjust = 0.5, face = "bold", size = 9),
-      plot.margin = margin(3, 3, 3, 3)
+      plot.margin = margin(8, 8, 8, 8)
     )
 }
 
@@ -576,7 +576,7 @@ col_right <- make_column_header("Future Projection") / p2b / p2d / p2f + plot_la
 figure2_plot <- col_left | col_right
 
 # Save outputs -------------------------------------------------------------
-ggsave(filename = figure1_file, plot = figure1_plot, width = 10, height = 16, dpi = 300)
+ggsave(filename = figure1_file, plot = figure1_plot, width = 9, height = 15, dpi = 300)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 300)
 
 message("Figure 1 saved to: ", figure1_file)
