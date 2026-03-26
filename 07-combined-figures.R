@@ -483,7 +483,7 @@ event_maps <- imap(event_list, ~ build_event_map(.x, nz_map_df, show_legend = (.
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 p1a_core <- event_map_grid +
   patchwork::plot_layout(guides = "collect") &
-  theme(legend.position = "right")
+  theme(legend.position = "bottom")
 p1a <- make_panel_tag("(a)") / p1a_core +
   plot_layout(heights = c(0.05, 1))
 
@@ -531,7 +531,7 @@ p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
 
 bottom_row <- p1b | p1c
 figure1_plot <- patchwork::wrap_elements(full = p1a) / patchwork::wrap_elements(full = bottom_row) +
-  plot_layout(heights = c(1, 1))
+  plot_layout(heights = c(1.35, 1))
 
 figure1_plot
 
