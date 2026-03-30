@@ -155,8 +155,8 @@ plot_rx1day_ts <- function(df_period, panel_tag, include_change = FALSE, heavy_c
   
   p <- ggplot(df_period, aes(x = Year, y = RX1day)) +
     geom_line(colour = "black", linewidth = 0.35) +
-    annotate("text", x = x_min, y = y_max, label = heavy_label, hjust = 0, vjust = 1.6, size = 2.7, colour = heavy_col) +
-    annotate("text", x = x_min, y = y_max, label = extreme_label, hjust = 0, vjust = 3.1, size = 2.7, colour = extreme_col) +
+    annotate("text", x = x_min, y = y_max, label = extreme_label, hjust = 0, vjust = 1.6, size = 2.7, colour = extreme_col) +
+    annotate("text", x = x_min, y = y_max, label = heavy_label, hjust = 0, vjust = 3.1, size = 2.7, colour = heavy_col) +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.04))) +
     labs(title = panel_tag, x = "Year", y = "RX1day (mm)") +
