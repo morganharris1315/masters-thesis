@@ -534,7 +534,7 @@ p1c <- ggplot(hy2023_df, aes(x = observation_date, y = rainfall_mm)) +
 
 bottom_row <- p1b | p1c
 figure1_plot <- patchwork::wrap_elements(full = p1a) / patchwork::wrap_elements(full = bottom_row) +
-  plot_layout(heights = c(1.5, 0.85))
+  plot_layout(heights = c(1.3, 0.75))
 
 figure1_plot
 
@@ -592,7 +592,7 @@ col_right <- make_column_header("Future Projection") / p2b / p2d / p2f + plot_la
 figure2_plot <- col_left | col_right
 
 # Save outputs -------------------------------------------------------------
-ggsave(filename = figure1_file, plot = figure1_plot, width = 9, height = 14, dpi = 300)
+ggsave(filename = figure1_file, plot = figure1_plot, width = 9, height = 13.5, dpi = 300)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 300)
 
 message("Figure 1 saved to: ", figure1_file)
