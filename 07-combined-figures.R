@@ -42,7 +42,7 @@ current_dir <- file.path(weatherathome_dir, "current_decade")
 future_dir <- file.path(weatherathome_dir, "3k_warmer")
 chiltern_obs_file <- file.path(base_raw_dir, "obs_data", "cleaned_datasets", "rain_coromandel_cleaned.csv")
 
-figure1_file <- file.path(base_raw_dir, "obs_data", "Figure1_combined.png")
+figure1_file <- file.path(base_raw_dir, "obs_data", "Figure1_coromandel_context.png")
 figure2_file <- file.path(weatherathome_dir, "Figure2_coromandel_cell_2x3.png")
 
 # Inputs -------------------------------------------------------------------
@@ -427,7 +427,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
       hjust = 1,
       vjust = 0.5,
       size = 2.6,
-      colour = "black",
+      colour = "red",
       fontface = "bold"
     ) +
     geom_text(
@@ -564,7 +564,7 @@ fp_df <- fp_df %>%
     heavy_days = count_heavy_days(future_files, matched_cell$lon_index, matched_cell$lat_index, heavy_fp)
   )
 
-# For Figure 2 panels (c)-(f), use Current Day thresholds for both periods.
+# Figure 2 panels (c)-(f)
 fp_df_cd_thresholds <- fp_df %>%
   mutate(
     heavy_threshold = heavy_cd,
@@ -595,8 +595,4 @@ figure2_plot <- col_left | col_right
 ggsave(filename = figure1_file, plot = figure1_plot, width = 9, height = 13.5, dpi = 300)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 300)
 
-message("Figure 1 saved to: ", figure1_file)
-message("Figure 2 saved to: ", figure2_file)
-message("Matched cell used for Figure 2: lon_index=", matched_cell$lon_index, ", lat_index=", matched_cell$lat_index)
-message(sprintf("Figure 2 current thresholds -> Heavy: %.2f mm, Extreme: %.2f mm", heavy_cd, extreme_cd))
-message(sprintf("Figure 2 future thresholds  -> Heavy: %.2f mm (%+.1f%%), Extreme: %.2f mm (%+.1f%%)", heavy_fp, heavy_change_pct, extreme_fp, extreme_change_pct))
+
