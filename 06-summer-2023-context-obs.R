@@ -264,72 +264,13 @@ identified_sites <- read.csv(sites_path)
 coromandel_lat_log_data <- identified_sites %>%
   filter(CaseStudy == "Coromandel")
 
-# LiDAR hillshade (base Coromandel map only) ------------------------------
-# LINZ New Zealand LiDAR 1m DEM (CC BY 4.0)
-# Source: https://data.linz.govt.nz/layer/121859-new-zealand-lidar-1m-dem/
-lidar_dir <- glue("{base_raw_dir}/obs_data/coromandel/LiDAR data")
-lidar_tile_ids <- c("BC36", "BC35", "BC34", "BC33",
-                    "BB37", "BB36", "BB35", "BB34", "BB33",
-                    "BA36", "BA35", "BA34", "BA33",
-                    "AZ35", "AZ34")
-
-lidar_files_all <- list.files(
-  lidar_dir,
-  pattern = "\\.(tif|tiff)$",
-  full.names = TRUE,
-  ignore.case = TRUE
-)
-
-lidar_file_stems <- toupper(tools::file_path_sans_ext(basename(lidar_files_all)))
-lidar_selected <- lidar_files_all[
-  str_detect(lidar_file_stems, paste0("^(", paste(lidar_tile_ids, collapse = "|"), ")"))
-]
-
-if (length(lidar_selected) == 0) {
-  stop(glue("No LiDAR .tif files matched requested tile IDs in: {lidar_dir}"))
-}
-
-# Use a virtual raster to avoid loading all tile values into memory.
-dem_vrt <- terra::vrt(lidar_selected)
-
-# Match the current base-map extent so hillshade and station map are the same size.
-coromandel_xlim <- c(175.2, 176.2)
-coromandel_ylim <- c(-37.5, -36.5)
-map_extent_ll <- terra::ext(coromandel_xlim[1], coromandel_xlim[2], coromandel_ylim[1], coromandel_ylim[2])
-map_extent_poly_ll <- terra::as.polygons(map_extent_ll, crs = "EPSG:4326")
-map_extent_poly_dem <- terra::project(map_extent_poly_ll, terra::crs(dem_vrt))
-
-dem_crop <- terra::crop(dem_vrt, map_extent_poly_dem, snap = "out")
-
-# Downsample before shading to keep plotting tractable.
-dem_coarse <- terra::aggregate(dem_crop, fact = 25, fun = mean, na.rm = TRUE)
-
-slope <- terra::terrain(dem_coarse, v = "slope", unit = "radians")
-aspect <- terra::terrain(dem_coarse, v = "aspect", unit = "radians")
-hillshade <- terra::shade(slope, aspect, angle = 40, direction = 315)
-hillshade_ll <- terra::project(hillshade, "EPSG:4326", method = "bilinear")
-hillshade_df <- as.data.frame(hillshade_ll, xy = TRUE, na.rm = TRUE)
-hillshade_value_col <- setdiff(names(hillshade_df), c("x", "y"))[[1]]
-hillshade_df <- hillshade_df %>%
-  rename(hillshade = all_of(hillshade_value_col))
-
 p_coromandel_map <- ggplot() +
-  geom_raster(
-    data = hillshade_df,
-    aes(x = x, y = y, fill = hillshade),
-    inherit.aes = FALSE,
-    alpha = 0.75
-  ) +
-  scale_fill_gradientn(
-    colours = gray.colors(10, start = 0.05, end = 0.95),
-    guide = "none"
-  ) +
   geom_polygon(
     data = nz_map_df,
     aes(x = long, y = lat, group = group),
-    fill = NA,
+    fill = "grey92",
     colour = "grey40",
-    linewidth = 0.25
+    linewidth = 0.2
   ) +
   geom_point(
     data = coromandel_lat_log_data,
@@ -338,7 +279,7 @@ p_coromandel_map <- ggplot() +
     size = 2,
     alpha = 0.9
   ) +
-  coord_quickmap(xlim = coromandel_xlim, ylim = coromandel_ylim, expand = FALSE) +
+  coord_quickmap(xlim = c(175.2, 176.2), ylim = c(-37.5, -36.5), expand = FALSE) +
   scale_x_continuous(
     breaks = c(175.2, 175.7, 176.2),
     labels = scales::label_number(accuracy = 0.1),
@@ -482,7 +423,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
       hjust = 1,
       vjust = 0.5,
       size = 2.6,
-      colour = "black",
+      colour = "red",
       fontface = "bold"
     ) +
     geom_text(
@@ -511,7 +452,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
     scale_colour_manual(
       values = c(
         "Daily Rainfall (mm)" = "grey20",
-        "Above Heavy Threshold" = "red"
+        "Above Heavy Threshold" = "#93acff"
       ),
       breaks = legend_labels,
       name = NULL
@@ -532,7 +473,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
           size = c(2.7, 3.4),
           stroke = c(0.4, 1.1),
           fill = c("grey45", "grey45"),
-          colour = c("grey20", "red"),
+          colour = c("grey20", "#93acff"),
           alpha = 1
         )
       )
@@ -578,3 +519,5 @@ library(terra)
 library(rayshader)
 library(viridis)
 library(terrainr)
+
+
