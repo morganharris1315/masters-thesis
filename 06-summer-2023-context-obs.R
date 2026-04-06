@@ -506,8 +506,6 @@ ggsave(
 
 
 # Adding Lidar Data -------------------------------------------------------
-
-# Install the packages if you haven't already
 #install.packages("lidR")
 #install.packages("terra")
 #install.packages("rayshader")
