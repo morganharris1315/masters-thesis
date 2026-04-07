@@ -20,10 +20,10 @@ library(maps)
 library(scales)
 
 # Style constants ----------------------------------------------------------
-heavy_col <- "#93acff"
-extreme_col <- "#5f66DB"
+heavy_col <- "deepskyblue"
+extreme_col <- "deepskyblue4"
 box_colour_light <- "#eff2ff"
-box_colour_dark <- "#6f8dff"
+box_colour_dark <- "deepskyblue4"
 
 theme_model_axes <- theme(
   panel.grid.major = element_blank(),
@@ -592,7 +592,7 @@ col_right <- make_column_header("Future Projection") / p2b / p2d / p2f + plot_la
 figure2_plot <- col_left | col_right
 
 # Save outputs -------------------------------------------------------------
-ggsave(filename = figure1_file, plot = figure1_plot, width = 9, height = 13.5, dpi = 300)
-ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 300)
+ggsave(filename = figure1_file, plot = figure1_plot, width = 9, height = 13.5, dpi = 1800)
+ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 1800)
 
 
