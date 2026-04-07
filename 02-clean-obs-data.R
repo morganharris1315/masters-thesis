@@ -46,7 +46,7 @@ clean_region_timeseries_obs <- function(region_name) {
   }
   
   # Read all files as character to avoid bind_rows type conflicts
-  df_list <- map(csv_files, function(f) {
+  df_list <- purrr::map(csv_files, function(f) {
     agent_no <- extract_agent_no(f)
     
     read_csv(f,
@@ -130,7 +130,7 @@ clean_region_timeseries_obs <- function(region_name) {
 
 
 # process all regions -----------------------------------------------------
-all_regions_obs <- map(regions_obs, clean_region_timeseries_obs)
+all_regions_obs <- purrr::map(regions_obs, clean_region_timeseries_obs)
 names(all_regions_obs) <- regions_obs
 
 # Combine all regions
