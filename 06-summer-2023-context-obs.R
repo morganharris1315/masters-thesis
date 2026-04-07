@@ -537,7 +537,7 @@ lidar_mosaic <- if (length(lidar_tiles) == 1) {
 # Ensure station lon/lat and NZ outline can be plotted on the same CRS.
 lidar_wgs84 <- terra::project(lidar_mosaic, "EPSG:4326")
 
-coromandel_extent <- terra::ext(175.2, 176.2, -37.5, -36.5)
+coromandel_extent <- terra::ext(175.2, 176.0,-37.5, -36.4)
 lidar_wgs84_crop <- terra::crop(lidar_wgs84, coromandel_extent)
 
 # Build simple grayscale hillshade background.
@@ -547,6 +547,21 @@ lidar_hillshade <- terra::shade(lidar_slope, lidar_aspect, angle = 45, direction
 names(lidar_hillshade) <- "hillshade"
 
 lidar_hillshade_df <- as.data.frame(lidar_hillshade, xy = TRUE, na.rm = TRUE)
+
+target_plot_cells <-  1e6
+hillshade_cells <- terra::ncell(lidar_hillshade)
+
+if (hillshade_cells > target_plot_cells) {
+  agg_factor <- ceiling(sqrt(hillshade_cells / target_plot_cells))
+  message(glue(
+    "Downsampling hillshade from {scales::comma(hillshade_cells)} to ~{scales::comma(round(hillshade_cells / (agg_factor^2)))} cells (aggregate factor = {agg_factor})."
+  ))
+  lidar_hillshade_plot <- terra::aggregate(lidar_hillshade, fact = agg_factor, fun = mean, na.rm = TRUE)
+} else {
+  lidar_hillshade_plot <- lidar_hillshade
+}
+
+lidar_hillshade_df <- as.data.frame(lidar_hillshade_plot, xy = TRUE, na.rm = TRUE)
 
 p_coromandel_lidar_base_map <- ggplot() +
   geom_raster(
@@ -558,28 +573,20 @@ p_coromandel_lidar_base_map <- ggplot() +
     high = "grey92",
     name = "Hillshade"
   ) +
-  geom_polygon(
-    data = nz_map_df,
-    aes(x = long, y = lat, group = group),
-    fill = NA,
-    colour = "grey20",
-    linewidth = 0.35
-  ) +
   geom_point(
     data = coromandel_lat_log_data,
     aes(x = Longitude, y = Latitude),
     shape = 21,
-    fill = "grey55",
+    fill = "red",
     colour = "black",
     size = 2
   ) +
   coord_quickmap(
-    xlim = c(175.2, 176.2),
-    ylim = c(-37.5, -36.5),
+    xlim = c(175.2, 176.0),
+    ylim = c(-37.5, -36.4),
     expand = FALSE
   ) +
   labs(
-    title = "Coromandel Stations with LiDAR Hillshade Background",
     x = "Longitude",
     y = "Latitude"
   ) +
