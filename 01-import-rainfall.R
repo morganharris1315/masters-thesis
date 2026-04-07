@@ -30,7 +30,7 @@ read_region_rainfall <- function(region_dir, region_name, sites_df) {
     return(NULL)
   }
   
-  station_dfs <- map(files, function(file) {
+  station_dfs <- purrr::map(files, function(file) {
     
     agent_no <- extract_agent_no(file)
     message("  • Reading station ", agent_no)
@@ -98,13 +98,13 @@ process_all_regions <- function(base_raw_dir) {
   processed_dir_obs <- glue("{base_raw_dir}/obs_data/cleaned_datasets")
   
   # Process each region
-  region_outputs <- map2(
+  region_outputs <- purrr::map2(
     region_list$region_dir,
     region_list$region_name,
     ~ read_region_rainfall(.x, .y, sites_df)
   )
   
-  names(region_outputs) <- map_chr(region_list$region_name, clean_region_name)
+  names(region_outputs) <- purrr::map_chr(region_list$region_name, clean_region_name)
   
   # Save region-level files
   for (r in names(region_outputs)) {
