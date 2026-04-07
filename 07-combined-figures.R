@@ -18,6 +18,7 @@ library(readr)
 library(lubridate)
 library(maps)
 library(scales)
+library(terra)
 
 # Style constants ----------------------------------------------------------
 heavy_col <- "deepskyblue"
@@ -41,6 +42,7 @@ weatherathome_dir <- file.path(base_raw_dir, "model_data")
 current_dir <- file.path(weatherathome_dir, "current_decade")
 future_dir <- file.path(weatherathome_dir, "3k_warmer")
 chiltern_obs_file <- file.path(base_raw_dir, "obs_data", "cleaned_datasets", "rain_coromandel_cleaned.csv")
+lidar_dir <- file.path(base_raw_dir, "obs_data", "coromandel", "LiDAR data")
 
 figure1_file <- file.path(base_raw_dir, "obs_data", "Figure1_coromandel_context.png")
 figure2_file <- file.path(weatherathome_dir, "Figure2_coromandel_cell_2x3.png")
@@ -362,7 +364,30 @@ event_definitions <- tibble::tribble(
 ) %>%
   mutate(event_title = map2_chr(start_date, end_date, format_event_title))
 
-build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim = c(-37.6, -36.4), show_legend = FALSE) {
+lidar_tile_paths <- list.files(lidar_dir, pattern = "\\.tif$", full.names = TRUE)
+if (length(lidar_tile_paths) == 0) {
+  stop("No .tif files found in LiDAR directory: ", lidar_dir)
+}
+
+lidar_tiles <- lapply(lidar_tile_paths, terra::rast)
+lidar_mosaic <- if (length(lidar_tiles) == 1) lidar_tiles[[1]] else terra::mosaic(terra::sprc(lidar_tiles))
+lidar_wgs84 <- terra::project(lidar_mosaic, "EPSG:4326")
+lidar_extent <- terra::ext(175.2, 176.0, -37.5, -36.3)
+lidar_crop <- terra::crop(lidar_wgs84, lidar_extent)
+lidar_slope <- terra::terrain(lidar_crop, v = "slope", unit = "radians")
+lidar_aspect <- terra::terrain(lidar_crop, v = "aspect", unit = "radians")
+lidar_hillshade <- terra::shade(lidar_slope, lidar_aspect, angle = 45, direction = 315)
+names(lidar_hillshade) <- "hillshade"
+
+target_plot_cells <- 1e6
+if (terra::ncell(lidar_hillshade) > target_plot_cells) {
+  agg_factor <- ceiling(sqrt(terra::ncell(lidar_hillshade) / target_plot_cells))
+  lidar_hillshade <- terra::aggregate(lidar_hillshade, fact = agg_factor, fun = mean, na.rm = TRUE)
+}
+
+lidar_hillshade_df <- as.data.frame(lidar_hillshade, xy = TRUE, na.rm = TRUE)
+
+build_event_map <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -36.3), show_legend = FALSE) {
   legend_labels <- c("Daily Rainfall (mm)", "Above Heavy Threshold")
   
   event_data <- coromandel_obs %>%
@@ -391,12 +416,14 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
     mutate(legend_key = legend_labels[2])
   
   ggplot() +
-    geom_polygon(
-      data = base_map_df,
-      aes(x = long, y = lat, group = group),
-      fill = "grey92",
-      colour = "grey40",
-      linewidth = 0.2
+    geom_raster(
+      data = lidar_hillshade_df,
+      aes(x = x, y = y, fill = hillshade)
+    ) +
+    scale_fill_gradient(
+      low = "grey15",
+      high = "grey92",
+      guide = "none"
     ) +
     geom_point(
       data = event_data_base,
@@ -469,6 +496,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
     ) +
     theme_thesis +
     theme(
+      panel.background = element_rect(fill = "white", colour = NA),
       axis.title = element_blank(),
       legend.position = if (isTRUE(show_legend)) "right" else "none",
       legend.justification = "center",
@@ -480,9 +508,8 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.1, 176.1), ylim
     )
 }
 
-nz_map_df<-map_data('nz')
 event_list <- split(event_definitions, event_definitions$event_id)
-event_maps <- imap(event_list, ~ build_event_map(.x, nz_map_df, show_legend = (.y == names(event_list)[1])))
+event_maps <- imap(event_list, ~ build_event_map(.x, show_legend = (.y == names(event_list)[1])))
 event_map_grid <- patchwork::wrap_plots(event_maps, ncol = 3, nrow = 2)
 p1a_core <- event_map_grid +
   patchwork::plot_layout(guides = "collect") &
@@ -594,5 +621,3 @@ figure2_plot <- col_left | col_right
 # Save outputs -------------------------------------------------------------
 ggsave(filename = figure1_file, plot = figure1_plot, width = 9, height = 13.5, dpi = 1800)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 1800)
-
-

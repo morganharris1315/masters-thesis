@@ -623,7 +623,9 @@ if (hillshade_panel_cells > target_plot_cells) {
 
 lidar_hillshade_panel_df <- as.data.frame(lidar_hillshade_panel_plot, xy = TRUE, na.rm = TRUE)
 
-build_event_map_lidar_hillshade <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -36.3)) {
+build_event_map_lidar_hillshade <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -36.3), show_legend = FALSE) {
+  legend_labels <- c("Daily Rainfall (mm)", "Above Heavy Threshold")
+
   event_data <- coromandel_obs %>%
     filter(
       observation_date >= event_row$start_date,
@@ -643,6 +645,13 @@ build_event_map_lidar_hillshade <- function(event_row, xlim = c(175.2, 176.0), y
     mutate(is_above_threshold = !is.na(threshold_single) & event_rainfall_mm > threshold_single) %>%
     filter(!is.na(latitude), !is.na(longitude), !is.na(event_rainfall_mm))
   
+  event_data_base <- event_data %>%
+    mutate(legend_key = legend_labels[1])
+  
+  event_data_above <- event_data %>%
+    filter(is_above_threshold) %>%
+    mutate(legend_key = legend_labels[2])
+  
   ggplot() +
     geom_raster(
       data = lidar_hillshade_panel_df,
@@ -654,23 +663,21 @@ build_event_map_lidar_hillshade <- function(event_row, xlim = c(175.2, 176.0), y
       guide = "none"
     ) +
     geom_point(
-      data = event_data,
-      aes(x = longitude, y = latitude),
+      data = event_data_base,
+      aes(x = longitude, y = latitude, colour = legend_key),
       shape = 21,
       fill = "white",
-      colour = "grey20",
       size = 2,
       stroke = 0.5,
       alpha = 0.95
     ) +
     geom_point(
-      data = event_data %>% filter(is_above_threshold),
-      aes(x = longitude, y = latitude),
+      data = event_data_above,
+      aes(x = longitude, y = latitude, colour = legend_key),
       shape = 21,
       fill = "white",
-      colour = "deepskyblue",
       size = 2,
-      stroke = 0.6
+      stroke = 0.9
     ) +
     geom_text(
       data = chiltern_site,
@@ -706,23 +713,41 @@ build_event_map_lidar_hillshade <- function(event_row, xlim = c(175.2, 176.0), y
       x = "Longitude",
       y = "Latitude"
     ) +
+    scale_colour_manual(
+      values = c(
+        "Daily Rainfall (mm)" = "grey20",
+        "Above Heavy Threshold" = "deepskyblue"
+      ),
+      breaks = legend_labels,
+      name = NULL
+    ) +
+    guides(
+      colour = guide_legend(
+        override.aes = list(
+          shape = c(21, 21),
+          size = c(2.7, 2.7),
+          stroke = c(0.5, 0.9),
+          fill = c("white", "white"),
+          alpha = 1
+        )
+      )
+    ) +
     theme_thesis +
     theme(
       panel.background = element_rect(fill = "white", colour = NA),
-      legend.position = "none"
+      legend.position = if (isTRUE(show_legend)) "right" else "none"
     )
 }
 
-event_maps_lidar_hillshade <- purrr::map(
-  split(event_definitions, event_definitions$event_id),
-  ~ build_event_map_lidar_hillshade(.x)
+event_list_lidar <- split(event_definitions, event_definitions$event_id)
+event_maps_lidar_hillshade <- purrr::imap(
+  event_list_lidar,
+  ~ build_event_map_lidar_hillshade(.x, show_legend = (.y == names(event_list_lidar)[1]))
 )
 
-p_coromandel_event_panel_lidar_hillshade <- patchwork::wrap_plots(
-  event_maps_lidar_hillshade,
-  ncol = 3,
-  nrow = 2
-)
+p_coromandel_event_panel_lidar_hillshade <- patchwork::wrap_plots(event_maps_lidar_hillshade, ncol = 3, nrow = 2) +
+  patchwork::plot_layout(guides = "collect") &
+  theme(legend.position = "right")
 
 print(p_coromandel_event_panel_lidar_hillshade)
 
@@ -731,4 +756,3 @@ ggsave(
   plot = p_coromandel_event_panel_lidar_hillshade,
   dpi = 300
 )
-
