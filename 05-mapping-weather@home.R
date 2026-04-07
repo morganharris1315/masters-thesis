@@ -5,9 +5,6 @@
 # Mapping weather@home data and saving NZ probability-ratio maps.
 # -------------------------------------------------------------------------
 
-# Changes still to be made
-# Want to add a gird outline around the Coromandel gird that I am using in Figure 2.
-
 # Loading packages ---------------------------------------------------------
 library(RNetCDF)
 library(ncdf4)
@@ -39,7 +36,7 @@ combined_ratio_output_png <- file.path(model_data_dir,
 ge5_ratio_output_png <- file.path(model_data_dir,
                                   "weather@home_probability_ratio_ge5_map.png")
 
-# Cell highlight settings ---------------------------------------------------
+# Cell highlight ---------------------------------------------------
 matched_cell <- data.frame(lon_index = 30L, lat_index = 16L)
 matched_land_mask_value <- 294.9544983
 
@@ -632,3 +629,5 @@ cat("NZ-intersecting cell count (top 10%):", length(ratio_layers[["probability_r
 
 cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]$keep_ids),"\n")
 # 185 cells
+
+
