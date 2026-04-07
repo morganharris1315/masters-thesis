@@ -158,7 +158,7 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
   
   stations <- sort(unique(region_df$station))
   
-  summary_tbl <- map_dfr(stations, function(stn) {
+  summary_tbl <- purrr::map_dfr(stations, function(stn) {
     df_station <- region_df %>%
       filter(station == stn) %>%
       arrange(observation_date)
@@ -227,7 +227,7 @@ build_region_summer_2023_table <- function(df_obs, region_name, output_dir) {
 }
 
 # Run for all selected regions --------------------------------------------
-region_summaries <- map(
+region_summaries <- purrr::map(
   regions_to_process,
   function(region_name) {
     region_context_dir <- glue("{base_raw_dir}/obs_data/{region_name}/summer_2023_context")
@@ -485,7 +485,7 @@ build_event_map <- function(event_row, base_map_df, xlim = c(175.2, 176.2), ylim
     )
 }
 
-event_maps <- map(
+event_maps <- purrr::map(
   split(event_definitions, event_definitions$event_id),
   ~ build_event_map(.x, nz_map_df)
 )
@@ -519,3 +519,82 @@ library(viridis)
 library(terrainr)
 
 
+# Build Coromandel LiDAR hillshade basemap ---------------------------------
+lidar_dir <- glue("{base_raw_dir}/obs_data/coromandel/LiDAR data")
+lidar_tile_paths <- dir_ls(lidar_dir, regexp = "\\.tif$", recurse = FALSE)
+
+if (length(lidar_tile_paths) == 0) {
+  stop(glue("No .tif files found in LiDAR directory: {lidar_dir}"))
+}
+
+lidar_tiles <- lapply(lidar_tile_paths, terra::rast)
+lidar_mosaic <- if (length(lidar_tiles) == 1) {
+  lidar_tiles[[1]]
+} else {
+  terra::mosaic(terra::sprc(lidar_tiles))
+}
+
+# Ensure station lon/lat and NZ outline can be plotted on the same CRS.
+lidar_wgs84 <- terra::project(lidar_mosaic, "EPSG:4326")
+
+coromandel_extent <- terra::ext(175.2, 176.2, -37.5, -36.5)
+lidar_wgs84_crop <- terra::crop(lidar_wgs84, coromandel_extent)
+
+# Build simple grayscale hillshade background.
+lidar_slope <- terra::terrain(lidar_wgs84_crop, v = "slope", unit = "radians")
+lidar_aspect <- terra::terrain(lidar_wgs84_crop, v = "aspect", unit = "radians")
+lidar_hillshade <- terra::shade(lidar_slope, lidar_aspect, angle = 45, direction = 315)
+names(lidar_hillshade) <- "hillshade"
+
+lidar_hillshade_df <- as.data.frame(lidar_hillshade, xy = TRUE, na.rm = TRUE)
+
+p_coromandel_lidar_base_map <- ggplot() +
+  geom_raster(
+    data = lidar_hillshade_df,
+    aes(x = x, y = y, fill = hillshade)
+  ) +
+  scale_fill_gradient(
+    low = "grey15",
+    high = "grey92",
+    name = "Hillshade"
+  ) +
+  geom_polygon(
+    data = nz_map_df,
+    aes(x = long, y = lat, group = group),
+    fill = NA,
+    colour = "grey20",
+    linewidth = 0.35
+  ) +
+  geom_point(
+    data = coromandel_lat_log_data,
+    aes(x = Longitude, y = Latitude),
+    shape = 21,
+    fill = "grey55",
+    colour = "black",
+    size = 2
+  ) +
+  coord_quickmap(
+    xlim = c(175.2, 176.2),
+    ylim = c(-37.5, -36.5),
+    expand = FALSE
+  ) +
+  labs(
+    title = "Coromandel Stations with LiDAR Hillshade Background",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_thesis +
+  theme(
+    panel.background = element_rect(fill = "white", colour = NA),
+    legend.position = "right"
+  )
+
+print(p_coromandel_lidar_base_map)
+
+ggsave(
+  filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_base_map_lidar_hillshade.png"),
+  plot = p_coromandel_lidar_base_map,
+  width = 8,
+  height = 7,
+  dpi = 300
+)
