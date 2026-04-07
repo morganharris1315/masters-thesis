@@ -5,10 +5,6 @@
 # Contextualise summer 2023 rainfall for observational stations.
 # -------------------------------------------------------------------------
 
-# Changes still to be made. 
-# I want to add LiDAR data so that I have elevation on the map
-# This should solve the issue of some of the dots going off the side of the land. 
-
 # Regions to process -------------------------------------------------------
 regions_to_process <- c("coromandel", "far_north", "top_of_south", "waikato")
 
@@ -605,3 +601,134 @@ ggsave(
   height = 7,
   dpi = 300
 )
+
+
+# Coromandel key-event maps with LiDAR hillshade background ---------------
+lidar_hillshade_panel_plot <- lidar_hillshade
+
+hillshade_panel_cells <- terra::ncell(lidar_hillshade_panel_plot)
+
+if (hillshade_panel_cells > target_plot_cells) {
+  agg_factor_hs <- ceiling(sqrt(hillshade_panel_cells / target_plot_cells))
+  message(glue(
+    "Downsampling hillshade raster from {scales::comma(hillshade_panel_cells)} to ~{scales::comma(round(hillshade_panel_cells / (agg_factor_hs^2)))} cells (aggregate factor = {agg_factor_hs})."
+  ))
+  lidar_hillshade_panel_plot <- terra::aggregate(
+    lidar_hillshade_panel_plot,
+    fact = agg_factor_hs,
+    fun = mean,
+    na.rm = TRUE
+  )
+}
+
+lidar_hillshade_panel_df <- as.data.frame(lidar_hillshade_panel_plot, xy = TRUE, na.rm = TRUE)
+
+build_event_map_lidar_hillshade <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -36.3)) {
+  event_data <- coromandel_obs %>%
+    filter(
+      observation_date >= event_row$start_date,
+      observation_date <= event_row$end_date
+    ) %>%
+    group_by(station) %>%
+    filter(!is.na(rainfall_mm)) %>%
+    slice_max(order_by = rainfall_mm, n = 1, with_ties = FALSE) %>%
+    ungroup() %>%
+    transmute(
+      station,
+      event_rainfall_mm = rainfall_mm,
+      event_date_used = observation_date
+    ) %>%
+    left_join(station_coords, by = "station") %>%
+    left_join(station_thresholds, by = "station") %>%
+    mutate(is_above_threshold = !is.na(threshold_single) & event_rainfall_mm > threshold_single) %>%
+    filter(!is.na(latitude), !is.na(longitude), !is.na(event_rainfall_mm))
+  
+  ggplot() +
+    geom_raster(
+      data = lidar_hillshade_panel_df,
+      aes(x = x, y = y, fill = hillshade)
+    ) +
+    scale_fill_gradient(
+      low = "grey15",
+      high = "grey92",
+      guide = "none"
+    ) +
+    geom_point(
+      data = event_data,
+      aes(x = longitude, y = latitude),
+      shape = 21,
+      fill = "white",
+      colour = "grey20",
+      size = 2,
+      stroke = 0.5,
+      alpha = 0.95
+    ) +
+    geom_point(
+      data = event_data %>% filter(is_above_threshold),
+      aes(x = longitude, y = latitude),
+      shape = 21,
+      fill = "white",
+      colour = "deepskyblue",
+      size = 2,
+      stroke = 0.6
+    ) +
+    geom_text(
+      data = chiltern_site,
+      aes(x = longitude, y = latitude, label = station),
+      nudge_x = -0.05,
+      hjust = 1,
+      vjust = 0.5,
+      size = 2.3,
+      colour = "red",
+      fontface = "bold"
+    ) +
+    geom_text(
+      data = event_data,
+      aes(x = longitude, y = latitude, label = round(event_rainfall_mm, 0)),
+      nudge_y = 0.045,
+      size = 2,
+      colour = "black",
+      fontface = "bold",
+      check_overlap = TRUE
+    ) +
+    coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
+    scale_x_continuous(
+      breaks = c(xlim[1], mean(xlim), xlim[2]),
+      labels = scales::label_number(accuracy = 0.1),
+      minor_breaks = NULL
+    ) +
+    scale_y_continuous(
+      breaks = seq(ylim[1], ylim[2], by = 0.4),
+      minor_breaks = NULL
+    ) +
+    labs(
+      title = event_row$event_title,
+      x = "Longitude",
+      y = "Latitude"
+    ) +
+    theme_thesis +
+    theme(
+      panel.background = element_rect(fill = "white", colour = NA),
+      legend.position = "none"
+    )
+}
+
+event_maps_lidar_hillshade <- purrr::map(
+  split(event_definitions, event_definitions$event_id),
+  ~ build_event_map_lidar_hillshade(.x)
+)
+
+p_coromandel_event_panel_lidar_hillshade <- patchwork::wrap_plots(
+  event_maps_lidar_hillshade,
+  ncol = 3,
+  nrow = 2
+)
+
+print(p_coromandel_event_panel_lidar_hillshade)
+
+ggsave(
+  filename = glue("{base_raw_dir}/obs_data/coromandel/coromandel_key_event_maps_3x2_lidar_hillshade.png"),
+  plot = p_coromandel_event_panel_lidar_hillshade,
+  dpi = 300
+)
+
