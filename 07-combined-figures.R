@@ -162,8 +162,8 @@ plot_rx1day_ts <- function(df_period, panel_tag, include_change = FALSE, heavy_c
   
   p <- ggplot(df_period, aes(x = Year, y = RX1day)) +
     geom_line(colour = "black", linewidth = 0.35) +
-    annotate("text", x = x_min, y = y_max, label = extreme_label, hjust = 0, vjust = 1.6, size = 2.7, colour = extreme_col) +
-    annotate("text", x = x_min, y = y_max, label = heavy_label, hjust = 0, vjust = 3.1, size = 2.7, colour = heavy_col) +
+    annotate("text", x = x_min, y = y_max, label = extreme_label, hjust = 0, vjust = 1.1, size = 2.7, colour = extreme_col) +
+    annotate("text", x = x_min, y = y_max, label = heavy_label, hjust = 0, vjust = 3.6, size = 2.7, colour = heavy_col) +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.04))) +
     labs(title = panel_tag, x = "Year", y = "RX1day (mm)") +
@@ -540,8 +540,7 @@ p1b <- p1b +
   geom_text(
     data = subset(chiltern_rx_plot, hydro_year == 2023),
     aes(x = Year, y = RX1day, label = "2023"),
-    nudge_y = max(chiltern_rx_plot$RX1day, na.rm = TRUE) * 0.03,
-    nudge_x = max(chiltern_rx_plot$Year, na.rm = TRUE) * 5,
+    nudge_x = -4.2,
     colour = "red3",
     size = 2.7,
     fontface = "bold"
