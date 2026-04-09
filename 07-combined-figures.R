@@ -541,7 +541,7 @@ p1b <- p1b +
     data = subset(chiltern_rx_plot, hydro_year == 2023),
     aes(x = Year, y = RX1day, label = "2023"),
     nudge_y = max(chiltern_rx_plot$RX1day, na.rm = TRUE) * 0.03,
-    nudge_x = max(chiltern_rx_plot$Year, na.rm = TRUE) * 5,
+    nudge_x = -1.5,
     colour = "red3",
     size = 2.7,
     fontface = "bold"
