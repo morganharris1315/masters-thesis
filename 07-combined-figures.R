@@ -144,7 +144,15 @@ pct_change <- function(future_value, current_value) {
   100 * (future_value - current_value) / current_value
 }
 
-plot_rx1day_ts <- function(df_period, panel_tag, include_change = FALSE, heavy_change = NA_real_, extreme_change = NA_real_, show_points = TRUE) {
+plot_rx1day_ts <- function(
+  df_period,
+  panel_tag,
+  include_change = FALSE,
+  heavy_change = NA_real_,
+  extreme_change = NA_real_,
+  show_points = TRUE,
+  y_upper = NULL
+) {
   heavy_label <- if (!include_change) {
     sprintf("Heavy %.1f mm", unique(df_period$heavy_threshold))
   } else {
@@ -157,15 +165,17 @@ plot_rx1day_ts <- function(df_period, panel_tag, include_change = FALSE, heavy_c
     sprintf("Extreme %.1f mm, %+0.1f%%", unique(df_period$extreme_threshold), extreme_change)
   }
   
-  y_max <- max(df_period$RX1day, na.rm = TRUE) * 1.05
+  if (is.null(y_upper)) {
+    y_upper <- max(df_period$RX1day, na.rm = TRUE) * 1.05
+  }
   x_min <- min(df_period$Year, na.rm = TRUE)
   
   p <- ggplot(df_period, aes(x = Year, y = RX1day)) +
     geom_line(colour = "black", linewidth = 0.35) +
-    annotate("text", x = x_min, y = y_max, label = extreme_label, hjust = 0, vjust = 1.1, size = 2.7, colour = extreme_col) +
-    annotate("text", x = x_min, y = y_max, label = heavy_label, hjust = 0, vjust = 3.6, size = 2.7, colour = heavy_col) +
+    annotate("text", x = x_min, y = y_upper, label = extreme_label, hjust = 0, vjust = 1.2, size = 2.7, colour = extreme_col, fontface = "bold") +
+    annotate("text", x = x_min, y = y_upper, label = heavy_label, hjust = 0, vjust = 2.7, size = 2.7, colour = heavy_col, fontface = "bold") +
     scale_x_continuous(expand = expansion(mult = c(0.01, 0.01))) +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.04))) +
+    scale_y_continuous(limits = c(0, y_upper), expand = expansion(mult = c(0, 0))) +
     labs(title = panel_tag, x = "Year", y = "RX1day (mm)") +
     theme_thesis +
     theme_model_axes +
@@ -610,8 +620,10 @@ heavy_days_max <- max(c(cd_df$heavy_days, fp_df_cd_thresholds$heavy_days), na.rm
 heavy_change_pct <- pct_change(heavy_fp, heavy_cd)
 extreme_change_pct <- pct_change(extreme_fp, extreme_cd)
 
-p2a <- plot_rx1day_ts(cd_df, panel_tag = "(a)", include_change = FALSE)
-p2b <- plot_rx1day_ts(fp_df, panel_tag = "(b)", include_change = TRUE, heavy_change = heavy_change_pct, extreme_change = extreme_change_pct)
+rx1day_upper_shared <- max(c(cd_df$RX1day, fp_df$RX1day), na.rm = TRUE) * 1.05
+
+p2a <- plot_rx1day_ts(cd_df, panel_tag = "(a)", include_change = FALSE, y_upper = rx1day_upper_shared)
+p2b <- plot_rx1day_ts(fp_df, panel_tag = "(b)", include_change = TRUE, heavy_change = heavy_change_pct, extreme_change = extreme_change_pct, y_upper = rx1day_upper_shared)
 p2c <- plot_heavy_hist(hist_cd, panel_tag = "(c)", max_exceed = heavy_days_max)
 p2d <- plot_heavy_hist(hist_fp, panel_tag = "(d)", max_exceed = heavy_days_max)
 p2e <- plot_quadrant_heatmap(cd_df, panel_tag = "(e)", heavy_cutoff = 4L, x_max = heavy_days_max)
