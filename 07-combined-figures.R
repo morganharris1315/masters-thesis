@@ -21,10 +21,10 @@ library(scales)
 library(terra)
 
 # Style constants ----------------------------------------------------------
-heavy_col <- "deepskyblue"
-extreme_col <- "deepskyblue4"
-box_colour_light <- "aliceblue"
-box_colour_dark <- "deepskyblue"
+#heavy_col <- "deepskyblue"
+#extreme_col <- "deepskyblue4"
+#box_colour_light <- "aliceblue"
+#box_colour_dark <- "deepskyblue"
 
 heavy_col <- "lightslateblue"
 extreme_col <- "darkslateblue"
