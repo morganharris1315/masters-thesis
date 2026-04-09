@@ -23,8 +23,13 @@ library(terra)
 # Style constants ----------------------------------------------------------
 heavy_col <- "deepskyblue"
 extreme_col <- "deepskyblue4"
-box_colour_light <- "#eff2ff"
-box_colour_dark <- "deepskyblue4"
+box_colour_light <- "aliceblue"
+box_colour_dark <- "deepskyblue"
+
+heavy_col <- "lightslateblue"
+extreme_col <- "darkslateblue"
+box_colour_light <- "lavender"
+box_colour_dark <- "lightslateblue"
 
 theme_model_axes <- theme(
   panel.grid.major = element_blank(),
@@ -305,8 +310,7 @@ chiltern_rx_plot <- chiltern_rx %>%
     extreme_threshold = extreme_obs
   )
 
-# Rebuild Coromandel event panel in this script so Figure 1 styling can
-# be tuned without altering the standalone context script.
+# 
 format_day_month <- function(x) {
   x <- as.Date(x)
   if (is.na(x)) return(NA_character_)
@@ -454,7 +458,7 @@ build_event_map <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -
       hjust = 1,
       vjust = 0.5,
       size = 2.6,
-      colour = "red",
+      colour = "red3",
       fontface = "bold"
     ) +
     geom_text(
@@ -478,7 +482,7 @@ build_event_map <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -
     labs(title = event_row$event_title, x = NULL, y = NULL) +
     scale_colour_manual(
       values = c(
-        "Daily Rainfall (mm)" = "grey20",
+        "Daily Rainfall (mm)" = "grey10",
         "Above Heavy Threshold" = heavy_col
       ),
       breaks = legend_labels,
@@ -537,8 +541,9 @@ p1b <- p1b +
     data = subset(chiltern_rx_plot, hydro_year == 2023),
     aes(x = Year, y = RX1day, label = "2023"),
     nudge_y = max(chiltern_rx_plot$RX1day, na.rm = TRUE) * 0.03,
+    nudge_x = max(chiltern_rx_plot$Year, na.rm = TRUE) * 5,
     colour = "red3",
-    size = 2.8,
+    size = 2.7,
     fontface = "bold"
   )
 
@@ -617,7 +622,8 @@ col_left <- make_column_header("Current Day") / p2a / p2c / p2e + plot_layout(he
 col_right <- make_column_header("Future Projection") / p2b / p2d / p2f + plot_layout(heights = c(0.09, 1, 1, 1))
 
 figure2_plot <- col_left | col_right
+figure2_plot
 
 # Save outputs -------------------------------------------------------------
-ggsave(filename = figure1_file, plot = figure1_plot, width = 9, height = 13.5, dpi = 1800)
-ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 1800)
+ggsave(filename = figure1_file, plot = figure1_plot, width = 7, height = 12, dpi = 2000)
+ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 2000)
