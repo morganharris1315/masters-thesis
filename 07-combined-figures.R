@@ -51,7 +51,7 @@ lidar_dir <- file.path(base_raw_dir, "obs_data", "coromandel", "LiDAR data")
 
 figure1_file <- file.path(base_raw_dir, "obs_data", "Figure1_coromandel_context.png")
 figure2_file <- file.path(weatherathome_dir, "Figure2_coromandel_cell_2x3.png")
-figure2_heavy5_file <- file.path(weatherathome_dir, "Figure2ef_coromandel_cell_heavy5.png")
+figure5_file <- file.path(weatherathome_dir, "Figure5.png")
 
 # Inputs -------------------------------------------------------------------
 matched_cell <- data.frame(lon_index = 30L, lat_index = 16L)
@@ -649,7 +649,7 @@ figure2_heavy5_plot
 # Save outputs -------------------------------------------------------------
 ggsave(filename = figure1_file, plot = figure1_plot, width = 7, height = 12, dpi = 2000)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 2000)
-ggsave(filename = figure2_heavy5_file, plot = figure2_heavy5_plot, width = 11, height = 5.4, dpi = 2000)
+ggsave(filename = figure5_file, plot = figure2_heavy5_plot, width = 11, height = 5.4, dpi = 2000)
 
 
 # Simple min/max helpers for Figure 1b text -------------------------------
