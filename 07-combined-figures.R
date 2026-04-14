@@ -51,6 +51,7 @@ lidar_dir <- file.path(base_raw_dir, "obs_data", "coromandel", "LiDAR data")
 
 figure1_file <- file.path(base_raw_dir, "obs_data", "Figure1_coromandel_context.png")
 figure2_file <- file.path(weatherathome_dir, "Figure2_coromandel_cell_2x3.png")
+figure2_heavy5_file <- file.path(weatherathome_dir, "Figure2ef_coromandel_cell_heavy5.png")
 
 # Inputs -------------------------------------------------------------------
 matched_cell <- data.frame(lon_index = 30L, lat_index = 16L)
@@ -629,15 +630,26 @@ p2d <- plot_heavy_hist(hist_fp, panel_tag = "(d)", max_exceed = heavy_days_max)
 p2e <- plot_quadrant_heatmap(cd_df, panel_tag = "(e)", heavy_cutoff = 4L, x_max = heavy_days_max)
 p2f <- plot_quadrant_heatmap(fp_df_cd_thresholds, panel_tag = "(f)", heavy_cutoff = 4L, x_max = heavy_days_max)
 
+# Figure 2e/f alternate framing: at least 5 Heavy days
+p2e_heavy5 <- plot_quadrant_heatmap(cd_df, panel_tag = "(e)", heavy_cutoff = 5L, x_max = heavy_days_max)
+p2f_heavy5 <- plot_quadrant_heatmap(fp_df_cd_thresholds, panel_tag = "(f)", heavy_cutoff = 5L, x_max = heavy_days_max)
+
 col_left <- make_column_header("Current Day") / p2a / p2c / p2e + plot_layout(heights = c(0.09, 1, 1, 1))
 col_right <- make_column_header("Future Projection") / p2b / p2d / p2f + plot_layout(heights = c(0.09, 1, 1, 1))
 
 figure2_plot <- col_left | col_right
 figure2_plot
 
+col_left_heavy5 <- make_column_header("Current Day") / p2e_heavy5 + plot_layout(heights = c(0.09, 1))
+col_right_heavy5 <- make_column_header("Future Projection") / p2f_heavy5 + plot_layout(heights = c(0.09, 1))
+
+figure2_heavy5_plot <- col_left_heavy5 | col_right_heavy5
+figure2_heavy5_plot
+
 # Save outputs -------------------------------------------------------------
 ggsave(filename = figure1_file, plot = figure1_plot, width = 7, height = 12, dpi = 2000)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 2000)
+ggsave(filename = figure2_heavy5_file, plot = figure2_heavy5_plot, width = 11, height = 5.4, dpi = 2000)
 
 
 # Simple min/max helpers for Figure 1b text -------------------------------
