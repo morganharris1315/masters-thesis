@@ -145,13 +145,13 @@ pct_change <- function(future_value, current_value) {
 }
 
 plot_rx1day_ts <- function(
-  df_period,
-  panel_tag,
-  include_change = FALSE,
-  heavy_change = NA_real_,
-  extreme_change = NA_real_,
-  show_points = TRUE,
-  y_upper = NULL
+    df_period,
+    panel_tag,
+    include_change = FALSE,
+    heavy_change = NA_real_,
+    extreme_change = NA_real_,
+    show_points = TRUE,
+    y_upper = NULL
 ) {
   heavy_label <- if (!include_change) {
     sprintf("Heavy %.1f mm", unique(df_period$heavy_threshold))
@@ -638,3 +638,26 @@ figure2_plot
 # Save outputs -------------------------------------------------------------
 ggsave(filename = figure1_file, plot = figure1_plot, width = 7, height = 12, dpi = 2000)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 2000)
+
+
+# Simple min/max helpers for Figure 1b text -------------------------------
+chiltern_rx1day_min <- min(chiltern_rx$RX1day, na.rm = TRUE)
+chiltern_rx1day_max <- max(chiltern_rx$RX1day, na.rm = TRUE)
+
+chiltern_rx1day_min_year <- chiltern_rx$hydro_year[which.min(chiltern_rx$RX1day)]
+chiltern_rx1day_max_year <- chiltern_rx$hydro_year[which.max(chiltern_rx$RX1day)]
+
+# Simple min/max helpers for Figure 1b text -------------------------------
+chiltern_rx1day_min 
+chiltern_rx1day_max 
+
+chiltern_rx1day_min_year 
+chiltern_rx1day_max_year 
+
+chiltern_record_start_year <- min(chiltern_rx$hydro_year, na.rm = TRUE)
+chiltern_record_end_year <- max(chiltern_rx$hydro_year, na.rm = TRUE)
+chiltern_record_years <- chiltern_record_end_year - chiltern_record_start_year + 1
+
+chiltern_record_start_year 
+chiltern_record_end_year
+
