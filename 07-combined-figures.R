@@ -636,8 +636,8 @@ figure2_plot <- col_left | col_right
 figure2_plot
 
 # Figure 5: at least 5 Heavy days
-p2e_heavy5 <- plot_quadrant_heatmap(cd_df, panel_tag = "(e)", heavy_cutoff = 5L, x_max = heavy_days_max)
-p2f_heavy5 <- plot_quadrant_heatmap(fp_df_cd_thresholds, panel_tag = "(f)", heavy_cutoff = 5L, x_max = heavy_days_max)
+p2e_heavy5 <- plot_quadrant_heatmap(cd_df, panel_tag = "(a)", heavy_cutoff = 5L, x_max = heavy_days_max)
+p2f_heavy5 <- plot_quadrant_heatmap(fp_df_cd_thresholds, panel_tag = "(b)", heavy_cutoff = 5L, x_max = heavy_days_max)
 
 col_left_heavy5 <- make_column_header("Current Day") / p2e_heavy5 + plot_layout(heights = c(0.09, 1))
 col_right_heavy5 <- make_column_header("Future Projection") / p2f_heavy5 + plot_layout(heights = c(0.09, 1))
