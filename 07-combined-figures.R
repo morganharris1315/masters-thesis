@@ -408,16 +408,12 @@ build_event_map <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -
   event_data <- coromandel_obs %>%
     filter(
       observation_date >= event_row$start_date,
-      observation_date <= event_row$end_date
-    ) %>%
+      observation_date <= event_row$end_date) %>%
     group_by(station) %>%
     filter(!is.na(rainfall_mm)) %>%
     slice_max(order_by = rainfall_mm, n = 1, with_ties = FALSE) %>%
     ungroup() %>%
-    transmute(
-      station,
-      event_rainfall_mm = rainfall_mm
-    ) %>%
+    transmute(station,event_rainfall_mm = rainfall_mm) %>%
     left_join(station_coords, by = "station") %>%
     left_join(all_station_thresholds, by = "station") %>%
     mutate(is_above_threshold = !is.na(threshold_single) & event_rainfall_mm > threshold_single) %>%
@@ -433,85 +429,47 @@ build_event_map <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -
   ggplot() +
     geom_raster(
       data = lidar_hillshade_df,
-      aes(x = x, y = y, fill = hillshade)
-    ) +
-    scale_fill_gradient(
-      low = "grey15",
-      high = "grey92",
-      guide = "none"
-    ) +
+      aes(x = x, y = y, fill = hillshade)) +
+    scale_fill_gradient(low = "grey15", high = "grey92", guide = "none") +
     geom_point(
       data = event_data_base,
-      aes(
-        x = longitude,
-        y = latitude,
-        colour = legend_key
-      ),
-      shape = 16,
-      size = 2,
-      alpha = 0.95
-    ) +
-    geom_point(
-      data = event_data_above,
-      aes(
-        x = longitude,
-        y = latitude,
-        colour = legend_key
-      ),
-      shape = 1,
-      size = 2,
-      stroke = 0.9
-    ) +
-    geom_text(
-      data = chiltern_site,
+      aes(x = longitude, y = latitude, colour = legend_key),
+      shape = 16, size = 2, alpha = 0.95) +
+    geom_point(data = event_data_above,
+      aes(x = longitude, y = latitude, colour = legend_key),
+      shape = 1, size = 2, stroke = 0.9) +
+    geom_text(data = chiltern_site,
       aes(x = longitude, y = latitude, label = station),
-      nudge_x = -0.05,
-      hjust = 1,
-      vjust = 0.5,
-      size = 2.6,
-      colour = "red3",
-      fontface = "bold"
-    ) +
-    geom_text(
-      data = event_data,
+      nudge_x = -0.05, hjust = 1, vjust = 0.5, size = 2.6,
+      colour = "red3", fontface = "bold") +
+    geom_text(data = event_data,
       aes(x = longitude, y = latitude, label = round(event_rainfall_mm, 0)),
-      nudge_y = 0.045,
-      size = 2.5,
-      colour = "grey10",
-      check_overlap = TRUE
-    ) +
+      nudge_y = 0.045, size = 2.5, colour = "grey10",check_overlap = TRUE) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     scale_x_continuous(
       breaks = c(xlim[1], mean(xlim), xlim[2]),
       labels = label_number(accuracy = 0.1),
-      minor_breaks = NULL
-    ) +
+      minor_breaks = NULL) +
     scale_y_continuous(
       breaks = seq(ylim[1], ylim[2], by = 0.4),
-      minor_breaks = NULL
-    ) +
+      minor_breaks = NULL) +
     labs(title = event_row$event_title, x = NULL, y = NULL) +
     scale_colour_manual(
       values = c(
         "Daily Rainfall (mm)" = "grey10",
-        "Above Heavy Threshold" = heavy_col
-      ),
+        "Above Heavy Threshold" = heavy_col),
       breaks = legend_labels,
-      name = NULL
-    ) +
-    guides(
-      colour = guide_legend(
+      name = NULL) +
+    guides(colour = guide_legend(
         override.aes = list(
           shape = c(16, 1),
           size = c(2.7, 2.7),
           stroke = c(0, 1),
-          alpha = 1
-        )
-      )
-    ) +
+          alpha = 1))) +
     theme_thesis +
     theme(
       panel.background = element_rect(fill = "white", colour = NA),
+      panel.border = element_rect(fill = NA, colour = "grey20", linewidth = 0.45),
       axis.title = element_blank(),
       legend.position = if (isTRUE(show_legend)) "right" else "none",
       legend.justification = "center",
@@ -519,9 +477,8 @@ build_event_map <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -
       panel.grid.major = element_line(colour = "grey80", linewidth = 0.2),
       panel.grid.minor = element_blank(),
       plot.title = element_text(hjust = 0.5, face = "bold", size = 9),
-      plot.margin = margin(8, 8, 8, 8)
-    )
-}
+      plot.margin = margin(8, 8, 8, 8))
+  }
 
 event_list <- split(event_definitions, event_definitions$event_id)
 event_maps <- imap(event_list, ~ build_event_map(.x, show_legend = (.y == names(event_list)[1])))
