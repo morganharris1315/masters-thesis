@@ -604,7 +604,7 @@ figure2_heavy5_plot
 
 # Save outputs -------------------------------------------------------------
 ggsave(filename = figure1_file, plot = figure1_plot, width = 7, height = 12, dpi = 2000)
-ggsave(filename = figure2_file, plot = figure2_plot, width = 11, height = 10.4, dpi = 2000)
+ggsave(filename = figure2_file, plot = figure2_plot, width = 7, height = 8, dpi = 2000)
 ggsave(filename = figure5_file, plot = figure2_heavy5_plot, width = 11, height = 4.5, dpi = 2000)
 
 
