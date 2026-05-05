@@ -665,3 +665,72 @@ rx1day_p989_cd
 
 #lon_index lat_index global_longitude0 global_latitude0
 #1        30        16          175.6814        -37.14073
+
+
+# Average % increase in Extreme RX1day threshold across New Zealand grid cells ----
+get_grid_metadata <- function(file_path) {
+  nc <- open.nc(file_path)
+  on.exit(close.nc(nc), add = TRUE)
+
+  lon <- var.get.nc(nc, "global_longitude0")
+  lat <- var.get.nc(nc, "global_latitude0")
+
+  if (!all(dim(lon) == dim(lat))) {
+    stop("Longitude and latitude grid dimensions do not match.")
+  }
+
+  list(lon = lon, lat = lat, dims = dim(lon))
+}
+
+build_cell_threshold_grid <- function(nc_files, quantile_prob = 0.90) {
+  grid_info <- get_grid_metadata(nc_files[1])
+  lon_n <- grid_info$dims[1]
+  lat_n <- grid_info$dims[2]
+
+  threshold_grid <- matrix(NA_real_, nrow = lon_n, ncol = lat_n)
+
+  for (i in seq_len(lon_n)) {
+    for (j in seq_len(lat_n)) {
+      cell_rx1day <- vapply(nc_files, function(f) {
+        daily <- extract_cell_daily_series(f, lon_index = i, lat_index = j)
+        max(daily, na.rm = TRUE)
+      }, numeric(1))
+
+      if (all(!is.finite(cell_rx1day))) {
+        threshold_grid[i, j] <- NA_real_
+      } else {
+        threshold_grid[i, j] <- as.numeric(quantile(cell_rx1day, probs = quantile_prob, na.rm = TRUE, type = 7))
+      }
+    }
+  }
+
+  list(threshold = threshold_grid, lon = grid_info$lon, lat = grid_info$lat)
+}
+
+nz_lon_range <- c(166, 179.5)
+nz_lat_range <- c(-48, -34)
+
+cd_threshold_grid <- build_cell_threshold_grid(current_files, quantile_prob = 0.90)
+fp_threshold_grid <- build_cell_threshold_grid(future_files, quantile_prob = 0.90)
+
+if (!all(dim(cd_threshold_grid$threshold) == dim(fp_threshold_grid$threshold))) {
+  stop("Current and future threshold grids have different dimensions.")
+}
+
+nz_mask <- cd_threshold_grid$lon >= nz_lon_range[1] & cd_threshold_grid$lon <= nz_lon_range[2] &
+  cd_threshold_grid$lat >= nz_lat_range[1] & cd_threshold_grid$lat <= nz_lat_range[2]
+
+extreme_threshold_pct_change_grid <- 100 * (fp_threshold_grid$threshold - cd_threshold_grid$threshold) / cd_threshold_grid$threshold
+extreme_threshold_pct_change_grid[!is.finite(extreme_threshold_pct_change_grid)] <- NA_real_
+
+mean_extreme_threshold_pct_increase_nz <- mean(extreme_threshold_pct_change_grid[nz_mask], na.rm = TRUE)
+mean_extreme_threshold_pct_increase_nz
+
+# Threshold values at the matched grid cell ---------------------------------
+matched_grid_thresholds <- tibble::tibble(
+  period = c("Current Day", "Future Projection"),
+  heavy_threshold_mm = c(heavy_cd, heavy_fp),
+  extreme_threshold_mm = c(extreme_cd, extreme_fp)
+)
+
+matched_grid_thresholds
