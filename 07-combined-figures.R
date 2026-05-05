@@ -12,6 +12,7 @@ library(RNetCDF)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(ggrepel)
 library(patchwork)
 library(purrr)
 library(readr)
@@ -402,6 +403,7 @@ if (terra::ncell(lidar_hillshade) > target_plot_cells) {
 
 lidar_hillshade_df <- as.data.frame(lidar_hillshade, xy = TRUE, na.rm = TRUE)
 
+
 build_event_map <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -36.3), show_legend = FALSE) {
   legend_labels <- c("Daily Rainfall (mm)", "Above Heavy Threshold")
   
@@ -444,7 +446,7 @@ build_event_map <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -
       colour = "red3", fontface = "bold") +
     geom_text(data = event_data,
       aes(x = longitude, y = latitude, label = round(event_rainfall_mm, 0)),
-      nudge_y = 0.045, size = 2.5, colour = "grey10",check_overlap = TRUE) +
+      nudge_y = 0.045, size = 2.5, colour = "grey10",check_overlap = FALSE) +
     coord_quickmap(xlim = xlim, ylim = ylim, expand = FALSE) +
     scale_x_continuous(
       breaks = c(xlim[1], mean(xlim), xlim[2]),
@@ -605,22 +607,28 @@ figure2_heavy5_plot
 # Save outputs -------------------------------------------------------------
 ggsave(filename = figure1_file, plot = figure1_plot, width = 7, height = 12, dpi = 2000)
 ggsave(filename = figure2_file, plot = figure2_plot, width = 7, height = 8, dpi = 2000)
-ggsave(filename = figure5_file, plot = figure2_heavy5_plot, width = 11, height = 4.5, dpi = 2000)
+ggsave(filename = figure5_file, plot = figure2_heavy5_plot, width = 7, height = 4.5, dpi = 2000)
 
 
-# Simple min/max helpers for Figure 1b text -------------------------------
+# Additional Checks -------------------------------
+
+
+# Min and Max Chiltern ----------------------------------------------------
+
 chiltern_rx1day_min <- min(chiltern_rx$RX1day, na.rm = TRUE)
 chiltern_rx1day_max <- max(chiltern_rx$RX1day, na.rm = TRUE)
 
 chiltern_rx1day_min_year <- chiltern_rx$hydro_year[which.min(chiltern_rx$RX1day)]
 chiltern_rx1day_max_year <- chiltern_rx$hydro_year[which.max(chiltern_rx$RX1day)]
 
-# Simple min/max helpers for Figure 1b text -------------------------------
 chiltern_rx1day_min 
 chiltern_rx1day_max 
 
 chiltern_rx1day_min_year 
 chiltern_rx1day_max_year 
+
+
+# Record length Chiltern  -------------------------------------------------
 
 chiltern_record_start_year <- min(chiltern_rx$hydro_year, na.rm = TRUE)
 chiltern_record_end_year <- max(chiltern_rx$hydro_year, na.rm = TRUE)
@@ -628,3 +636,32 @@ chiltern_record_years <- chiltern_record_end_year - chiltern_record_start_year +
 
 chiltern_record_start_year 
 chiltern_record_end_year
+
+  chiltern_rx1day_check <- chiltern_rx %>%
+  arrange(desc(RX1day), hydro_year) %>%
+  mutate(rank_rx1day = row_number()) %>%
+  select(rank_rx1day, hydro_year, RX1day)
+
+print(chiltern_rx1day_check, n=50)
+
+
+# Rx1day Chiltern  --------------------------------------------------------
+chiltern_hy2023_rx1day <- chiltern_rx %>%
+  filter(hydro_year == 2023) %>%
+  pull(RX1day)
+
+chiltern_hy2023_rx1day
+
+
+# 98.9 percentile Rx1day at matched cell ----------------------------------
+
+rx1day_p989_cd <- as.numeric(quantile(cd_df$RX1day, probs = 0.989, na.rm = TRUE, type = 7))
+rx1day_p989_fp <- as.numeric(quantile(fp_df$RX1day, probs = 0.989, na.rm = TRUE, type = 7))
+
+rx1day_p989_cd
+
+
+# The coordinates of the matched cell -------------------------------------
+
+#lon_index lat_index global_longitude0 global_latitude0
+#1        30        16          175.6814        -37.14073
