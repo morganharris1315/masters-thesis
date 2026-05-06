@@ -356,17 +356,19 @@ plot_ratio_surface <- function(df, ratio_col, title_text, output_file) {
   ratio_poly <- build_cell_polygons(lon, lat, ratio_mat, "ratio_value")
   keep_ids <- get_nz_intersecting_cell_ids(ratio_poly)
   make_nz_ratio_plot(ratio_poly, keep_ids, title_text, ratio_breaks, ratio_palette, output_file)
-  keep_ids
+  list(poly = ratio_poly, keep_ids = keep_ids)
 }
 
-keep_ids_98.9 <- plot_ratio_surface(
+ratio_layers_design <- list()
+
+ratio_layers_design[["probability_ratio_rx1day_98.9_future_over_current"]] <- plot_ratio_surface(
   df = grid_results_design,
   ratio_col = "probability_ratio_rx1day_98.9_future_over_current",
   title_text = "Years with Rx1day >= 98.9th Percentile",
   output_file = file.path(weatherathome_dir, "weather@home_design_check_ratio_map_98.9.png")
 )
 
-keep_ids_96.6 <- plot_ratio_surface(
+ratio_layers_design[["probability_ratio_rx1day_96.6_future_over_current"]] <- plot_ratio_surface(
   df = grid_results_design,
   ratio_col = "probability_ratio_rx1day_96.6_future_over_current",
   title_text = "Years with Rx1day >= 96.6th Percentile",
@@ -381,31 +383,32 @@ calc_finite_stats <- function(x) {
   c(min = min(x_finite), mean = mean(x_finite), max = max(x_finite))
 }
 
-extract_nz_ratio_values <- function(df, ratio_col, keep_ids) {
-  ratio_mat <- matrix(NA_real_, nrow = nlon, ncol = nlat)
-  idx <- cbind(as.integer(df$lon_index), as.integer(df$lat_index))
-  ratio_mat[idx] <- as.numeric(df[[ratio_col]])
-  ratio_mat[!mask_is_land] <- NA_real_
-  
-  ratio_poly <- build_cell_polygons(lon, lat, ratio_mat, "ratio_value")
-  ratio_poly_nz <- ratio_poly[ratio_poly$id %in% keep_ids, ]
-  ratio_poly_nz$ratio_value
+get_mapped_values <- function(layer_entry) {
+  keep_rows <- layer_entry$poly$id %in% layer_entry$keep_ids
+  layer_entry$poly$ratio_value[keep_rows & is.finite(layer_entry$poly$ratio_value)]
 }
 
-nz_ratio_values_98.9 <- extract_nz_ratio_values(
-  grid_results_design,
-  "probability_ratio_rx1day_98.9_future_over_current",
-  keep_ids_98.9
+nz_probability_ratio_rx1day_98.9_stats <- calc_finite_stats(
+  get_mapped_values(ratio_layers_design[["probability_ratio_rx1day_98.9_future_over_current"]]))
+nz_probability_ratio_rx1day_96.6_stats <- calc_finite_stats(
+  get_mapped_values(ratio_layers_design[["probability_ratio_rx1day_96.6_future_over_current"]]))
+
+summary_stats_design <- data.frame(
+  metric = c(
+    "probability_ratio_rx1day_98.9_future_over_current",
+    "probability_ratio_rx1day_96.6_future_over_current"
+  ),
+  min = c(nz_probability_ratio_rx1day_98.9_stats[["min"]], nz_probability_ratio_rx1day_96.6_stats[["min"]]),
+  mean = c(nz_probability_ratio_rx1day_98.9_stats[["mean"]], nz_probability_ratio_rx1day_96.6_stats[["mean"]]),
+  max = c(nz_probability_ratio_rx1day_98.9_stats[["max"]], nz_probability_ratio_rx1day_96.6_stats[["max"]])
 )
 
-nz_ratio_values_96.6 <- extract_nz_ratio_values(
-  grid_results_design,
-  "probability_ratio_rx1day_96.6_future_over_current",
-  keep_ids_96.6
+write.csv(
+  summary_stats_design,
+  file = file.path(weatherathome_dir, "weather@home_design_check_summary_stats.csv"),
+  row.names = FALSE
 )
-
-nz_probability_ratio_rx1day_98.9_stats <- calc_finite_stats(nz_ratio_values_98.9)
-nz_probability_ratio_rx1day_96.6_stats <- calc_finite_stats(nz_ratio_values_96.6)
 
 nz_probability_ratio_rx1day_98.9_stats
 nz_probability_ratio_rx1day_96.6_stats
+summary_stats_design
