@@ -677,3 +677,23 @@ nz_probability_ratio_rx1day_top10_stats
 nz_probability_ratio_joint_top10_ge4_stats
 nz_probability_ratio_joint_top10_ge5_stats
 mean_rx1day_threshold_90_pct_change_future_over_current_nz
+
+summary_stats_output_csv <- file.path(
+  model_data_dir,
+  "weather@home_nz_summary_stats.csv")
+
+summary_stats_table <- dplyr::bind_rows(
+  data.frame(variable = "nz_probability_ratio_ge4_stats", t(nz_probability_ratio_ge4_stats)),
+  data.frame(variable = "nz_probability_ratio_ge5_stats", t(nz_probability_ratio_ge5_stats)),
+  data.frame(variable = "nz_probability_ratio_rx1day_top10_stats", t(nz_probability_ratio_rx1day_top10_stats)),
+  data.frame(variable = "nz_probability_ratio_joint_top10_ge4_stats", t(nz_probability_ratio_joint_top10_ge4_stats)),
+  data.frame(variable = "nz_probability_ratio_joint_top10_ge5_stats", t(nz_probability_ratio_joint_top10_ge5_stats)),
+  data.frame(
+    variable = "mean_rx1day_threshold_90_pct_change_future_over_current_nz",
+    min = NA_real_,
+    mean = mean_rx1day_threshold_90_pct_change_future_over_current_nz,
+    max = NA_real_)
+)
+
+utils::write.csv(summary_stats_table, summary_stats_output_csv, row.names = FALSE)
+
