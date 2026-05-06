@@ -631,3 +631,49 @@ cat("NZ-intersecting cell count (joint):", length(ratio_layers[["probability_rat
 # 185 cells
 
 
+# Summary Statistics ------------------------------------------------------
+
+calc_finite_stats <- function(x) {
+  x_finite <- x[is.finite(x)]
+  if (length(x_finite) == 0) {
+    return(c(min = NA_real_, mean = NA_real_, max = NA_real_))
+  }
+  c(min = min(x_finite), mean = mean(x_finite), max = max(x_finite))
+}
+
+get_mapped_values <- function(layer_entry) {
+  keep_rows <- layer_entry$poly$id %in% layer_entry$keep_ids
+  layer_entry$poly$ratio_value[keep_rows & is.finite(layer_entry$poly$ratio_value)]
+}
+
+nz_probability_ratio_ge4_stats <- calc_finite_stats(
+  get_mapped_values(ratio_layers[["probability_ratio_ge4_future_over_current"]]))
+nz_probability_ratio_ge5_stats <- calc_finite_stats(
+  get_mapped_values(ratio_layers[["probability_ratio_ge5_future_over_current"]]))
+nz_probability_ratio_rx1day_top10_stats <- calc_finite_stats(
+  get_mapped_values(ratio_layers[["probability_ratio_rx1day_top10_future_over_current"]]))
+nz_probability_ratio_joint_top10_ge4_stats <- calc_finite_stats(
+  get_mapped_values(ratio_layers[["probability_ratio_joint_top10_ge4_future_over_current"]]))
+nz_probability_ratio_joint_top10_ge5_stats <- calc_finite_stats(
+  get_mapped_values(ratio_layers[["probability_ratio_joint_top10_ge5_future_over_current"]]))
+
+if (!("cell_id" %in% names(ratio_grid))) {
+  ratio_grid$cell_id <- paste(ratio_grid$lon_index, ratio_grid$lat_index, sep = "_")
+}
+
+threshold90_change_values_nz <- ratio_grid$rx1day_threshold_90_pct_change_future_over_current[
+  ratio_grid$cell_id %in% ratio_layers[["probability_ratio_ge4_future_over_current"]]$keep_ids &
+    is.finite(ratio_grid$rx1day_threshold_90_pct_change_future_over_current)]
+
+mean_rx1day_threshold_90_pct_change_future_over_current_nz <- if (length(threshold90_change_values_nz) == 0) {
+  NA_real_
+} else {
+  mean(threshold90_change_values_nz, na.rm = TRUE)
+}
+
+nz_probability_ratio_ge4_stats
+nz_probability_ratio_ge5_stats
+nz_probability_ratio_rx1day_top10_stats
+nz_probability_ratio_joint_top10_ge4_stats
+nz_probability_ratio_joint_top10_ge5_stats
+mean_rx1day_threshold_90_pct_change_future_over_current_nz
