@@ -542,7 +542,7 @@ lidar_aspect <- terra::terrain(lidar_wgs84_crop, v = "aspect", unit = "radians")
 lidar_hillshade <- terra::shade(lidar_slope, lidar_aspect, angle = 45, direction = 315)
 names(lidar_hillshade) <- "hillshade"
 
-lidar_hillshade_df <- as.data.frame(lidar_hillshade, xy = TRUE, na.rm = TRUE)
+#lidar_hillshade_df <- as.data.frame(lidar_hillshade, xy = TRUE, na.rm = TRUE)
 
 target_plot_cells <-  1e6
 hillshade_cells <- terra::ncell(lidar_hillshade)
@@ -625,7 +625,7 @@ lidar_hillshade_panel_df <- as.data.frame(lidar_hillshade_panel_plot, xy = TRUE,
 
 build_event_map_lidar_hillshade <- function(event_row, xlim = c(175.2, 176.0), ylim = c(-37.5, -36.3), show_legend = FALSE) {
   legend_labels <- c("Daily Rainfall (mm)", "Above Heavy Threshold")
-
+  
   event_data <- coromandel_obs %>%
     filter(
       observation_date >= event_row$start_date,
@@ -756,3 +756,4 @@ ggsave(
   plot = p_coromandel_event_panel_lidar_hillshade,
   dpi = 300
 )
+
