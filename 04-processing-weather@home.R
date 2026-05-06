@@ -176,7 +176,7 @@ calc_exceedance_proportion <- function(exceedance_array, min_days) {
 
 calc_probability_ratio <- function(current_prop, future_prop) {
   probability_ratio <- future_prop / current_prop
-
+  
   # Handle divide-by-zero cases explicitly:
   # - if current proportion is 0 and future > 0, ratio is Inf
   # - if both are 0, set ratio to NA (undefined)
@@ -379,22 +379,40 @@ write.csv(
 )
 
 # NZ land-cell filtering for summary statistics ----------------------------
-get_nz_land_cell_mask <- function(lon_vec, lat_vec) {
-  pts <- data.frame(global_longitude0 = lon_vec, global_latitude0 = lat_vec)
-  pts_ok <- is.finite(pts$global_longitude0) & is.finite(pts$global_latitude0)
+lse_mask_file <- file.path(weatherathome_dir, "Land-Sea Mask for Weather@home Data.csv")
+mask_transpose <- TRUE
 
-  nz_map <- maps::map("nz", fill = TRUE, plot = FALSE)
-  nz_sf <- sf::st_as_sf(nz_map) |> sf::st_set_crs(4326)
-  nz_union <- sf::st_union(nz_sf)
-
-  pts_sf <- sf::st_as_sf(pts[pts_ok, , drop = FALSE], coords = c("global_longitude0", "global_latitude0"), crs = 4326)
-  on_land <- lengths(sf::st_intersects(pts_sf, nz_union)) > 0
-
-  out <- rep(FALSE, nrow(pts))
-  out[pts_ok] <- on_land
-  out
+load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) {
+  mask_tbl <- utils::read.csv(mask_file, stringsAsFactors = FALSE)
+  vals <- suppressWarnings(as.numeric(unlist(mask_tbl, use.names = FALSE)))
+  
+  base_candidates <- list(
+    matrix(vals, nrow = nlon, ncol = nlat, byrow = TRUE),
+    matrix(vals, nrow = nlon, ncol = nlat, byrow = FALSE),
+    matrix(vals, nrow = nlat, ncol = nlon, byrow = TRUE),
+    matrix(vals, nrow = nlat, ncol = nlon, byrow = FALSE)
+  )
+  
+  dims_ok <- vapply(base_candidates, function(m) {
+    nr <- nrow(m)
+    nc <- ncol(m)
+    (nr == nlon && nc == nlat) || (nr == nlat && nc == nlon)
+  }, logical(1))
+  
+  if (!any(dims_ok)) {
+    stop(sprintf("Could not coerce LSE mask to %d x %d matrix.", nlon, nlat))}
+  
+  mask <- base_candidates[[which(dims_ok)[1]]]
+  if (isTRUE(transpose_mask)) {
+    mask <- t(mask)
+  }
+  
+  if (nrow(mask) != nlon || ncol(mask) != nlat) {
+    stop("Mask dimensions do not match rainfall grid after transpose setting.")
+  } 
+  mask
 }
-
+  
 calc_finite_stats <- function(x) {
   x_finite <- x[is.finite(x)]
   if (length(x_finite) == 0) {
@@ -403,8 +421,18 @@ calc_finite_stats <- function(x) {
   c(min = min(x_finite), mean = mean(x_finite), max = max(x_finite))
 }
 
-grid_results$nz_land_cell <- get_nz_land_cell_mask(grid_results$global_longitude0, grid_results$global_latitude0)
-grid_results_nz <- grid_results[grid_results$nz_land_cell, , drop = FALSE]
+nlon <- nrow(rx1day_threshold_33_current)
+nlat <- ncol(rx1day_threshold_33_current)
+mask_matrix <- load_lse_mask_matrix(
+  mask_file = lse_mask_file,
+  nlon = nlon,
+  nlat = nlat,
+  transpose_mask = mask_transpose
+)
+mask_is_land <- !is.na(mask_matrix)
+
+grid_results$nz_land_cell <- mask_is_land[cbind(grid_results$lon_index, grid_results$lat_index)]
+grid_results_nz <- grid_results[which(grid_results$nz_land_cell), , drop = FALSE]
 
 write.csv(
   grid_results_nz,
@@ -429,3 +457,5 @@ nz_probability_ratio_rx1day_top10_stats
 nz_probability_ratio_joint_top10_ge4_stats
 nz_probability_ratio_joint_top10_ge5_stats
 mean_rx1day_threshold_90_pct_change_future_over_current_nz
+
+  
