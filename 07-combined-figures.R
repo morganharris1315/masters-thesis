@@ -20,6 +20,7 @@ library(lubridate)
 library(maps)
 library(scales)
 library(terra)
+library(sf)
 
 # Style constants ----------------------------------------------------------
 #heavy_col <- "deepskyblue"
@@ -97,9 +98,12 @@ extract_cell_daily_series <- function(file_path, lon_index, lat_index, var_name 
 build_annual_cell_df <- function(nc_files, lon_index, lat_index, period_label) {
   bind_rows(lapply(seq_along(nc_files), function(i) {
     daily <- extract_cell_daily_series(nc_files[i], lon_index, lat_index)
+    daily_finite <- daily[is.finite(daily)]
+    rx1day <- if (length(daily_finite) == 0) NA_real_ else max(daily_finite)
+
     data.frame(
       Year = i,
-      RX1day = max(daily, na.rm = TRUE),
+      RX1day = rx1day,
       file = basename(nc_files[i]),
       Period = period_label,
       stringsAsFactors = FALSE
@@ -668,62 +672,54 @@ rx1day_p989_cd
 
 
 # Average % increase in Extreme RX1day threshold across New Zealand grid cells ----
-get_grid_metadata <- function(file_path) {
-  nc <- open.nc(file_path)
-  on.exit(close.nc(nc), add = TRUE)
+get_nz_land_cell_mask <- function(lon, lat) {
+  grid_pts <- data.frame(
+    lon = as.vector(lon),
+    lat = as.vector(lat)
+  )
 
-  lon <- var.get.nc(nc, "global_longitude0")
-  lat <- var.get.nc(nc, "global_latitude0")
-
-  if (!all(dim(lon) == dim(lat))) {
-    stop("Longitude and latitude grid dimensions do not match.")
+  valid_idx <- is.finite(grid_pts$lon) & is.finite(grid_pts$lat)
+  if (!any(valid_idx)) {
+    stop("No valid lon/lat points available to build NZ land mask.")
   }
 
-  list(lon = lon, lat = lat, dims = dim(lon))
+  pts_sf <- sf::st_as_sf(grid_pts[valid_idx, , drop = FALSE], coords = c("lon", "lat"), crs = 4326)
+  nz_map <- maps::map("nz", fill = TRUE, plot = FALSE)
+  nz_sf <- sf::st_as_sf(nz_map) |> sf::st_set_crs(4326)
+  nz_union <- sf::st_union(nz_sf)
+
+  on_land <- lengths(sf::st_intersects(pts_sf, nz_union)) > 0
+  mask_vec <- rep(FALSE, nrow(grid_pts))
+  mask_vec[valid_idx] <- on_land
+  matrix(mask_vec, nrow = nrow(lon), ncol = ncol(lon))
 }
 
-build_cell_threshold_grid <- function(nc_files, quantile_prob = 0.90) {
-  grid_info <- get_grid_metadata(nc_files[1])
-  lon_n <- grid_info$dims[1]
-  lat_n <- grid_info$dims[2]
-
-  threshold_grid <- matrix(NA_real_, nrow = lon_n, ncol = lat_n)
-
-  for (i in seq_len(lon_n)) {
-    for (j in seq_len(lat_n)) {
-      cell_rx1day <- vapply(nc_files, function(f) {
-        daily <- extract_cell_daily_series(f, lon_index = i, lat_index = j)
-        max(daily, na.rm = TRUE)
-      }, numeric(1))
-
-      if (all(!is.finite(cell_rx1day))) {
-        threshold_grid[i, j] <- NA_real_
-      } else {
-        threshold_grid[i, j] <- as.numeric(quantile(cell_rx1day, probs = quantile_prob, na.rm = TRUE, type = 7))
-      }
-    }
-  }
-
-  list(threshold = threshold_grid, lon = grid_info$lon, lat = grid_info$lat)
+grid_csv <- file.path(weatherathome_dir, "weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid.csv")
+if (!file.exists(grid_csv)) {
+  stop("Grid summary CSV not found: ", grid_csv)
 }
 
-nz_lon_range <- c(166, 179.5)
-nz_lat_range <- c(-48, -34)
+grid_tbl <- readr::read_csv(grid_csv, show_col_types = FALSE)
+required_cols <- c(
+  "lon_index", "lat_index", "global_longitude0", "global_latitude0",
+  "rx1day_threshold_90_current", "rx1day_threshold_90_future",
+  "rx1day_threshold_90_pct_change_future_over_current"
+)
 
-cd_threshold_grid <- build_cell_threshold_grid(current_files, quantile_prob = 0.90)
-fp_threshold_grid <- build_cell_threshold_grid(future_files, quantile_prob = 0.90)
-
-if (!all(dim(cd_threshold_grid$threshold) == dim(fp_threshold_grid$threshold))) {
-  stop("Current and future threshold grids have different dimensions.")
+if (!all(required_cols %in% names(grid_tbl))) {
+  stop("Grid CSV is missing required columns: ", paste(setdiff(required_cols, names(grid_tbl)), collapse = ", "))
 }
 
-nz_mask <- cd_threshold_grid$lon >= nz_lon_range[1] & cd_threshold_grid$lon <= nz_lon_range[2] &
-  cd_threshold_grid$lat >= nz_lat_range[1] & cd_threshold_grid$lat <= nz_lat_range[2]
+nz_land_mask <- get_nz_land_cell_mask(
+  lon = matrix(grid_tbl$global_longitude0, nrow = max(grid_tbl$lon_index), ncol = max(grid_tbl$lat_index)),
+  lat = matrix(grid_tbl$global_latitude0, nrow = max(grid_tbl$lon_index), ncol = max(grid_tbl$lat_index))
+)
 
-extreme_threshold_pct_change_grid <- 100 * (fp_threshold_grid$threshold - cd_threshold_grid$threshold) / cd_threshold_grid$threshold
-extreme_threshold_pct_change_grid[!is.finite(extreme_threshold_pct_change_grid)] <- NA_real_
+threshold_pct_change_grid <- matrix(NA_real_, nrow = max(grid_tbl$lon_index), ncol = max(grid_tbl$lat_index))
+threshold_pct_change_grid[cbind(grid_tbl$lon_index, grid_tbl$lat_index)] <-
+  grid_tbl$rx1day_threshold_90_pct_change_future_over_current
 
-mean_extreme_threshold_pct_increase_nz <- mean(extreme_threshold_pct_change_grid[nz_mask], na.rm = TRUE)
+mean_extreme_threshold_pct_increase_nz <- mean(threshold_pct_change_grid[nz_land_mask], na.rm = TRUE)
 mean_extreme_threshold_pct_increase_nz
 
 # Threshold values at the matched grid cell ---------------------------------

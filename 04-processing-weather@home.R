@@ -11,6 +11,8 @@
 # Loading in RNetCDF ------------------------------------------------------
 #install.packages("RNetCDF")
 library(RNetCDF)
+library(sf)
+library(maps)
 
 # Exploring the structure of the data -------------------------------------
 #Looking at a single file in the list of files in the folder current_day
@@ -219,6 +221,19 @@ rx1day_threshold_90_current <- apply(
   type = 7
 )
 
+rx1day_threshold_90_future <- apply(
+  future_rx_array,
+  c(1, 2),
+  quantile,
+  probs = 0.90,
+  na.rm = TRUE,
+  type = 7
+)
+
+rx1day_threshold_90_pct_change_future_over_current <-
+  100 * (rx1day_threshold_90_future - rx1day_threshold_90_current) / rx1day_threshold_90_current
+rx1day_threshold_90_pct_change_future_over_current[!is.finite(rx1day_threshold_90_pct_change_future_over_current)] <- NA_real_
+
 calc_rx1day_top10_proportion <- function(rx_array, threshold_matrix) {
   exceed_top10 <- sweep(rx_array, c(1, 2), threshold_matrix, FUN = ">=")
   apply(exceed_top10, c(1, 2), mean, na.rm = TRUE)
@@ -332,6 +347,8 @@ grid_results <- data.frame(
   global_latitude0 = global_latitude0[cbind(grid_template$lon_index, grid_template$lat_index)],
   rx1day_threshold_33_current = rx1day_threshold_33_current[cbind(grid_template$lon_index, grid_template$lat_index)],
   rx1day_threshold_90_current = rx1day_threshold_90_current[cbind(grid_template$lon_index, grid_template$lat_index)],
+  rx1day_threshold_90_future = rx1day_threshold_90_future[cbind(grid_template$lon_index, grid_template$lat_index)],
+  rx1day_threshold_90_pct_change_future_over_current = rx1day_threshold_90_pct_change_future_over_current[cbind(grid_template$lon_index, grid_template$lat_index)],
   prop_years_ge4_current = current_prop_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
   prop_years_ge4_future = future_prop_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
   probability_ratio_ge4_future_over_current = probability_ratio_ge4[cbind(grid_template$lon_index, grid_template$lat_index)],
@@ -361,23 +378,54 @@ write.csv(
   row.names = FALSE
 )
 
-max(probability_ratio_ge4, na.rm = TRUE) # Max ge4
-mean(probability_ratio_ge4[is.finite(probability_ratio_ge4)], na.rm = TRUE) # Mean ge4
-min(probability_ratio_ge4, na.rm = TRUE) # Min ge4
+# NZ land-cell filtering for summary statistics ----------------------------
+get_nz_land_cell_mask <- function(lon_vec, lat_vec) {
+  pts <- data.frame(global_longitude0 = lon_vec, global_latitude0 = lat_vec)
+  pts_ok <- is.finite(pts$global_longitude0) & is.finite(pts$global_latitude0)
 
-max(probability_ratio_ge5, na.rm = TRUE) # Max ge5
-mean(probability_ratio_ge5[is.finite(probability_ratio_ge5)], na.rm = TRUE) # Mean ge5
-min(probability_ratio_ge5, na.rm = TRUE) # Min ge5
+  nz_map <- maps::map("nz", fill = TRUE, plot = FALSE)
+  nz_sf <- sf::st_as_sf(nz_map) |> sf::st_set_crs(4326)
+  nz_union <- sf::st_union(nz_sf)
 
+  pts_sf <- sf::st_as_sf(pts[pts_ok, , drop = FALSE], coords = c("global_longitude0", "global_latitude0"), crs = 4326)
+  on_land <- lengths(sf::st_intersects(pts_sf, nz_union)) > 0
 
-max(probability_ratio_rx1day_top10, na.rm = TRUE) # Max top10 RX1day
-mean(probability_ratio_rx1day_top10[is.finite(probability_ratio_rx1day_top10)], na.rm = TRUE) # Mean top10 RX1day
-min(probability_ratio_rx1day_top10, na.rm = TRUE) # Min top10 RX1day
+  out <- rep(FALSE, nrow(pts))
+  out[pts_ok] <- on_land
+  out
+}
 
-max(probability_ratio_joint_top10_ge4, na.rm = TRUE) # Max joint top10 + ge4
-mean(probability_ratio_joint_top10_ge4[is.finite(probability_ratio_joint_top10_ge4)], na.rm = TRUE) # Mean joint top10 + ge4
-min(probability_ratio_joint_top10_ge4, na.rm = TRUE) # Min joint top10 + ge4
+calc_finite_stats <- function(x) {
+  x_finite <- x[is.finite(x)]
+  if (length(x_finite) == 0) {
+    return(c(min = NA_real_, mean = NA_real_, max = NA_real_))
+  }
+  c(min = min(x_finite), mean = mean(x_finite), max = max(x_finite))
+}
 
-max(probability_ratio_joint_top10_ge5, na.rm = TRUE) # Max joint top10 + ge5
-mean(probability_ratio_joint_top10_ge5[is.finite(probability_ratio_joint_top10_ge5)], na.rm = TRUE) # Mean joint top10 + ge5
-min(probability_ratio_joint_top10_ge5, na.rm = TRUE) # Min joint top10 + ge5
+grid_results$nz_land_cell <- get_nz_land_cell_mask(grid_results$global_longitude0, grid_results$global_latitude0)
+grid_results_nz <- grid_results[grid_results$nz_land_cell, , drop = FALSE]
+
+write.csv(
+  grid_results_nz,
+  file = file.path(weatherathome_dir, "weather@home_exceedance_ge4_ge5_top10_joint_probability_ratio_grid_nz_land.csv"),
+  row.names = FALSE
+)
+
+nz_probability_ratio_ge4_stats <- calc_finite_stats(grid_results_nz$probability_ratio_ge4_future_over_current)
+nz_probability_ratio_ge5_stats <- calc_finite_stats(grid_results_nz$probability_ratio_ge5_future_over_current)
+nz_probability_ratio_rx1day_top10_stats <- calc_finite_stats(grid_results_nz$probability_ratio_rx1day_top10_future_over_current)
+nz_probability_ratio_joint_top10_ge4_stats <- calc_finite_stats(grid_results_nz$probability_ratio_joint_top10_ge4_future_over_current)
+nz_probability_ratio_joint_top10_ge5_stats <- calc_finite_stats(grid_results_nz$probability_ratio_joint_top10_ge5_future_over_current)
+
+mean_rx1day_threshold_90_pct_change_future_over_current_nz <- mean(
+  grid_results_nz$rx1day_threshold_90_pct_change_future_over_current,
+  na.rm = TRUE
+)
+
+nz_probability_ratio_ge4_stats
+nz_probability_ratio_ge5_stats
+nz_probability_ratio_rx1day_top10_stats
+nz_probability_ratio_joint_top10_ge4_stats
+nz_probability_ratio_joint_top10_ge5_stats
+mean_rx1day_threshold_90_pct_change_future_over_current_nz
