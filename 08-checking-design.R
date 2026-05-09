@@ -412,3 +412,185 @@ write.csv(
 nz_probability_ratio_rx1day_98.9_stats
 nz_probability_ratio_rx1day_96.6_stats
 summary_stats_design
+
+
+# Heatmap Style -----------------------------------------------------------
+
+
+if (!exists("matched_cell")) {
+  matched_cell <- data.frame(lon_index = 30L, lat_index = 16L)
+}
+
+if (!exists("box_colour_light")) box_colour_light <- "lavender"
+if (!exists("box_colour_dark")) box_colour_dark <- "lightslateblue"
+if (!exists("theme_thesis")) {
+  theme_thesis <- ggplot2::theme_minimal(base_size = 9) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(size = 9, face = "bold", hjust = 0.5),
+      axis.title = ggplot2::element_text(size = 9),
+      axis.text = ggplot2::element_text(size = 7),
+      panel.grid.major = ggplot2::element_line(colour = "grey85", linewidth = 0.3),
+      panel.grid.minor = ggplot2::element_line(colour = "grey92", linewidth = 0.2)
+    )
+}
+
+if (!exists("build_quadrant_df")) {
+  build_quadrant_df <- function(df_period, heavy_cutoff = 4L) {
+    exceed_max <- max(df_period$heavy_days, na.rm = TRUE)
+    
+    tile_df <- df_period %>%
+      dplyr::mutate(
+        exceed_group = dplyr::if_else(
+          heavy_days < heavy_cutoff,
+          paste0("<", heavy_cutoff, " heavy days"),
+          paste0(">=", heavy_cutoff, " heavy days")
+        ),
+        rx_group = dplyr::if_else(RX1day < extreme_threshold, "below Extreme", "at/above Extreme")
+      ) %>%
+      dplyr::count(exceed_group, rx_group, name = "n_years") %>%
+      tidyr::complete(
+        exceed_group = c(paste0("<", heavy_cutoff, " heavy days"), paste0(">=", heavy_cutoff, " heavy days")),
+        rx_group = c("below Extreme", "at/above Extreme"),
+        fill = list(n_years = 0)
+      ) %>%
+      dplyr::mutate(
+        pct_years = 100 * n_years / sum(n_years),
+        pct_label = paste0(round(pct_years, 1), "%"),
+        xmin = dplyr::if_else(exceed_group == paste0("<", heavy_cutoff, " heavy days"), -0.5, heavy_cutoff),
+        xmax = dplyr::if_else(exceed_group == paste0("<", heavy_cutoff, " heavy days"), heavy_cutoff, exceed_max + 0.5),
+        ymin = dplyr::if_else(rx_group == "below Extreme", 0, unique(df_period$extreme_threshold)),
+        ymax = dplyr::if_else(rx_group == "below Extreme", unique(df_period$extreme_threshold), max(df_period$RX1day, na.rm = TRUE) * 1.02),
+        xmid = (xmin + xmax) / 2,
+        ymid = (ymin + ymax) / 2
+      )
+    
+    list(tile_df = tile_df, exceed_max = exceed_max)
+  }
+}
+
+if (!exists("plot_quadrant_heatmap")) {
+  plot_quadrant_heatmap <- function(df_period, panel_tag, heavy_cutoff = 4L, x_max = NULL) {
+    hm <- build_quadrant_df(df_period, heavy_cutoff = heavy_cutoff)
+    if (is.null(x_max)) {
+      x_max <- hm$exceed_max
+    }
+    
+    tile_df_plot <- hm$tile_df %>%
+      dplyr::mutate(
+        xmax = dplyr::if_else(exceed_group == paste0(">=", heavy_cutoff, " heavy days"), x_max + 0.5, xmax),
+        xmid = (xmin + xmax) / 2
+      )
+    
+    ggplot2::ggplot(tile_df_plot) +
+      ggplot2::geom_rect(
+        ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = pct_years),
+        colour = "white",
+        linewidth = 0.3
+      ) +
+      ggplot2::geom_text(
+        ggplot2::aes(x = xmid, y = ymid, label = pct_label),
+        colour = "black",
+        size = 3.0,
+        fontface = "bold"
+      ) +
+      ggplot2::geom_vline(xintercept = heavy_cutoff, colour = "black", linewidth = 0.35) +
+      ggplot2::geom_hline(yintercept = unique(df_period$extreme_threshold), colour = "black", linewidth = 0.35) +
+      ggplot2::scale_x_continuous(breaks = 0:x_max, limits = c(-0.5, x_max + 0.5), expand = ggplot2::expansion(mult = c(0, 0))) +
+      ggplot2::scale_y_continuous(limits = c(0, max(df_period$RX1day, na.rm = TRUE) * 1.02), expand = ggplot2::expansion(mult = c(0, 0))) +
+      ggplot2::scale_fill_gradient(low = box_colour_light, high = box_colour_dark, limits = c(0, 100), guide = "none") +
+      ggplot2::labs(title = panel_tag, x = "Number of Heavy days", y = "RX1day (mm)") +
+      theme_thesis +
+      ggplot2::theme(
+        panel.grid = ggplot2::element_blank(),
+        panel.border = ggplot2::element_rect(colour = "grey45", fill = NA, linewidth = 0.35),
+        axis.line = ggplot2::element_blank(),
+        plot.title = ggplot2::element_text(hjust = 0)
+      )
+  }
+}
+
+if (!exists("make_column_header")) {
+  make_column_header <- function(label_text) {
+    ggplot2::ggplot() +
+      ggplot2::annotate("text", x = 0.5, y = 0.5, label = label_text, fontface = "bold", size = 3.5) +
+      ggplot2::xlim(0, 1) +
+      ggplot2::ylim(0, 1) +
+      ggplot2::theme_void()
+  }
+}
+
+build_design_cell_df <- function(rx_array, exceedance_array, extreme_threshold, period_label) {
+  lon_index <- matched_cell$lon_index
+  lat_index <- matched_cell$lat_index
+  n_years <- dim(rx_array)[3]
+  data.frame(
+    Year = seq_len(n_years),
+    RX1day = as.numeric(rx_array[lon_index, lat_index, ]),
+    Period = period_label,
+    heavy_threshold = as.numeric(rx1day_threshold_33_current[lon_index, lat_index]),
+    extreme_threshold = as.numeric(extreme_threshold),
+    heavy_days = as.numeric(exceedance_array[lon_index, lat_index, ]),
+    stringsAsFactors = FALSE
+  )
+}
+
+build_alternative_threshold_heatmap_pair <- function(extreme_threshold, threshold_label, output_file) {
+  current_df <- build_design_cell_df(
+    rx_array = current_rx_array,
+    exceedance_array = current_exceedance_array,
+    extreme_threshold = extreme_threshold,
+    period_label = "Current Day"
+  )
+  future_df <- build_design_cell_df(
+    rx_array = future_rx_array,
+    exceedance_array = future_exceedance_array,
+    extreme_threshold = extreme_threshold,
+    period_label = "Future Projection"
+  )
+  heavy_days_max <- max(c(current_df$heavy_days, future_df$heavy_days), na.rm = TRUE)
+  
+  current_panel <- plot_quadrant_heatmap(current_df, panel_tag = "(e)", heavy_cutoff = 4L, x_max = heavy_days_max)
+  future_panel <- plot_quadrant_heatmap(future_df, panel_tag = "(f)", heavy_cutoff = 4L, x_max = heavy_days_max)
+  
+  current_column <- patchwork::wrap_plots(
+    make_column_header("Current Day"),
+    current_panel,
+    ncol = 1,
+    heights = c(0.09, 1)
+  )
+  future_column <- patchwork::wrap_plots(
+    make_column_header("Future Projection"),
+    future_panel,
+    ncol = 1,
+    heights = c(0.09, 1)
+  )
+  heatmap_plot <- patchwork::wrap_plots(current_column, future_column, ncol = 2)
+  heatmap_plot <- heatmap_plot + patchwork::plot_annotation(
+    title = paste0(threshold_label)
+  )
+  
+  ggplot2::ggsave(filename = output_file, plot = heatmap_plot, width = 7, height = 2.8, dpi = 2000)
+  heatmap_plot
+}
+
+matched_cell_heatmap_98.9_file <- file.path(
+  weatherathome_dir,
+  "weather@home_design_check_matched_cell_heatmap_98.9.png"
+)
+matched_cell_heatmap_96.6_file <- file.path(
+  weatherathome_dir,
+  "weather@home_design_check_matched_cell_heatmap_96.6.png"
+)
+
+matched_cell_heatmap_98.9 <- build_alternative_threshold_heatmap_pair(
+  extreme_threshold = rx1day_threshold_98.9_current[matched_cell$lon_index, matched_cell$lat_index],
+  threshold_label = "98.9th percentile",
+  output_file = matched_cell_heatmap_98.9_file
+)
+
+matched_cell_heatmap_96.6 <- build_alternative_threshold_heatmap_pair(
+  extreme_threshold = rx1day_threshold_96.6_current[matched_cell$lon_index, matched_cell$lat_index],
+  threshold_label = "96.6th percentile",
+  output_file = matched_cell_heatmap_96.6_file
+)
+
