@@ -118,7 +118,7 @@ probability_ratio_joint_96.6_ge4 <- calc_probability_ratio(
   future_prop_joint_96.6_ge4
 )
 
-# Build and save alternative-threshold CSV --------------------------------
+# Saving alternative-threshold CSV --------------------------------
 
 nc_grid <- open.nc(current_day_files[1])
 longitude0 <- var.get.nc(nc_grid, "longitude0")
@@ -167,7 +167,7 @@ design_csv_file <- file.path(
 
 write.csv(grid_results_design, design_csv_file, row.names = FALSE)
 
-# NZ-only mapping using same style as Script 05 ----------------------------
+# NZ-only mapping using same style as 05 ----------------------------
 
 model_data_dir <- weatherathome_dir
 nc_file <- file.path(model_data_dir, "current_decade",
