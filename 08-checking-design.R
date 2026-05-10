@@ -2,7 +2,7 @@
 # 08-checking-design.R
 # -------------------------------------------------------------------------
 # April 2026
-# Aligning Extreme threshold with % of at least 4 excedance day in current day. 
+# Aligning Extreme threshold with % of at least 4 excedance day in current day.
 # -------------------------------------------------------------------------
 
 # Matching Rx1day Extreme threshold with 1.1% -----------------------------
@@ -183,9 +183,9 @@ load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) 
     stringsAsFactors = FALSE,
     na.strings = c("NaN", "NA", "")
   )
-  
+
   numeric_raw <- suppressWarnings(as.data.frame(lapply(raw, as.numeric)))
-  
+
   as_m <- function(x) as.matrix(x)
   base_candidates <- list(
     as_m(numeric_raw),
@@ -193,20 +193,20 @@ load_lse_mask_matrix <- function(mask_file, nlon, nlat, transpose_mask = FALSE) 
     as_m(numeric_raw[, -1, drop = FALSE]),
     as_m(numeric_raw[-1, -1, drop = FALSE])
   )
-  
+
   dims_ok <- vapply(base_candidates, function(m) {
     is.matrix(m) && nrow(m) == nlon && ncol(m) == nlat
   }, logical(1))
-  
+
   if (!any(dims_ok)) {
     stop(sprintf("Could not coerce LSE mask to %d x %d matrix.", nlon, nlat))
   }
-  
+
   mask <- base_candidates[[which(dims_ok)[1]]]
   if (isTRUE(transpose_mask)) {
     mask <- t(mask)
   }
-  
+
   if (nrow(mask) != nlon || ncol(mask) != nlat) {
     stop("Mask dimensions do not match rainfall grid after transpose setting.")
   }
@@ -219,35 +219,35 @@ build_cell_polygons <- function(lon_mat, lat_mat, value_mat, value_name = "value
   centres$lat <- as.vector(lat_mat)
   centres$value <- as.vector(value_mat)
   centres <- centres[is.finite(centres$lon) & is.finite(centres$lat), ]
-  
+
   key <- paste(centres$lon_index, centres$lat_index, sep = "_")
   key_lookup <- setNames(seq_len(nrow(centres)), key)
-  
+
   get_xy <- function(i, j) {
     k <- paste(i, j, sep = "_")
     idx <- unname(key_lookup[k])
     if (length(idx) == 0L || is.na(idx)) return(c(NA_real_, NA_real_))
     c(centres$lon[idx], centres$lat[idx])
   }
-  
+
   polygon_parts <- vector("list", nrow(centres))
   part_i <- 0L
-  
+
   for (r in seq_len(nrow(centres))) {
     i <- centres$lon_index[r]
     j <- centres$lat_index[r]
     c0 <- c(centres$lon[r], centres$lat[r])
-    
+
     c_w <- get_xy(i - 1, j)
     c_e <- get_xy(i + 1, j)
     c_s <- get_xy(i, j - 1)
     c_n <- get_xy(i, j + 1)
-    
+
     v_i <- if (all(is.finite(c_w)) && all(is.finite(c_e))) (c_e - c_w) / 2 else if (all(is.finite(c_e))) c_e - c0 else if (all(is.finite(c_w))) c0 - c_w else c(NA_real_, NA_real_)
     v_j <- if (all(is.finite(c_s)) && all(is.finite(c_n))) (c_n - c_s) / 2 else if (all(is.finite(c_n))) c_n - c0 else if (all(is.finite(c_s))) c0 - c_s else c(NA_real_, NA_real_)
-    
+
     if (!all(is.finite(v_i)) || !all(is.finite(v_j))) next
-    
+
     corners <- rbind(
       c0 - 0.5 * v_i - 0.5 * v_j,
       c0 + 0.5 * v_i - 0.5 * v_j,
@@ -255,7 +255,7 @@ build_cell_polygons <- function(lon_mat, lat_mat, value_mat, value_name = "value
       c0 - 0.5 * v_i + 0.5 * v_j,
       c0 - 0.5 * v_i - 0.5 * v_j
     )
-    
+
     part_i <- part_i + 1L
     polygon_parts[[part_i]] <- data.frame(
       id = paste(i, j, sep = "_"),
@@ -267,7 +267,7 @@ build_cell_polygons <- function(lon_mat, lat_mat, value_mat, value_name = "value
       value = ifelse(is.nan(centres$value[r]), NA_real_, centres$value[r])
     )
   }
-  
+
   if (part_i == 0L) return(data.frame())
   polygons <- do.call(rbind, polygon_parts[seq_len(part_i)])
   names(polygons)[names(polygons) == "value"] <- value_name
@@ -310,25 +310,189 @@ get_nz_intersecting_cell_ids <- function(cell_polygons_df) {
   cells_sf$id[intersects]
 }
 
-make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, ratio_palette, output_file) {
+make_nz_ratio_plot <- function(poly_df, keep_ids, title_text, ratio_breaks, ratio_palette, output_file = NULL) {
   poly_nz <- poly_df[poly_df$id %in% keep_ids, ]
   poly_nz <- poly_nz[is.finite(poly_nz$ratio_value), ]
-  plot_breaks <- c(-Inf, ratio_breaks, Inf)
+
+  if (nrow(poly_nz) == 0) {
+    stop(sprintf("No NZ-intersecting cells found for '%s'.", title_text))
+  }
+
+  core_breaks <- ratio_breaks[ratio_breaks >= 1 & ratio_breaks <= 6]
+  if (length(core_breaks) < 2) {
+    stop("`ratio_breaks` must include at least two values between 1 and 6.")
+  }
+
+  plot_breaks <- c(-Inf, core_breaks, Inf)
   bin_levels <- paste0("bin_", seq_len(length(plot_breaks) - 1))
-  poly_nz$ratio_bin <- cut(poly_nz$ratio_value, breaks = plot_breaks, include.lowest = TRUE, right = FALSE, labels = bin_levels)
+
+  poly_nz$ratio_bin <- cut(
+    poly_nz$ratio_value,
+    breaks = plot_breaks,
+    include.lowest = TRUE,
+    right = FALSE,
+    labels = bin_levels
+  )
   poly_nz$ratio_bin <- factor(poly_nz$ratio_bin, levels = bin_levels)
-  
+
+  palette_for_bins <- setNames(ratio_palette, bin_levels)
   nz_outline <- map_data("nz")
+
   p <- ggplot(poly_nz, aes(x = lon, y = lat, fill = ratio_bin)) +
     geom_polygon(aes(group = id), colour = NA, linewidth = 0) +
-    geom_path(data = nz_outline, aes(x = long, y = lat, group = group), inherit.aes = FALSE, colour = "black", linewidth = 0.45, alpha = 0.9) +
+    geom_path(
+      data = nz_outline,
+      aes(x = long, y = lat, group = group),
+      inherit.aes = FALSE,
+      colour = "black",
+      linewidth = 0.45,
+      alpha = 0.9
+    ) +
     coord_fixed() +
-    scale_fill_manual(values = setNames(ratio_palette, bin_levels), drop = FALSE, guide = "none") +
+    scale_fill_manual(
+      values = palette_for_bins,
+      drop = FALSE,
+      guide = "none"
+    ) +
     labs(title = title_text, x = NULL, y = NULL) +
     theme_minimal(base_size = 13) +
-    theme(plot.title = element_text(face = "bold", size = 14), axis.title = element_blank())
-  
-  ggsave(output_file, p, width = 6.7, height = 8.0, dpi = 600)
+    theme(
+      plot.title = element_text(face = "bold", size = 14),
+      axis.title = element_blank(),
+      legend.position = "none"
+    )
+
+  if (exists("matched_cell")) {
+    selected_id <- paste(matched_cell$lon_index, matched_cell$lat_index, sep = "_")
+    selected_poly <- poly_df[poly_df$id == selected_id, ]
+    if (nrow(selected_poly) > 0) {
+      p <- p + geom_polygon(
+        data = selected_poly,
+        aes(x = lon, y = lat, group = id),
+        inherit.aes = FALSE,
+        fill = NA,
+        colour = "#f03b20",
+        linewidth = 0.7
+      )
+    } else {
+      warning(sprintf("Selected cell id '%s' was not found in polygon data.", selected_id))
+    }
+  }
+
+  if (!is.null(output_file)) {
+    ggsave(output_file, p, width = 6.7, height = 8.0, dpi = 600)
+  }
+  p
+}
+
+make_triangle_colorbar_plot <- function(ratio_breaks, ratio_palette, legend_title = "Probability Ratio") {
+  if (length(ratio_breaks) < 2) {
+    stop("`ratio_breaks` must contain at least two values.")
+  }
+
+  core_breaks <- sort(unique(ratio_breaks))
+  if (length(core_breaks) < 2) {
+    stop("`ratio_breaks` must include at least two finite values.")
+  }
+
+  lower_cap <- 0
+  upper_step <- diff(tail(core_breaks, 2))
+  upper_cap <- max(core_breaks)
+
+  interval_min <- c(lower_cap, head(core_breaks, -1))
+  interval_max <- core_breaks
+
+  if (length(ratio_palette) < (length(interval_min) + 1)) {
+    stop("`ratio_palette` must include one colour per bar segment plus one for the top arrow head.")
+  }
+
+  bar_df <- data.frame(
+    ymin = interval_min,
+    ymax = interval_max,
+    fill_col = ratio_palette[seq_len(length(interval_min))]
+  )
+
+  ratio_min <- lower_cap
+  ratio_max <- upper_cap
+  ratio_span <- ratio_max - ratio_min
+  top_triangle_height <- upper_step
+  bar_xmin <- 0.31
+  bar_xmax <- 0.57
+
+  tri_df <- data.frame(
+    x = c(bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax),
+    y = c(ratio_max, ratio_max + top_triangle_height, ratio_max),
+    group = "top",
+    fill_col = ratio_palette[length(ratio_palette)]
+  )
+
+  tick_df <- data.frame(
+    y = c(0, ratio_breaks),
+    label = scales::label_number(accuracy = 0.1)(c(0, ratio_breaks))
+  )
+
+  ggplot() +
+    geom_rect(
+      data = bar_df,
+      aes(xmin = bar_xmin, xmax = bar_xmax, ymin = ymin, ymax = ymax, fill = fill_col),
+      inherit.aes = FALSE,
+      colour = NA
+    ) +
+    geom_polygon(
+      data = tri_df,
+      aes(x = x, y = y, group = group, fill = fill_col),
+      inherit.aes = FALSE,
+      colour = NA
+    ) +
+    geom_path(
+      data = data.frame(
+        x = c(bar_xmin, bar_xmin, (bar_xmin + bar_xmax) / 2, bar_xmax, bar_xmax),
+        y = c(ratio_min, ratio_max, ratio_max + top_triangle_height, ratio_max, ratio_min)
+      ),
+      aes(x = x, y = y),
+      inherit.aes = FALSE,
+      linewidth = 0.35,
+      colour = "black"
+    ) +
+    geom_segment(
+      aes(x = bar_xmin, xend = bar_xmax, y = ratio_min, yend = ratio_min),
+      inherit.aes = FALSE,
+      linewidth = 0.35,
+      colour = "black"
+    ) +
+    geom_segment(
+      data = tick_df,
+      aes(x = bar_xmax, xend = bar_xmax + 0.11, y = y, yend = y),
+      inherit.aes = FALSE,
+      linewidth = 0.3,
+      colour = "black"
+    ) +
+    geom_text(
+      data = tick_df,
+      aes(x = bar_xmax + 0.17, y = y, label = label),
+      hjust = 0,
+      size = 3.8
+    ) +
+    annotate(
+      "text",
+      x = bar_xmin,
+      y = ratio_max + top_triangle_height + (0.05 * ratio_span),
+      label = legend_title,
+      hjust = 0,
+      vjust = 0,
+      fontface = "bold",
+      size = 5.5
+    ) +
+    scale_fill_identity() +
+    coord_cartesian(
+      xlim = c(0, 1.95),
+      ylim = c(ratio_min - (0.04 * ratio_span), ratio_max + top_triangle_height + (0.16 * ratio_span)),
+      clip = "off"
+    ) +
+    theme_void() +
+    theme(
+      plot.margin = margin(14, 16, 10, 8)
+    )
 }
 
 nc <- open.nc(nc_file)
@@ -347,19 +511,26 @@ mask_is_land <- !is.na(mask_matrix)
 ratio_breaks <- c(1, 1.5, 2, 2.5, 3, 4, 5)
 ratio_palette <- c("#D0D4DA", "#D7E8FF", "#BFD9FF", "#7FB3FF", "#3F8BE6", "#0B4FAF", "#08306B", "#041F4A")
 
-plot_ratio_surface <- function(df, ratio_col, title_text, output_file) {
+plot_ratio_surface <- function(df, ratio_col, title_text, output_file = NULL) {
   ratio_mat <- matrix(NA_real_, nrow = nlon, ncol = nlat)
   idx <- cbind(as.integer(df$lon_index), as.integer(df$lat_index))
   ratio_mat[idx] <- as.numeric(df[[ratio_col]])
   ratio_mat[!mask_is_land] <- NA_real_
-  
+
   ratio_poly <- build_cell_polygons(lon, lat, ratio_mat, "ratio_value")
   keep_ids <- get_nz_intersecting_cell_ids(ratio_poly)
-  make_nz_ratio_plot(ratio_poly, keep_ids, title_text, ratio_breaks, ratio_palette, output_file)
-  list(poly = ratio_poly, keep_ids = keep_ids)
+  ratio_plot <- make_nz_ratio_plot(ratio_poly, keep_ids, title_text, ratio_breaks, ratio_palette, output_file)
+  list(poly = ratio_poly, keep_ids = keep_ids, plot = ratio_plot)
 }
 
 ratio_layers_design <- list()
+
+ratio_layers_design[["probability_ratio_ge4_future_over_current"]] <- plot_ratio_surface(
+  df = grid_results_design,
+  ratio_col = "probability_ratio_ge4_future_over_current",
+  title_text = "(b) Years with ≥4 Heavy days",
+  output_file = file.path(weatherathome_dir, "weather@home_design_check_ratio_map_ge4.png")
+)
 
 ratio_layers_design[["probability_ratio_rx1day_98.9_future_over_current"]] <- plot_ratio_surface(
   df = grid_results_design,
@@ -375,6 +546,29 @@ ratio_layers_design[["probability_ratio_rx1day_96.6_future_over_current"]] <- pl
   output_file = file.path(weatherathome_dir, "weather@home_design_check_ratio_map_96.6.png")
 )
 
+p_ratio_legend_design <- make_triangle_colorbar_plot(ratio_breaks, ratio_palette)
+
+build_alternative_percentile_ratio_pair <- function(percentile_key, output_file) {
+  threshold_plot <- ratio_layers_design[[paste0("probability_ratio_rx1day_", percentile_key, "_future_over_current")]]$plot
+  heavy_plot <- ratio_layers_design[["probability_ratio_ge4_future_over_current"]]$plot
+  combined_plot <- threshold_plot + heavy_plot + p_ratio_legend_design +
+    patchwork::plot_layout(widths = c(1, 1, 0.40))
+
+  ggplot2::ggsave(filename = output_file, plot = combined_plot, width = 16, height = 8.5, dpi = 300)
+  combined_plot
+}
+
+alternative_percentile_ratio_98.9 <- build_alternative_percentile_ratio_pair(
+  percentile_key = "98.9",
+  output_file = file.path(weatherathome_dir, "weather@home_design_check_ratio_pair_98.9_ge4.png")
+)
+
+alternative_percentile_ratio_96.6 <- build_alternative_percentile_ratio_pair(
+  percentile_key = "96.6",
+  output_file = file.path(weatherathome_dir, "weather@home_design_check_ratio_pair_96.6_ge4.png")
+)
+
+
 calc_finite_stats <- function(x) {
   x_finite <- x[is.finite(x)]
   if (length(x_finite) == 0) {
@@ -388,6 +582,8 @@ get_mapped_values <- function(layer_entry) {
   layer_entry$poly$ratio_value[keep_rows & is.finite(layer_entry$poly$ratio_value)]
 }
 
+nz_probability_ratio_ge4_stats <- calc_finite_stats(
+  get_mapped_values(ratio_layers_design[["probability_ratio_ge4_future_over_current"]]))
 nz_probability_ratio_rx1day_98.9_stats <- calc_finite_stats(
   get_mapped_values(ratio_layers_design[["probability_ratio_rx1day_98.9_future_over_current"]]))
 nz_probability_ratio_rx1day_96.6_stats <- calc_finite_stats(
@@ -395,12 +591,25 @@ nz_probability_ratio_rx1day_96.6_stats <- calc_finite_stats(
 
 summary_stats_design <- data.frame(
   metric = c(
+    "probability_ratio_ge4_future_over_current",
     "probability_ratio_rx1day_98.9_future_over_current",
     "probability_ratio_rx1day_96.6_future_over_current"
   ),
-  min = c(nz_probability_ratio_rx1day_98.9_stats[["min"]], nz_probability_ratio_rx1day_96.6_stats[["min"]]),
-  mean = c(nz_probability_ratio_rx1day_98.9_stats[["mean"]], nz_probability_ratio_rx1day_96.6_stats[["mean"]]),
-  max = c(nz_probability_ratio_rx1day_98.9_stats[["max"]], nz_probability_ratio_rx1day_96.6_stats[["max"]])
+  min = c(
+    nz_probability_ratio_ge4_stats[["min"]],
+    nz_probability_ratio_rx1day_98.9_stats[["min"]],
+    nz_probability_ratio_rx1day_96.6_stats[["min"]]
+  ),
+  mean = c(
+    nz_probability_ratio_ge4_stats[["mean"]],
+    nz_probability_ratio_rx1day_98.9_stats[["mean"]],
+    nz_probability_ratio_rx1day_96.6_stats[["mean"]]
+  ),
+  max = c(
+    nz_probability_ratio_ge4_stats[["max"]],
+    nz_probability_ratio_rx1day_98.9_stats[["max"]],
+    nz_probability_ratio_rx1day_96.6_stats[["max"]]
+  )
 )
 
 write.csv(
@@ -409,6 +618,7 @@ write.csv(
   row.names = FALSE
 )
 
+nz_probability_ratio_ge4_stats
 nz_probability_ratio_rx1day_98.9_stats
 nz_probability_ratio_rx1day_96.6_stats
 summary_stats_design
@@ -437,7 +647,7 @@ if (!exists("theme_thesis")) {
 if (!exists("build_quadrant_df")) {
   build_quadrant_df <- function(df_period, heavy_cutoff = 4L) {
     exceed_max <- max(df_period$heavy_days, na.rm = TRUE)
-    
+
     tile_df <- df_period %>%
       dplyr::mutate(
         exceed_group = dplyr::if_else(
@@ -463,7 +673,7 @@ if (!exists("build_quadrant_df")) {
         xmid = (xmin + xmax) / 2,
         ymid = (ymin + ymax) / 2
       )
-    
+
     list(tile_df = tile_df, exceed_max = exceed_max)
   }
 }
@@ -474,13 +684,13 @@ if (!exists("plot_quadrant_heatmap")) {
     if (is.null(x_max)) {
       x_max <- hm$exceed_max
     }
-    
+
     tile_df_plot <- hm$tile_df %>%
       dplyr::mutate(
         xmax = dplyr::if_else(exceed_group == paste0(">=", heavy_cutoff, " heavy days"), x_max + 0.5, xmax),
         xmid = (xmin + xmax) / 2
       )
-    
+
     ggplot2::ggplot(tile_df_plot) +
       ggplot2::geom_rect(
         ggplot2::aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = pct_years),
@@ -548,10 +758,10 @@ build_alternative_threshold_heatmap_pair <- function(extreme_threshold, threshol
     period_label = "Future Projection"
   )
   heavy_days_max <- max(c(current_df$heavy_days, future_df$heavy_days), na.rm = TRUE)
-  
+
   current_panel <- plot_quadrant_heatmap(current_df, panel_tag = "(e)", heavy_cutoff = 4L, x_max = heavy_days_max)
   future_panel <- plot_quadrant_heatmap(future_df, panel_tag = "(f)", heavy_cutoff = 4L, x_max = heavy_days_max)
-  
+
   current_column <- patchwork::wrap_plots(
     make_column_header("Current Day"),
     current_panel,
@@ -568,7 +778,7 @@ build_alternative_threshold_heatmap_pair <- function(extreme_threshold, threshol
   heatmap_plot <- heatmap_plot + patchwork::plot_annotation(
     title = paste0(threshold_label)
   )
-  
+
   ggplot2::ggsave(filename = output_file, plot = heatmap_plot, width = 7, height = 2.8, dpi = 2000)
   heatmap_plot
 }
@@ -595,7 +805,7 @@ matched_cell_heatmap_96.6 <- build_alternative_threshold_heatmap_pair(
 )
 
 #Matched grid-cell RX1day threshold comparison ---------------------------
-  
+
   if (!exists("rx1day_threshold_90_current")) {
     rx1day_threshold_90_current <- apply(
       current_rx_array,
