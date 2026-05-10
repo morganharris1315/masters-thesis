@@ -364,14 +364,14 @@ ratio_layers_design <- list()
 ratio_layers_design[["probability_ratio_rx1day_98.9_future_over_current"]] <- plot_ratio_surface(
   df = grid_results_design,
   ratio_col = "probability_ratio_rx1day_98.9_future_over_current",
-  title_text = "Years with Rx1day >= 98.9th Percentile",
+  title_text = "(a) Years with Extreme Rx1day (98.9th)",
   output_file = file.path(weatherathome_dir, "weather@home_design_check_ratio_map_98.9.png")
 )
 
 ratio_layers_design[["probability_ratio_rx1day_96.6_future_over_current"]] <- plot_ratio_surface(
   df = grid_results_design,
   ratio_col = "probability_ratio_rx1day_96.6_future_over_current",
-  title_text = "Years with Rx1day >= 96.6th Percentile",
+  title_text = "(a) Years with Extreme Rx1day (96.6th)",
   output_file = file.path(weatherathome_dir, "weather@home_design_check_ratio_map_96.6.png")
 )
 
@@ -584,13 +584,77 @@ matched_cell_heatmap_96.6_file <- file.path(
 
 matched_cell_heatmap_98.9 <- build_alternative_threshold_heatmap_pair(
   extreme_threshold = rx1day_threshold_98.9_current[matched_cell$lon_index, matched_cell$lat_index],
-  threshold_label = "98.9th percentile",
+  threshold_label = "(98.9th)",
   output_file = matched_cell_heatmap_98.9_file
 )
 
 matched_cell_heatmap_96.6 <- build_alternative_threshold_heatmap_pair(
   extreme_threshold = rx1day_threshold_96.6_current[matched_cell$lon_index, matched_cell$lat_index],
-  threshold_label = "96.6th percentile",
+  threshold_label = "(96.6th)",
   output_file = matched_cell_heatmap_96.6_file
 )
+
+#Matched grid-cell RX1day threshold comparison ---------------------------
+  
+  if (!exists("rx1day_threshold_90_current")) {
+    rx1day_threshold_90_current <- apply(
+      current_rx_array,
+      c(1, 2),
+      quantile,
+      probs = 0.90,
+      na.rm = TRUE,
+      type = 7
+    )
+  }
+
+if (!exists("rx1day_threshold_90_future")) {
+  rx1day_threshold_90_future <- apply(
+    future_rx_array,
+    c(1, 2),
+    quantile,
+    probs = 0.90,
+    na.rm = TRUE,
+    type = 7
+  )
+}
+
+matched_cell_rx1day_threshold_comparison <- data.frame(
+  lon_index = matched_cell$lon_index,
+  lat_index = matched_cell$lat_index,
+  percentile = c("90th", "96.6th", "98.9th"),
+  probability = c(0.900, 0.966, 0.989),
+  current_threshold_mm = c(
+    rx1day_threshold_90_current[matched_cell$lon_index, matched_cell$lat_index],
+    rx1day_threshold_96.6_current[matched_cell$lon_index, matched_cell$lat_index],
+    rx1day_threshold_98.9_current[matched_cell$lon_index, matched_cell$lat_index]
+  ),
+  future_threshold_mm = c(
+    rx1day_threshold_90_future[matched_cell$lon_index, matched_cell$lat_index],
+    rx1day_threshold_96.6_future[matched_cell$lon_index, matched_cell$lat_index],
+    rx1day_threshold_98.9_future[matched_cell$lon_index, matched_cell$lat_index]
+  )
+)
+
+matched_cell_rx1day_threshold_comparison$current_threshold_mm <- round(
+  matched_cell_rx1day_threshold_comparison$current_threshold_mm,
+  2
+)
+matched_cell_rx1day_threshold_comparison$future_threshold_mm <- round(
+  matched_cell_rx1day_threshold_comparison$future_threshold_mm,
+  2
+)
+
+matched_cell_rx1day_threshold_comparison_file <- file.path(
+  weatherathome_dir,
+  "weather@home_design_check_matched_cell_rx1day_threshold_comparison.csv"
+)
+
+write.csv(
+  matched_cell_rx1day_threshold_comparison,
+  matched_cell_rx1day_threshold_comparison_file,
+  row.names = FALSE
+)
+
+matched_cell_rx1day_threshold_comparison
+
 
