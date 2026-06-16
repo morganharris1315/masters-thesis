@@ -9,9 +9,10 @@ raw_obs_dirs <- list(
   far_north    = far_north_raw_dir,
   top_of_south = top_of_south_raw_dir,
   waikato      = waikato_raw_dir
+  hauraki       = hauraki_raw_dir
 )
 
-regions_obs <- c("coromandel", "far_north", "top_of_south", "waikato")
+regions_obs <- c("coromandel", "far_north", "top_of_south", "waikato", "hauraki")
 
 # Columns expected to be numeric
 numeric_cols <- c("rainfall_mm", "period_hrs", "deficit_mm", "runoff_mm",
@@ -187,3 +188,4 @@ unique(combined_df_obs$station[combined_df_obs$region == "coromandel"])
 unique(combined_df_obs$station[combined_df_obs$region == "far_north"])
 unique(combined_df_obs$station[combined_df_obs$region == "top_of_south"])
 unique(combined_df_obs$station[combined_df_obs$region == "waikato"])
+unique(combined_df_obs$station[combined_df_obs$region == "hauraki"])
