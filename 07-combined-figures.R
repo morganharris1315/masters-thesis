@@ -22,6 +22,13 @@ library(scales)
 library(terra)
 library(sf)
 
+#If didn't run 04:
+current_rx_array <- readRDS("current_rx_array.rds")
+future_rx_array <- readRDS("future_rx_array.rds")
+
+current_exceedance_array <- readRDS("current_exceedance_array.rds")
+future_exceedance_array <- readRDS("future_exceedance_array.rds")
+
 # Style constants ----------------------------------------------------------
 #heavy_col <- "deepskyblue"
 #extreme_col <- "deepskyblue4"
@@ -668,9 +675,6 @@ rx1day_p989_cd
 #1        30        16          175.6814        -37.14073
 
 # Average % increase in Extreme RX1day threshold across New Zealand grid cells ----
-test_files <- current_files[1:3]
-test <- build_cell_threshold_grid(test_files, quantile_prob = 0.90)
-
 get_grid_metadata <- function(file_path) {
   nc <- open.nc(file_path)
   on.exit(close.nc(nc), add = TRUE)
@@ -709,6 +713,9 @@ build_cell_threshold_grid <- function(nc_files, quantile_prob = 0.90) {
   
   list(threshold = threshold_grid, lon = grid_info$lon, lat = grid_info$lat)
 }
+
+test_files <- current_files[1:3]
+test <- build_cell_threshold_grid(test_files, quantile_prob = 0.90)
 
 nz_lon_range <- c(166, 179.5)
 nz_lat_range <- c(-48, -34)
