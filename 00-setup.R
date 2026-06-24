@@ -26,6 +26,7 @@ coromandel_raw_dir   <- glue("{base_raw_dir}/coromandel_raw")
 far_north_raw_dir    <- glue("{base_raw_dir}/far_north_raw")
 top_of_south_raw_dir <- glue("{base_raw_dir}/top_of_south_raw")
 waikato_raw_dir      <- glue("{base_raw_dir}/waikato_raw")
+hauraki_raw_dir      <- glue("{base_raw_dir}/hauraki_raw")
 model_data_dir       <- glue("{base_raw_dir}/model_data")
 
 theme_thesis <- theme_minimal(base_size = 9) +
