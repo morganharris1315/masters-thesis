@@ -91,7 +91,7 @@ process_all_regions <- function(base_raw_dir) {
     "Coromandel",       glue("{base_raw_dir}/coromandel_raw"),
     "Far North",        glue("{base_raw_dir}/far_north_raw"),
     "Top of South",     glue("{base_raw_dir}/top_of_south_raw"),
-    "Waikato",          glue("{base_raw_dir}/waikato_raw")
+    "Waikato",          glue("{base_raw_dir}/waikato_raw"),
     "Hauraki Plains",   glue("{base_raw_dir}/hauraki_raw")
   )
   
@@ -132,7 +132,4 @@ process_all_regions <- function(base_raw_dir) {
 
 # Run ---------------------------------------------------------------------
 all_regions <- process_all_regions(base_raw_dir)
-
-
-
 
