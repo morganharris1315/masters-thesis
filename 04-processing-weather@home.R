@@ -458,4 +458,9 @@ nz_probability_ratio_joint_top10_ge4_stats
 nz_probability_ratio_joint_top10_ge5_stats
 mean_rx1day_threshold_90_pct_change_future_over_current_nz
 
+saveRDS(current_rx_array, "current_rx_array.rds")
+saveRDS(future_rx_array, "future_rx_array.rds")
+
+saveRDS(current_exceedance_array, "current_exceedance_array.rds")
+saveRDS(future_exceedance_array, "future_exceedance_array.rds")
   
