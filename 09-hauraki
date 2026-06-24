@@ -1,1 +1,647 @@
-# ------------------------------------------------------------------------- # 09-hauraki.R # ------------------------------------------------------------------------- # June 2026 # Applying anaysis to the Hauraki Plains # ------------------------------------------------------------------------- library(tidyverse) library(lubridate) library(sf) library(rnaturalearth) library(rnaturalearthdata) library(terra) # Load cleaned dataset ---------------------------------------------------- obs_path <- glue("{base_raw_dir}/obs_data/cleaned_datasets/rain_hauraki_cleaned.csv") hauraki_obs <- read_csv(obs_path, show_col_types = FALSE) %>% mutate(observation_date = as.Date(observation_date), hydro_year = if_else(month(observation_date) >= 7, year(observation_date) + 1, year(observation_date))) %>% distinct(station, observation_date, .keep_all = TRUE) names(hauraki_obs) # Threshold calculation --------------------------------------------------- compute_RX1day_obs <- function(df_station, missing_day_threshold = 30) { df_station %>% group_by(hydro_year) %>% summarise(missing_days = sum(is.na(rainfall_mm)), RX1day_raw = if_else(all(is.na(rainfall_mm)), NA_real_, max(rainfall_mm, na.rm = TRUE)), RX1day = if_else(missing_days >= missing_day_threshold, NA_real_, RX1day_raw),.groups = "drop") %>% select(hydro_year, RX1day)} calculate_rx1day_thresholds_obs <- function(df_station_obs){ RX1day_df <- compute_RX1day_obs(df_station_obs) rx <- RX1day_df$RX1day heavy_threshold <- quantile(rx, probs = 1/3, na.rm = TRUE, type = 7) extreme_threshold <- quantile(rx, probs = 0.9, na.rm = TRUE, type = 7) tibble(heavy_threshold_mm = as.numeric(heavy_threshold), extreme_threshold_mm = as.numeric(extreme_threshold))} # Calculate station thresholds ------------------------------------------- station_thresholds <- hauraki_obs %>% group_by(station) %>% group_modify(~{calculate_rx1day_thresholds_obs(.x)}) %>% ungroup() # HY2017 exceedances ------------------------------------------------- collapse_dates <- function(x) {if(length(x) == 0 || all(is.na(x))){return(NA_character_)} paste(sort(unique(format(as.Date(x), "%Y-%m-%d"))), collapse = "; ")} hauraki_hy2017_summary <- hauraki_obs %>% filter(hydro_year == 2017) %>% left_join(station_thresholds, by = "station") %>% group_by(station) %>% summarise(region = first(region), hydrological_year = 2017, annual_rainfall_mm = sum(rainfall_mm, na.rm = TRUE), heavy_threshold_mm = first(heavy_threshold_mm), extreme_threshold_mm = first(extreme_threshold_mm), heavy_exceedance_count = sum(rainfall_mm > heavy_threshold_mm, na.rm = TRUE), heavy_exceedance_dates = collapse_dates(observation_date[rainfall_mm > heavy_threshold_mm]), extreme_exceedance_count = sum(rainfall_mm > extreme_threshold_mm, na.rm = TRUE), extreme_exceedance_dates = collapse_dates(observation_date[rainfall_mm > extreme_threshold_mm]), rx1day_hy2017_mm = max(rainfall_mm, na.rm = TRUE), rx1day_hy2017_date = as.character(observation_date[which.max(rainfall_mm)][1]),.groups = "drop") hauraki_hy2017_summary # Save -------------------------------------------------------------------- write_csv(hauraki_hy2017_summary, glue("{base_raw_dir}/obs_data/hauraki_plains_hy2017_exceedances.csv")) # Figure 1 Hauraki Version ----------------------------------------------------------------- maukoro_site <- hauraki_obs %>% filter(station == "Maukoro Landing Rd") %>% summarise(station = first(station), latitude = first(latitude), longitude = first(longitude)) maukoro_obs <- hauraki_obs %>% filter(station == "Maukoro Landing Rd") %>% arrange(observation_date) maukoro_rx <- compute_RX1day_obs(maukoro_obs) heavy_obs <- as.numeric(quantile(maukoro_rx$RX1day, probs = 1/3, na.rm = TRUE, type = 7)) extreme_obs <- as.numeric(quantile(maukoro_rx$RX1day, probs = 0.9, na.rm = TRUE, type = 7)) maukoro_rx_plot <- maukoro_rx %>% mutate(Year = hydro_year,heavy_threshold = heavy_obs, extreme_threshold = extreme_obs) all_station_thresholds <- hauraki_obs %>% filter(!is.na(rainfall_mm)) %>% group_by(station, hydro_year) %>% summarise(rx1day = max(rainfall_mm, na.rm = TRUE), .groups = "drop") %>% group_by(station) %>% summarise(threshold_single = as.numeric(quantile(rx1day, probs = 1/3,na.rm = TRUE, type = 7)),.groups = "drop") station_coords <- hauraki_obs %>% filter(!is.na(latitude),!is.na(longitude)) %>% group_by(station) %>% summarise(latitude = first(latitude),longitude = first(longitude), .groups = "drop") # LiDAR background -------------------------------------------------------- hauraki_lidar_dir <- "C:/Users/Morgan/OneDrive - The University of Waikato/Masters Thesis/Thesis/Compound Events/obs_data/hauraki/LiDAR data" lidar_tile_paths <- list.files( hauraki_lidar_dir, pattern = "\\.tif$", full.names = TRUE) map_xlim <- c(175.1, 175.9) map_ylim <- c(-38.0, -36.8) # Define plotting extent in WGS84 map_extent_wgs84 <- terra::ext(map_xlim[1],map_xlim[2],map_ylim[1],map_ylim[2]) # Convert extent -> polygon map_poly_wgs84 <- terra::as.polygons(map_extent_wgs84, crs = "EPSG:4326") # Project to NZTM map_poly_nztm <- terra::project(map_poly_wgs84,"EPSG:2193") # Extent in NZTM coordinates map_extent_nztm <- terra::ext(map_poly_nztm) lidar_tiles <- lapply( lidar_tile_paths, function(f) { r <- terra::rast(f) overlap <- terra::intersect( terra::ext(r), map_extent_nztm) if (is.null(overlap)) {return(NULL)} terra::crop(r, map_extent_nztm)}) lidar_tiles <- Filter(Negate(is.null), lidar_tiles) lidar_mosaic <- if (length(lidar_tiles) == 1) { lidar_tiles[[1]]} else {terra::mosaic(terra::sprc(lidar_tiles))} lidar_wgs84 <- terra::project(lidar_mosaic, "EPSG:4326") lidar_crop <- terra::crop(lidar_wgs84) lidar_slope <- terra::terrain(lidar_crop, v = "slope", unit = "radians") lidar_aspect <- terra::terrain(lidar_crop, v = "aspect", unit = "radians") lidar_hillshade <- terra::shade(lidar_slope, lidar_aspect, angle = 45, direction = 315) names(lidar_hillshade) <- "hillshade" target_plot_cells <- 1e6 if (terra::ncell(lidar_hillshade) > target_plot_cells) { agg_factor <- ceiling( sqrt(terra::ncell(lidar_hillshade) / target_plot_cells)) lidar_hillshade <- terra::aggregate( lidar_hillshade, fact = agg_factor, fun = mean, na.rm = TRUE)} lidar_hillshade_df <- as.data.frame( lidar_hillshade, xy = TRUE, na.rm = TRUE) event_definitions_hauraki <- tibble::tribble( ~event_id, ~start_date, ~end_date, 1L, as.Date("2017-02-16"), as.Date("2017-02-16"), 2L, as.Date("2017-03-07"), as.Date("2017-03-08"), 3L, as.Date("2017-03-10"), as.Date("2017-03-11"), 4L, as.Date("2017-04-04"), as.Date("2017-04-05"), 5L, as.Date("2017-04-12"), as.Date("2017-04-12"), 6L, as.Date("2017-05-12"), as.Date("2017-05-12")) %>% mutate( event_title = map2_chr( start_date, end_date, format_event_title)) build_event_map <- function( event_row, xlim = map_xlim, ylim = map_ylim, show_legend = FALSE) { legend_labels <- c("Daily Rainfall (mm)", "Above Heavy Threshold") event_data <- hauraki_obs %>% filter( observation_date >= event_row$start_date, observation_date <= event_row$end_date) %>% group_by(station) %>% filter(!is.na(rainfall_mm)) %>% slice_max( order_by = rainfall_mm, n = 1, with_ties = FALSE) %>% ungroup() %>% transmute(station, event_rainfall_mm = rainfall_mm) %>% left_join(station_coords, by = "station") %>% left_join(all_station_thresholds, by = "station") %>% mutate(is_above_threshold = !is.na(threshold_single) & event_rainfall_mm > threshold_single) %>% filter(!is.na(latitude), !is.na(longitude), !is.na(event_rainfall_mm)) event_data_base <- event_data %>% mutate(legend_key = factor(legend_labels[1], levels = legend_labels)) event_data_above <- event_data %>% filter(is_above_threshold) %>% mutate(legend_key = factor( legend_labels[2], levels = legend_labels)) ggplot() + geom_raster( data = lidar_hillshade_df, aes(x = x, y = y, fill = hillshade)) + scale_fill_gradient(low = "grey15", high = "grey92", guide = "none") + geom_point(data = event_data_base, aes(x = longitude, y = latitude, colour = legend_key), shape = 16, size = 2) + geom_point( data = event_data_above, aes(x = longitude, y = latitude, colour = legend_key), shape = 1, size = 2, stroke = 0.9) + geom_text( data = event_data, aes(x = longitude, y = latitude, label = round(event_rainfall_mm, 0)), nudge_y = 0.03, size = 2.5) + geom_text( data = maukoro_site, aes(x = longitude, y = latitude, label = station), colour = "red3", fontface = "bold", nudge_y = -0.01, vjust = 1, hjust = 0.5, size = 2.7) + coord_quickmap( xlim = xlim, ylim = ylim, expand = FALSE) + scale_x_continuous( breaks = c( xlim[1], mean(xlim), xlim[2]), labels = scales::label_number( accuracy = 0.1), minor_breaks = NULL) + scale_y_continuous( breaks = seq(ylim[1], ylim[2], by = 0.4), minor_breaks = NULL) + scale_colour_manual( values = c( "Daily Rainfall (mm)" = "grey10", "Above Heavy Threshold" = heavy_col), breaks = legend_labels, drop = FALSE, name = NULL) + labs(title = event_row$event_title, x = NULL, y = NULL) + theme_thesis + theme(panel.background = element_rect( fill = "white", colour = NA), panel.border = element_rect( fill = NA, colour = "grey20", linewidth = 0.45), axis.title = element_blank(), legend.position = if (isTRUE(show_legend)) "right" else "none", legend.justification = "center", legend.margin = margin(0, 0, 0, 0), panel.grid.major = element_line( colour = "grey80", linewidth = 0.2 ), panel.grid.minor = element_blank(), plot.title = element_text( hjust = 0.5, face = "bold", size = 9), plot.margin = margin(8, 8, 8, 8 )) } event_list <- split( event_definitions_hauraki, event_definitions_hauraki$event_id) event_maps <- imap( event_list, ~ build_event_map( .x, show_legend = (.y == names(event_list)[1]))) event_map_grid <- wrap_plots( event_maps, ncol = 3, nrow = 2) p1a_core <- event_map_grid + plot_layout(guides = "collect") & theme(legend.position = "bottom") p1a <- make_panel_tag("(a)") / p1a_core + plot_layout(heights = c(0.05, 1)) p1a p1b <- ggplot(maukoro_rx_plot, aes(x = Year,y = RX1day)) + geom_line(colour = "black", linewidth = 0.35) + geom_point(colour = "black", size = 0.45) + geom_hline(yintercept = heavy_obs, colour = heavy_col, linewidth = 1) + geom_hline(yintercept = extreme_obs, colour = extreme_col, linewidth = 1) + annotate("text",x = min(maukoro_rx_plot$Year), y = 100, label = sprintf("Extreme %.1f mm", extreme_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = extreme_col, fontface = "bold") + annotate("text",x = min(maukoro_rx_plot$Year), y = 100, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 2.7, size = 2.7, colour = heavy_col, fontface = "bold") + geom_point(data = subset(maukoro_rx_plot,hydro_year == 2017), colour = "red3", size = 1.7) + geom_text(data = subset(maukoro_rx_plot, hydro_year == 2017), aes(label = "2017"), colour = "red3", fontface = "bold", nudge_y = 3) + scale_y_continuous( limits = c(0, 100), expand = c(0, 0) ) + labs( title = "(b)", x = "Year", y = "RX1day (mm)" ) + theme_thesis + theme_model_axes + theme( plot.title = element_text(hjust = 0) ) hy2017_df <- maukoro_obs %>% filter(hydro_year == 2017) axis_breaks <- seq( as.Date("2016-07-01"), as.Date("2017-06-01"), by = "1 month" ) p1c <- ggplot( hy2017_df, aes( x = observation_date, y = rainfall_mm ) ) + geom_col( fill = "black", width = 1.5 ) + geom_hline( yintercept = heavy_obs, colour = heavy_col, linewidth = 1 ) + annotate( "text", x = as.Date("2016-07-01"), y = 100, label = sprintf("Heavy %.1f mm", heavy_obs), hjust = 0, vjust = 1.2, size = 2.7, colour = heavy_col, fontface = "bold" ) + scale_x_date( breaks = axis_breaks, date_labels = "%b", limits = c( as.Date("2016-07-01"), as.Date("2017-06-30") ) ) + scale_y_continuous( limits = c(0, 100), expand = c(0, 0) ) + labs( title = "(c)", x = "Date", y = "Daily Rainfall (mm)" ) + theme_thesis + theme_model_axes + theme( plot.title = element_text(hjust = 0) ) bottom_row_hauraki <- p1b | p1c figure1_plot_hauraki <- wrap_elements(full = p1a) / wrap_elements(full = bottom_row_hauraki) + plot_layout( heights = c(1.3, 0.75) ) figure1_plot_hauraki figure1_file_hauraki <- file.path(base_raw_dir, "obs_data", "Figure1_hauraki_context.png") ggsave(filename = figure1_file_hauraki, plot = figure1_plot_hauraki, width = 7, height = 12, dpi = 2000)
+# -------------------------------------------------------------------------
+# 09-hauraki.R
+# -------------------------------------------------------------------------
+# June 2026
+# Applying analysis to the Hauraki Plains
+# -------------------------------------------------------------------------
+
+library(tidyverse)
+library(lubridate)
+library(sf)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(terra)
+
+# Load cleaned dataset ----------------------------------------------------
+
+obs_path <- glue(
+  "{base_raw_dir}/obs_data/cleaned_datasets/rain_hauraki_cleaned.csv"
+)
+
+hauraki_obs <- read_csv(obs_path, show_col_types = FALSE) %>%
+  mutate(
+    observation_date = as.Date(observation_date),
+    hydro_year = if_else(
+      month(observation_date) >= 7,
+      year(observation_date) + 1,
+      year(observation_date)
+    )
+  ) %>%
+  distinct(station, observation_date, .keep_all = TRUE)
+
+names(hauraki_obs)
+
+# Threshold calculation ---------------------------------------------------
+
+compute_RX1day_obs <- function(df_station, missing_day_threshold = 30) {
+  df_station %>%
+    group_by(hydro_year) %>%
+    summarise(
+      missing_days = sum(is.na(rainfall_mm)),
+      RX1day_raw = if_else(
+        all(is.na(rainfall_mm)),
+        NA_real_,
+        max(rainfall_mm, na.rm = TRUE)
+      ),
+      RX1day = if_else(
+        missing_days >= missing_day_threshold,
+        NA_real_,
+        RX1day_raw
+      ),
+      .groups = "drop"
+    ) %>%
+    select(hydro_year, RX1day)
+}
+
+calculate_rx1day_thresholds_obs <- function(df_station_obs) {
+  RX1day_df <- compute_RX1day_obs(df_station_obs)
+  rx <- RX1day_df$RX1day
+  
+  heavy_threshold <- quantile(
+    rx,
+    probs = 1 / 3,
+    na.rm = TRUE,
+    type = 7
+  )
+  
+  extreme_threshold <- quantile(
+    rx,
+    probs = 0.9,
+    na.rm = TRUE,
+    type = 7
+  )
+  
+  tibble(
+    heavy_threshold_mm = as.numeric(heavy_threshold),
+    extreme_threshold_mm = as.numeric(extreme_threshold)
+  )
+}
+
+# Calculate station thresholds -------------------------------------------
+
+station_thresholds <- hauraki_obs %>%
+  group_by(station) %>%
+  group_modify(~ calculate_rx1day_thresholds_obs(.x)) %>%
+  ungroup()
+
+# HY2017 exceedances ------------------------------------------------------
+
+collapse_dates <- function(x) {
+  if (length(x) == 0 || all(is.na(x))) {
+    return(NA_character_)
+  }
+  
+  paste(
+    sort(unique(format(as.Date(x), "%Y-%m-%d"))),
+    collapse = "; "
+  )
+}
+
+hauraki_hy2017_summary <- hauraki_obs %>%
+  filter(hydro_year == 2017) %>%
+  left_join(station_thresholds, by = "station") %>%
+  group_by(station) %>%
+  summarise(
+    region = first(region),
+    hydrological_year = 2017,
+    annual_rainfall_mm = sum(rainfall_mm, na.rm = TRUE),
+    heavy_threshold_mm = first(heavy_threshold_mm),
+    extreme_threshold_mm = first(extreme_threshold_mm),
+    heavy_exceedance_count = sum(
+      rainfall_mm > heavy_threshold_mm,
+      na.rm = TRUE
+    ),
+    heavy_exceedance_dates = collapse_dates(
+      observation_date[rainfall_mm > heavy_threshold_mm]
+    ),
+    extreme_exceedance_count = sum(
+      rainfall_mm > extreme_threshold_mm,
+      na.rm = TRUE
+    ),
+    extreme_exceedance_dates = collapse_dates(
+      observation_date[rainfall_mm > extreme_threshold_mm]
+    ),
+    rx1day_hy2017_mm = max(rainfall_mm, na.rm = TRUE),
+    rx1day_hy2017_date = as.character(
+      observation_date[which.max(rainfall_mm)][1]
+    ),
+    .groups = "drop"
+  )
+
+hauraki_hy2017_summary
+
+# Save --------------------------------------------------------------------
+
+write_csv(
+  hauraki_hy2017_summary,
+  glue("{base_raw_dir}/obs_data/hauraki_plains_hy2017_exceedances.csv")
+)
+
+# Figure 1 Hauraki Version ------------------------------------------------
+
+maukoro_site <- hauraki_obs %>%
+  filter(station == "Maukoro Landing Rd") %>%
+  summarise(
+    station = first(station),
+    latitude = first(latitude),
+    longitude = first(longitude)
+  )
+
+maukoro_obs <- hauraki_obs %>%
+  filter(station == "Maukoro Landing Rd") %>%
+  arrange(observation_date)
+
+maukoro_rx <- compute_RX1day_obs(maukoro_obs)
+
+heavy_obs <- as.numeric(
+  quantile(
+    maukoro_rx$RX1day,
+    probs = 1 / 3,
+    na.rm = TRUE,
+    type = 7
+  )
+)
+
+extreme_obs <- as.numeric(
+  quantile(
+    maukoro_rx$RX1day,
+    probs = 0.9,
+    na.rm = TRUE,
+    type = 7
+  )
+)
+
+maukoro_rx_plot <- maukoro_rx %>%
+  mutate(
+    Year = hydro_year,
+    heavy_threshold = heavy_obs,
+    extreme_threshold = extreme_obs
+  )
+
+all_station_thresholds <- hauraki_obs %>%
+  filter(!is.na(rainfall_mm)) %>%
+  group_by(station, hydro_year) %>%
+  summarise(
+    rx1day = max(rainfall_mm, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  group_by(station) %>%
+  summarise(
+    threshold_single = as.numeric(
+      quantile(
+        rx1day,
+        probs = 1 / 3,
+        na.rm = TRUE,
+        type = 7
+      )
+    ),
+    .groups = "drop"
+  )
+
+station_coords <- hauraki_obs %>%
+  filter(!is.na(latitude), !is.na(longitude)) %>%
+  group_by(station) %>%
+  summarise(
+    latitude = first(latitude),
+    longitude = first(longitude),
+    .groups = "drop"
+  )
+
+# Hillshade background ----------------------------------------------------
+
+hauraki_hillshade_dir <- glue("{base_raw_dir}/obs_data/hauraki/Hilshade")
+
+hillshade_tile_paths <- list.files(
+  hauraki_hillshade_dir,
+  pattern = "\\.jpg$",
+  full.names = TRUE,
+  ignore.case = TRUE
+)
+
+hillshade_crs <- "EPSG:2193"
+
+map_xlim <- c(175.1, 175.9)
+map_ylim <- c(-38.0, -36.8)
+
+# Define plotting extent in WGS84
+map_extent_wgs84 <- terra::ext(
+  map_xlim[1],
+  map_xlim[2],
+  map_ylim[1],
+  map_ylim[2]
+)
+
+# Convert extent to polygon
+map_poly_wgs84 <- terra::as.polygons(
+  map_extent_wgs84,
+  crs = "EPSG:4326"
+)
+
+# Read only hillshade tiles that intersect the plotting extent
+hillshade_tiles <- lapply(
+  hillshade_tile_paths,
+  function(f) {
+    r <- terra::rast(f)
+    
+    # JPG tiles use matching JGW world files for position, but may not store CRS.
+    if (is.na(terra::crs(r)) || terra::crs(r) == "") {
+      terra::crs(r) <- hillshade_crs
+    }
+    
+    map_poly_tile_crs <- terra::project(
+      map_poly_wgs84,
+      terra::crs(r)
+    )
+    
+    map_extent_tile_crs <- terra::ext(map_poly_tile_crs)
+    
+    overlap <- terra::intersect(
+      terra::ext(r),
+      map_extent_tile_crs
+    )
+    
+    if (is.null(overlap)) {
+      return(NULL)
+    }
+    
+    terra::crop(r, map_extent_tile_crs)
+  }
+)
+
+hillshade_tiles <- Filter(
+  Negate(is.null),
+  hillshade_tiles
+)
+
+if (length(hillshade_tiles) == 0) {
+  stop("No hillshade tiles intersect the Hauraki map extent.")
+}
+
+hillshade_mosaic <- if (length(hillshade_tiles) == 1) {
+  hillshade_tiles[[1]]
+} else {
+  terra::mosaic(
+    terra::sprc(hillshade_tiles)
+  )
+}
+
+map_poly_hillshade_crs <- terra::project(
+  map_poly_wgs84,
+  terra::crs(hillshade_mosaic)
+)
+
+hillshade_crop <- terra::crop(
+  hillshade_mosaic,
+  terra::ext(map_poly_hillshade_crs)
+)
+
+hillshade_wgs84 <- terra::project(
+  hillshade_crop,
+  "EPSG:4326"
+)
+
+names(hillshade_wgs84) <- "hillshade"
+
+target_plot_cells <- 1e6
+
+if (terra::ncell(hillshade_wgs84) > target_plot_cells) {
+  agg_factor <- ceiling(
+    sqrt(terra::ncell(hillshade_wgs84) / target_plot_cells)
+  )
+  
+  hillshade_wgs84 <- terra::aggregate(
+    hillshade_wgs84,
+    fact = agg_factor,
+    fun = mean,
+    na.rm = TRUE
+  )
+}
+
+hillshade_df <- as.data.frame(
+  hillshade_wgs84,
+  xy = TRUE,
+  na.rm = TRUE
+)
+
+event_definitions_hauraki <- tibble::tribble(
+  ~event_id, ~start_date, ~end_date,
+  1L, as.Date("2017-02-16"), as.Date("2017-02-16"),
+  2L, as.Date("2017-03-07"), as.Date("2017-03-08"),
+  3L, as.Date("2017-03-10"), as.Date("2017-03-11"),
+  4L, as.Date("2017-04-04"), as.Date("2017-04-05"),
+  5L, as.Date("2017-04-12"), as.Date("2017-04-12"),
+  6L, as.Date("2017-05-12"), as.Date("2017-05-12")
+) %>%
+  mutate(
+    event_title = map2_chr(
+      start_date,
+      end_date,
+      format_event_title
+    )
+  )
+
+build_event_map <- function(
+    event_row,
+    xlim = map_xlim,
+    ylim = map_ylim,
+    show_legend = FALSE
+) {
+  legend_labels <- c("Daily Rainfall (mm)", "Above Heavy Threshold")
+  
+  event_data <- hauraki_obs %>%
+    filter(
+      observation_date >= event_row$start_date,
+      observation_date <= event_row$end_date
+    ) %>%
+    group_by(station) %>%
+    filter(!is.na(rainfall_mm)) %>%
+    slice_max(
+      order_by = rainfall_mm,
+      n = 1,
+      with_ties = FALSE
+    ) %>%
+    ungroup() %>%
+    transmute(
+      station,
+      event_rainfall_mm = rainfall_mm
+    ) %>%
+    left_join(station_coords, by = "station") %>%
+    left_join(all_station_thresholds, by = "station") %>%
+    mutate(
+      is_above_threshold = !is.na(threshold_single) &
+        event_rainfall_mm > threshold_single
+    ) %>%
+    filter(
+      !is.na(latitude),
+      !is.na(longitude),
+      !is.na(event_rainfall_mm)
+    )
+  
+  event_data_base <- event_data %>%
+    mutate(
+      legend_key = factor(
+        legend_labels[1],
+        levels = legend_labels
+      )
+    )
+  
+  event_data_above <- event_data %>%
+    filter(is_above_threshold) %>%
+    mutate(
+      legend_key = factor(
+        legend_labels[2],
+        levels = legend_labels
+      )
+    )
+  
+  ggplot() +
+    geom_raster(
+      data = hillshade_df,
+      aes(x = x, y = y, fill = hillshade)
+    ) +
+    scale_fill_gradient(
+      low = "grey15",
+      high = "grey92",
+      guide = "none"
+    ) +
+    geom_point(
+      data = event_data_base,
+      aes(x = longitude, y = latitude, colour = legend_key),
+      shape = 16,
+      size = 2
+    ) +
+    geom_point(
+      data = event_data_above,
+      aes(x = longitude, y = latitude, colour = legend_key),
+      shape = 1,
+      size = 2,
+      stroke = 0.9
+    ) +
+    geom_text(
+      data = event_data,
+      aes(
+        x = longitude,
+        y = latitude,
+        label = round(event_rainfall_mm, 0)
+      ),
+      nudge_y = 0.03,
+      size = 2.5
+    ) +
+    geom_text(
+      data = maukoro_site,
+      aes(x = longitude, y = latitude, label = station),
+      colour = "red3",
+      fontface = "bold",
+      nudge_y = -0.01,
+      vjust = 1,
+      hjust = 0.5,
+      size = 2.7
+    ) +
+    coord_quickmap(
+      xlim = xlim,
+      ylim = ylim,
+      expand = FALSE
+    ) +
+    scale_x_continuous(
+      breaks = c(xlim[1], mean(xlim), xlim[2]),
+      labels = scales::label_number(accuracy = 0.1),
+      minor_breaks = NULL
+    ) +
+    scale_y_continuous(
+      breaks = seq(ylim[1], ylim[2], by = 0.4),
+      minor_breaks = NULL
+    ) +
+    scale_colour_manual(
+      values = c(
+        "Daily Rainfall (mm)" = "grey10",
+        "Above Heavy Threshold" = heavy_col
+      ),
+      breaks = legend_labels,
+      drop = FALSE,
+      name = NULL
+    ) +
+    labs(
+      title = event_row$event_title,
+      x = NULL,
+      y = NULL
+    ) +
+    theme_thesis +
+    theme(
+      panel.background = element_rect(
+        fill = "white",
+        colour = NA
+      ),
+      panel.border = element_rect(
+        fill = NA,
+        colour = "grey20",
+        linewidth = 0.45
+      ),
+      axis.title = element_blank(),
+      legend.position = if (isTRUE(show_legend)) "right" else "none",
+      legend.justification = "center",
+      legend.margin = margin(0, 0, 0, 0),
+      panel.grid.major = element_line(
+        colour = "grey80",
+        linewidth = 0.2
+      ),
+      panel.grid.minor = element_blank(),
+      plot.title = element_text(
+        hjust = 0.5,
+        face = "bold",
+        size = 9
+      ),
+      plot.margin = margin(8, 8, 8, 8)
+    )
+}
+
+event_list <- split(
+  event_definitions_hauraki,
+  event_definitions_hauraki$event_id
+)
+
+event_maps <- imap(
+  event_list,
+  ~ build_event_map(
+    .x,
+    show_legend = (.y == names(event_list)[1])
+  )
+)
+
+event_map_grid <- wrap_plots(
+  event_maps,
+  ncol = 3,
+  nrow = 2
+)
+
+p1a_core <- event_map_grid +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+
+p1a <- make_panel_tag("(a)") / p1a_core +
+  plot_layout(heights = c(0.05, 1))
+
+p1a
+
+p1b <- ggplot(maukoro_rx_plot, aes(x = Year, y = RX1day)) +
+  geom_line(colour = "black", linewidth = 0.35) +
+  geom_point(colour = "black", size = 0.45) +
+  geom_hline(yintercept = heavy_obs, colour = heavy_col, linewidth = 1) +
+  geom_hline(yintercept = extreme_obs, colour = extreme_col, linewidth = 1) +
+  annotate(
+    "text",
+    x = min(maukoro_rx_plot$Year),
+    y = 100,
+    label = sprintf("Extreme %.1f mm", extreme_obs),
+    hjust = 0,
+    vjust = 1.2,
+    size = 2.7,
+    colour = extreme_col,
+    fontface = "bold"
+  ) +
+  annotate(
+    "text",
+    x = min(maukoro_rx_plot$Year),
+    y = 100,
+    label = sprintf("Heavy %.1f mm", heavy_obs),
+    hjust = 0,
+    vjust = 2.7,
+    size = 2.7,
+    colour = heavy_col,
+    fontface = "bold"
+  ) +
+  geom_point(
+    data = subset(maukoro_rx_plot, hydro_year == 2017),
+    colour = "red3",
+    size = 1.7
+  ) +
+  geom_text(
+    data = subset(maukoro_rx_plot, hydro_year == 2017),
+    aes(label = "2017"),
+    colour = "red3",
+    fontface = "bold",
+    nudge_y = 3
+  ) +
+  scale_y_continuous(
+    limits = c(0, 100),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "(b)",
+    x = "Year",
+    y = "RX1day (mm)"
+  ) +
+  theme_thesis +
+  theme_model_axes +
+  theme(plot.title = element_text(hjust = 0))
+
+hy2017_df <- maukoro_obs %>%
+  filter(hydro_year == 2017)
+
+axis_breaks <- seq(
+  as.Date("2016-07-01"),
+  as.Date("2017-06-01"),
+  by = "1 month"
+)
+
+p1c <- ggplot(
+  hy2017_df,
+  aes(x = observation_date, y = rainfall_mm)
+) +
+  geom_col(fill = "black", width = 1.5) +
+  geom_hline(yintercept = heavy_obs, colour = heavy_col, linewidth = 1) +
+  annotate(
+    "text",
+    x = as.Date("2016-07-01"),
+    y = 100,
+    label = sprintf("Heavy %.1f mm", heavy_obs),
+    hjust = 0,
+    vjust = 1.2,
+    size = 2.7,
+    colour = heavy_col,
+    fontface = "bold"
+  ) +
+  scale_x_date(
+    breaks = axis_breaks,
+    date_labels = "%b",
+    limits = c(
+      as.Date("2016-07-01"),
+      as.Date("2017-06-30")
+    )
+  ) +
+  scale_y_continuous(
+    limits = c(0, 100),
+    expand = c(0, 0)
+  ) +
+  labs(
+    title = "(c)",
+    x = "Date",
+    y = "Daily Rainfall (mm)"
+  ) +
+  theme_thesis +
+  theme_model_axes +
+  theme(plot.title = element_text(hjust = 0))
+
+bottom_row_hauraki <- p1b | p1c
+
+figure1_plot_hauraki <- wrap_elements(full = p1a) /
+  wrap_elements(full = bottom_row_hauraki) +
+  plot_layout(heights = c(1.3, 0.75))
+
+figure1_plot_hauraki
+
+figure1_file_hauraki <- file.path(
+  base_raw_dir,
+  "obs_data",
+  "Figure1_hauraki_context.png"
+)
+
+ggsave(
+  filename = figure1_file_hauraki,
+  plot = figure1_plot_hauraki,
+  width = 7,
+  height = 12,
+  dpi = 2000
+)
+
+
+
