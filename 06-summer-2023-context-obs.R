@@ -6,7 +6,7 @@
 # -------------------------------------------------------------------------
 
 # Regions to process -------------------------------------------------------
-regions_to_process <- c("coromandel", "far_north", "top_of_south", "waikato")
+regions_to_process <- c("coromandel", "far_north", "top_of_south", "waikato","hauraki")
 
 # Helper functions ---------------------------------------------------------
 compute_RX1day_obs <- function(df_station, missing_day_threshold = 30) {
@@ -25,9 +25,6 @@ calculate_rx1day_thresholds_obs <- function(df_station_obs) {
   RX1day_df <- compute_RX1day_obs(df_station_obs)
   rx <- RX1day_df$RX1day
   
-  # Keep single-threshold definition aligned with
-  # 03a-blockmaxima-function-obs-singlethreshold.R:
-  # threshold where 2/3 of annual RX1day values are above it.
   single_threshold <- quantile(
     rx,
     probs = 1 / 3,
@@ -502,13 +499,11 @@ ggsave(
 
 
 # Adding Lidar Data -------------------------------------------------------
-#install.packages("lidR")
 #install.packages("terra")
 #install.packages("rayshader")
 #install.packages("terrainr")
 
 # Load the libraries
-library(lidR)
 library(terra)
 library(rayshader)
 library(viridis)
@@ -538,6 +533,8 @@ lidar_wgs84_crop <- terra::crop(lidar_wgs84, coromandel_extent)
 
 # Build simple grayscale hillshade background.
 lidar_slope <- terra::terrain(lidar_wgs84_crop, v = "slope", unit = "radians")
+
+###################
 lidar_aspect <- terra::terrain(lidar_wgs84_crop, v = "aspect", unit = "radians")
 lidar_hillshade <- terra::shade(lidar_slope, lidar_aspect, angle = 45, direction = 315)
 names(lidar_hillshade) <- "hillshade"
