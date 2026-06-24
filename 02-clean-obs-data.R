@@ -8,7 +8,7 @@ raw_obs_dirs <- list(
   coromandel   = coromandel_raw_dir,
   far_north    = far_north_raw_dir,
   top_of_south = top_of_south_raw_dir,
-  waikato      = waikato_raw_dir
+  waikato      = waikato_raw_dir,
   hauraki       = hauraki_raw_dir
 )
 
