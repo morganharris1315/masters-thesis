@@ -1,0 +1,405 @@
+# -------------------------------------------------------------------------
+# Recovery Model
+# -------------------------------------------------------------------------
+# August 2026
+# Linear and non-linear recovery relationships
+# -------------------------------------------------------------------------
+
+
+# Load packages -----------------------------------------------------------
+
+library(tidyverse)
+
+
+# Define recovery index values --------------------------------------------
+
+recovery_levels <- tibble(
+  recovery_index = c(1, 0.875, 0.75, 0.625, 0.50, 0.375, 0.25, 0.125),
+  starting_value = c(250, 225, 200, 175, 150, 125, 100, 75)
+)
+
+
+# Define colours for each recovery index ----------------------------------
+# Colours follow the continuous 1 -> 0 colour scheme:
+#
+# 1.000  = #07519A
+# 0.750  = #3382BE
+# 0.500  = #6BAED6
+# 0.250  = #BDD7E8
+# 0.000  = #F0F3FF
+#
+# Intermediate colours are interpolated between these colours.
+
+recovery_colours <- c(
+  "1"     = "#07519A",
+  "0.875" = "#1D6AAC",
+  "0.75"  = "#3382BE",
+  "0.625" = "#4F98CA",
+  "0.5"   = "#6BAED6",
+  "0.375" = "#94C2DF",
+  "0.25"  = "#BDD7E8",
+  "0.125" = "#D6E5F4"
+)
+
+
+# =========================================================================
+# 01 - LINEAR RECOVERY
+# =========================================================================
+
+# Generate x values for each recovery index
+# Lines stop when y reaches 50
+
+linear_data <- recovery_levels %>%
+  rowwise() %>%
+  mutate(
+    x = list(
+      seq(
+        0,
+        (starting_value - 50) / (50 / 9)
+      )
+    )
+  ) %>%
+  unnest(x) %>%
+  mutate(
+    y = -(50 / 9) * x + starting_value
+  ) %>%
+  ungroup()
+
+
+# Plot linear recovery ----------------------------------------------------
+
+linear_plot <- ggplot(
+  linear_data,
+  aes(
+    x = x,
+    y = y,
+    colour = factor(recovery_index)
+  )
+) +
+  geom_line(
+    linewidth = 1
+  ) +
+  geom_hline(
+    yintercept = 50,
+    linetype = "dashed"
+  ) +
+  labs(
+    x = "Recovery Duration (Months)",
+    y = "Impacts Relative to a 1 in 50 Year Impact",
+    colour = "Recovery Index"
+  ) +
+  scale_colour_manual(
+    values = recovery_colours,
+    breaks = c(1, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125)
+  ) +
+  scale_x_continuous(
+    limits = c(0, 36),
+    breaks = seq(0, 36, 9),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(0, NA),
+    expand = c(0, 0)
+  ) +
+  theme_classic()
+
+
+# Display plot
+linear_plot
+
+
+# =========================================================================
+# 02 - NON-LINEAR RECOVERY
+# =========================================================================
+
+# Generate x values for each recovery index
+# Lines stop when y reaches 50
+
+nonlinear_data <- recovery_levels %>%
+  rowwise() %>%
+  mutate(
+    x = list(
+      seq(
+        0,
+        36 * log(50 / starting_value) / log(0.2)
+      )
+    )
+  ) %>%
+  unnest(x) %>%
+  mutate(
+    y = starting_value * 0.2^(x / 36)
+  ) %>%
+  ungroup()
+
+
+# Plot non-linear recovery ------------------------------------------------
+
+nonlinear_plot <- ggplot(
+  nonlinear_data,
+  aes(
+    x = x,
+    y = y,
+    colour = factor(recovery_index)
+  )
+) +
+  geom_line(
+    linewidth = 1
+  ) +
+  geom_hline(
+    yintercept = 50,
+    linetype = "dashed"
+  ) +
+  labs(
+    x = "Recovery Duration (Months)",
+    y = "Impacts Relative to a 1 in 50 Year Impact",
+    colour = "Recovery Index"
+  ) +
+  scale_colour_manual(
+    values = recovery_colours,
+    breaks = c(1, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125)
+  ) +
+  scale_x_continuous(
+    limits = c(0, 36),
+    breaks = seq(0, 36, 9),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(0, NA),
+    expand = c(0, 0)
+  ) +
+  theme_classic()
+
+
+# Display plot
+nonlinear_plot
+
+
+# =========================================================================
+# 03 - CONTINUOUS LINEAR RECOVERY GRADIENT
+# =========================================================================
+
+# Generate many recovery index values
+# Each recovery index is represented by a thin line.
+#
+# A very fine interval is used so the lines visually form a
+# continuous gradient from recovery index 0 to 1.
+
+linear_gradient_data <- expand_grid(
+  recovery_index = seq(0, 1, by = 0.002),
+  x = seq(0, 36, by = 0.05)
+) %>%
+  mutate(
+    starting_value = 50 + 200 * recovery_index,
+    y = starting_value - (50 / 9) * x
+  ) %>%
+  filter(y >= 50)
+
+
+# Plot continuous linear recovery gradient -------------------------------
+
+linear_gradient_plot <- ggplot(
+  linear_gradient_data,
+  aes(
+    x = x,
+    y = y,
+    group = recovery_index,
+    colour = recovery_index
+  )
+) +
+  geom_line(
+    linewidth = 0.25
+  ) +
+  geom_hline(
+    yintercept = 50,
+    linetype = "dashed"
+  ) +
+  labs(
+    x = "Recovery Duration (Months)",
+    y = "Impacts Relative to a 1 in 50 Year Impact",
+    colour = "Recovery Index"
+  ) +
+  scale_colour_gradientn(
+    colours = c(
+      "#F0F3FF",
+      "#BDD7E8",
+      "#6BAED6",
+      "#3382BE",
+      "#07519A"
+    ),
+    values = c(0, 0.25, 0.50, 0.75, 1),
+    limits = c(0, 1),
+    breaks = c(0, 0.25, 0.50, 0.75, 1),
+    guide = guide_colorbar(
+      barheight = grid::unit(4.2, "cm"),
+      barwidth = grid::unit(0.4, "cm")
+    )
+  ) +
+  scale_x_continuous(
+    limits = c(0, 36),
+    breaks = seq(0, 36, 9),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(0, NA),
+    expand = c(0, 0)
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "right",
+    legend.justification = "center"
+  )
+
+
+# Display plot
+linear_gradient_plot
+
+
+# =========================================================================
+# 04 - CONTINUOUS NON-LINEAR RECOVERY GRADIENT
+# =========================================================================
+
+# Generate many recovery index values
+# Each recovery index is represented by a thin line.
+#
+# A very fine interval is used so the lines visually form a
+# continuous gradient from recovery index 0 to 1.
+
+nonlinear_gradient_data <- expand_grid(
+  recovery_index = seq(0, 1, by = 0.002),
+  x = seq(0, 36, by = 0.05)
+) %>%
+  mutate(
+    starting_value = 50 + 200 * recovery_index,
+    y = starting_value * 0.2^(x / 36)
+  ) %>%
+  filter(y >= 50)
+
+
+# Plot continuous non-linear recovery gradient ---------------------------
+
+nonlinear_gradient_plot <- ggplot(
+  nonlinear_gradient_data,
+  aes(
+    x = x,
+    y = y,
+    group = recovery_index,
+    colour = recovery_index
+  )
+) +
+  geom_line(
+    linewidth = 0.25
+  ) +
+  geom_hline(
+    yintercept = 50,
+    linetype = "dashed"
+  ) +
+  labs(
+    x = "Recovery Duration (Months)",
+    y = "Impacts Relative to a 1 in 50 Year Impact",
+    colour = "Recovery Index"
+  ) +
+  scale_colour_gradientn(
+    colours = c(
+      "#F0F3FF",
+      "#BDD7E8",
+      "#6BAED6",
+      "#3382BE",
+      "#07519A"
+    ),
+    values = c(0, 0.25, 0.50, 0.75, 1),
+    limits = c(0, 1),
+    breaks = c(0, 0.25, 0.50, 0.75, 1),
+    guide = guide_colorbar(
+      barheight = grid::unit(4.2, "cm"),
+      barwidth = grid::unit(0.4, "cm")
+    )
+  ) +
+  scale_x_continuous(
+    limits = c(0, 36),
+    breaks = seq(0, 36, 9),
+    expand = c(0, 0)
+  ) +
+  scale_y_continuous(
+    limits = c(0, NA),
+    expand = c(0, 0)
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "right",
+    legend.justification = "center"
+  )
+
+
+# Display plot
+nonlinear_gradient_plot
+
+
+# =========================================================================
+# 05 - SAVE RECOVERY MODEL FIGURES
+# =========================================================================
+
+# Define output directory
+recovery_model_dir <- "C:/Users/morga/OneDrive - The University of Waikato/Masters Thesis/Thesis/Recovery Index"
+
+
+# -------------------------------------------------------------------------
+# Recovery Linear
+# -------------------------------------------------------------------------
+
+ggsave(
+  filename = file.path(recovery_model_dir, "Recovery Linear.png"),
+  plot = linear_plot,
+  width = 8,
+  height = 6,
+  units = "in",
+  dpi = 600
+)
+
+
+# -------------------------------------------------------------------------
+# Recovery Nonlinear
+# -------------------------------------------------------------------------
+
+ggsave(
+  filename = file.path(recovery_model_dir, "Recovery Nonlinear.png"),
+  plot = nonlinear_plot,
+  width = 8,
+  height = 6,
+  units = "in",
+  dpi = 600
+)
+
+
+# -------------------------------------------------------------------------
+# Recovery Linear Continuous
+# -------------------------------------------------------------------------
+
+ggsave(
+  filename = file.path(
+    recovery_model_dir,
+    "Recovery Linear Continuous.png"
+  ),
+  plot = linear_gradient_plot,
+  width = 8,
+  height = 6,
+  units = "in",
+  dpi = 600
+)
+
+
+# -------------------------------------------------------------------------
+# Recovery Nonlinear Continuous
+# -------------------------------------------------------------------------
+
+ggsave(
+  filename = file.path(
+    recovery_model_dir,
+    "Recovery Nonlinear Continuous.png"
+  ),
+  plot = nonlinear_gradient_plot,
+  width = 8,
+  height = 6,
+  units = "in",
+  dpi = 600
+)
+
